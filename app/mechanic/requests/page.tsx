@@ -60,7 +60,7 @@ export default async function Opportunities({ searchParams }: { searchParams: Pr
             <p>No new repair requests. Requests that fit your repairs and area appear here and in Notifications.</p>
           ) : (
             <p>
-              No requests yet. Clutch only sends you requests once your profile and screening are complete ({ready.done} of {ready.steps.length} steps done).{" "}
+              No requests yet. Clutch sends you requests once your profile is complete ({ready.done} of {ready.steps.length} steps done).{" "}
               <Link href="/mechanic" className="font-semibold text-ink underline decoration-rule underline-offset-2">
                 See what&apos;s left
               </Link>

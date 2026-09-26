@@ -22,7 +22,7 @@ export default async function SavedMechanics() {
     <div className="space-y-8">
       <div className="border-b-2 border-ink pb-4">
         <h1 className="display text-[2rem] sm:text-[2.5rem]">Saved Mechanics</h1>
-        <p className="mt-1 text-ink-2">The people you trust with your car. Booking them again goes straight to them.</p>
+        <p className="mt-1 text-ink-2">Mechanics you&apos;ve saved. Booking them again goes straight to them.</p>
       </div>
       {ids.length === 0 && (
         <p className="border-y border-rule py-6 text-ink-3">

@@ -51,7 +51,7 @@ export default async function Welcome({ searchParams }: { searchParams: Promise<
             </span>
             <span className="min-w-0 flex-1">
               <span className="heading block text-[1.375rem]">I need a mechanic</span>
-              <span className="mt-0.5 block text-[0.9375rem] text-ink-2">Find someone you can trust to fix your car.</span>
+              <span className="mt-0.5 block text-[0.9375rem] text-ink-2">Find a mechanic for your car and see what Clutch has verified about them.</span>
             </span>
             <ArrowRight size={20} className="shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden />
           </button>

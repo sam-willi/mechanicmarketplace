@@ -61,9 +61,9 @@ export type PickKind = "best" | "soonest" | "both";
 export type TopPick<T> = { row: T; kind: PickKind; title: string; definition: string };
 
 export const PICK_COPY: Record<PickKind, { title: string; definition: (c: string) => string }> = {
-  best: { title: "Best Fit", definition: (c) => `Most verified experience with ${c || "this job"}.` },
-  soonest: { title: "Soonest Strong Fit", definition: (c) => `The earliest opening among mechanics with strong verified ${c || "relevant"} experience.` },
-  both: { title: "Best Fit · soonest available", definition: (c) => `Most verified experience with ${c || "this job"}, and no strong fit can come sooner.` },
+  best: { title: "Best Fit", definition: (c) => `Most Clutch-verified repairs like ${c || "this job"}.` },
+  soonest: { title: "Soonest Strong Fit", definition: (c) => `The earliest opening among mechanics with several Clutch-verified ${c || "relevant"} repairs.` },
+  both: { title: "Best Fit · soonest available", definition: (c) => `Most Clutch-verified repairs like ${c || "this job"}, and no strong fit can come sooner.` },
 };
 
 const when = (p: PublicMechanicProfile) => {

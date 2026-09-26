@@ -12,7 +12,7 @@ import { BellLink, BottomNav, TopNav, type NavItem } from "@/components/app/nav"
 import { needsNewMechanic } from "@/lib/domain/status";
 
 /**
- * Customer Clutch: "Find someone you trust to fix your car."
+ * Customer Clutch: "Find a mechanic for your car and see what Clutch has verified."
  * Calm, low-density shell. No mechanic-business features live here.
  */
 export default async function CustomerLayout({ children }: { children: React.ReactNode }) {

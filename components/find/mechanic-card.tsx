@@ -133,8 +133,8 @@ export function RecommendationCard({ fit, ctx, profileHref, quoteHref, kind, tit
           </summary>
           <div className="pb-1 text-[0.875rem]">
             <p className="text-ink-2">
-              {definition} &ldquo;Verified experience&rdquo; means repairs confirmed on Clutch; it says nothing about the checks listed on the card. Ranked by that experience,
-              then full verification; price and payment never affect order.
+              {definition} &ldquo;Clutch-verified repairs&rdquo; are repairs confirmed on Clutch; they say nothing about the identity, background, driving record or
+              insurance checks listed on the card. Ranked by that experience, then full verification only at equal experience; price and payment never affect order.
             </p>
             <dl className="mt-2">
               {factors.map((f) => (

@@ -118,6 +118,9 @@ What the customer sees, in priority order. The profile follows this order top to
 
 1. **Identity** — is this person who they say they are? *Identity Verified* (vendor ID + selfie).
 2. **Safety** — are they safe to let near my car and home? *Background Check Passed*, *Driving Record Check Passed*, *Insurance Verified*. Shown as one compact "Screened" line, because it's the baseline, not the pitch.
+
+> **Superseded (2026-09-26):** there is no combined "Screened" line. Identity, background, driving record and insurance each show their own status (Verified, Pending, Not completed, Not verified, Expired, Could not be verified), and mechanics can be booked without them after the customer's acknowledgement. See PRODUCT.md.
+
 3. **Relevant proof** — have they done my repair on my car? Count per repair category and per make, crossed when context is known ("18 brake jobs · 6 on BMW").
 4. **Credentials** — certifications and employment, each with its source.
 5. **Outcomes** — verified rating (only from verified-repair reviews), per-dimension scores, repeat customers.

@@ -73,7 +73,7 @@ export default async function CustomerHome({ searchParams }: { searchParams: Pro
             <Wrench size={26} aria-hidden className="shrink-0" />
             <span className="min-w-0 flex-1">
               <span className="heading block text-[1.25rem] text-sheet">Describe the problem</span>
-              <span className="block text-[0.875rem] text-on-brand-2">{noSupply ? "Save a request for the first mechanic who fits." : "Get estimates from qualified mechanics."}</span>
+              <span className="block text-[0.875rem] text-on-brand-2">{noSupply ? "Save a request for the first mechanic who fits." : "Get estimates from available mechanics who match your car, repair and area."}</span>
             </span>
             <ArrowRight size={20} aria-hidden className="shrink-0 transition-transform group-hover:translate-x-0.5" />
           </Link>

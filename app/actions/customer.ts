@@ -232,7 +232,7 @@ export async function sendToReplacement(requestId: string, mechanicId: string) {
   redirect(`/customer/requests/${requestId}?sent=1`);
 }
 
-/** Or send it to a few more qualified mechanics and compare estimates. */
+/** Or send it to a few more mechanics who match the car, repair and area, and compare estimates. */
 export async function sendToMoreMechanics(requestId: string) {
   const repo = await getRepo();
   const { cid, n } = await customer();

@@ -192,7 +192,7 @@ export interface RepositoryCore {
   // ---- Customer writes ----
   /**
    * Posts a request. With `directTo` it goes only to that mechanic (requested from their profile);
-   * with `rebookOf` only to that returning mechanic; otherwise to a small set of qualified mechanics.
+   * with `rebookOf` only to that returning mechanic; otherwise to a small set of matching mechanics (complete profile, serves the area, fits the repair).
    */
   createRequest(
     input: Omit<RepairRequest, "id" | "status" | "createdAt" | "matchedMechanicIds" | "declinedBy" | "questions" | "interested" | "history"> & {

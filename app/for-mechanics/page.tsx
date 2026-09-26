@@ -23,7 +23,7 @@ export default function ForMechanics() {
           <div>
             <h1 className="display text-[2.75rem] sm:text-[4.25rem]">Your skill. Your proof. Your customers.</h1>
             <p className="mt-5 max-w-[52ch] text-[1.125rem] leading-relaxed text-ink-2">
-              Years of good work at a shop or dealership shouldn&apos;t stay with the shop. Clutch turns it into evidence you own, so strangers can trust you on day one of
+              Years of good work at a shop or dealership shouldn&apos;t stay with the shop. Clutch turns it into evidence you own, so strangers can check your record on day one of
               going independent.
             </p>
             <ul className="mt-8 space-y-2 text-[1.0625rem] font-semibold">
@@ -64,10 +64,10 @@ export default function ForMechanics() {
           </h2>
           <div className="mt-2 max-w-[68ch] space-y-2 text-ink-2">
             <p>
-              Clutch is new, and we&apos;re verifying our first mechanics in Los Angeles now. We can&apos;t promise a number of jobs yet. Customers describe their repair on
+              Clutch is new, and we&apos;re onboarding our first mechanics in Los Angeles now. We can&apos;t promise a number of jobs yet. Customers describe their repair on
               Clutch; once you&apos;re verified, the requests that fit your repairs and area are sent to you, including ones customers saved before you joined.
             </p>
-            <p>Joining now means your profile, screening and proof are in place when customers arrive.</p>
+            <p>Joining now means your profile, checks and proof are in place when customers arrive.</p>
           </div>
         </section>
 

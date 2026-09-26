@@ -208,7 +208,7 @@ A navy-and-brass cover around cream pages, with one verification ink and one hig
 ### Named Rules
 **The Numerals Carry the Force Rule.** Counts, ratings and prices are set heavy and tabular, and every count states its base underneath in meta type ("from 27 verified reviews").
 
-**The Field Label Rule.** Small caps labels name a field in a ruled cell (Your car, Screened, Estimate request). They are never decorative kickers above headlines.
+**The Field Label Rule.** Small caps labels name a field in a ruled cell (Your car, Checks, Estimate request). They are never decorative kickers above headlines.
 
 ## Layout
 

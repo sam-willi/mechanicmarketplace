@@ -387,7 +387,7 @@ export default async function CompareQuotes({
           )}
         </section>
       ) : !replacement && !job && !waiting && !cancelled ? (
-        <p className="mt-8 border-y border-rule py-6 text-ink-2">Sent to {plural(pending, "qualified mechanic")}. Their replies will appear on this page.</p>
+        <p className="mt-8 border-y border-rule py-6 text-ink-2">Sent to {plural(pending, "mechanic")} who {pending === 1 ? "matches" : "match"} your car, repair and area. Their replies will appear on this page, with which of their checks Clutch has verified.</p>
       ) : null}
 
       {!waiting && !cancelled && cancellable ? <ManageRequest r={r} editable={editable} /> : null}

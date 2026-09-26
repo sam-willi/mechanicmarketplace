@@ -18,7 +18,6 @@ import {
   submitInsurance,
 } from "@/app/actions/mechanic";
 import { Field, NeedsPersona, Notice, PageTitle, StatusPill } from "@/components/workspace/ui";
-import { completeness, profileSteps } from "@/lib/domain/completeness";
 
 export const metadata: Metadata = { title: "Verification Center" };
 
@@ -43,8 +42,6 @@ export default async function VerificationCenter({ searchParams }: { searchParam
     { kind: "insurance", v: latestFor("insurance"), applies: true },
   ];
 
-  const steps = profileSteps(pub, { hasPhoto: Boolean(src.mechanic.photoUrl), hasPricing: src.mechanic.hourlyRateCents > 0, shared: true });
-  const blocking = completeness(steps).blockingWork;
   const tracked = vers.filter((v) => v.category !== "past_repair");
   const totalItems = tracked.length + (safetyRows.filter((r) => r.applies && !r.v).length);
   const verifiedCount = tracked.filter((v) => ["verified", "reverification_required"].includes(effectiveStatus(v.status, v.expiresAt))).length;
@@ -71,11 +68,7 @@ export default async function VerificationCenter({ searchParams }: { searchParam
           <p className="font-bold">Complete verification to build customer trust.</p>
           <p className="mt-1 text-[0.9375rem] text-ink-2">
             Customers see a check for each thing you prove, and nothing else: never your documents or screening reports.{" "}
-            {blocking.length ? (
-              <span className="font-semibold text-ink">Required before you can send estimates for real work: {blocking.map((b) => b.label.toLowerCase()).join(", ")}.</span>
-            ) : (
-              "Your safety baseline is complete, so you can send estimates."
-            )}
+            None of these checks is required to send estimates or be booked. Customers see each one&apos;s status, and fully verified mechanics rank higher at equal experience.
           </p>
         </div>
       </section>

@@ -77,7 +77,7 @@ export function SiteFooter() {
       <div className="mx-auto grid max-w-[1200px] gap-6 px-4 py-10 text-[0.875rem] text-ink-2 sm:grid-cols-[1fr_auto] sm:px-6">
         <div className="space-y-2">
           <Wordmark />
-          <p className="max-w-[46ch]">One network, two products: find someone you trust to fix your car, or build your independent mechanic business. Launching in Los Angeles.</p>
+          <p className="max-w-[46ch]">One network, two products: find a mechanic for your car and see what Clutch has verified, or build your independent mechanic business. Launching in Los Angeles.</p>
         </div>
         <nav aria-label="Footer" className="grid grid-cols-2 gap-x-8 gap-y-2">
           <Link href="/customer/mechanics" className="hover:text-ink">Find a Mechanic</Link>

@@ -23,7 +23,7 @@ export type ReadinessStep = {
 
 /**
  * What stands between a mechanic and being sent requests, in the order to do it. Mirrors the
- * matching rule (lib/data/mock/repository.ts `qualifiedMechanics`): a base area and radius,
+ * matching rule (lib/data/mock/repository.ts `matchingMechanics`): a base area and radius,
  * repair types, pricing and availability. The four verification checks follow as optional
  * steps: customers see each one's status, and verified checks improve ranking, but none is
  * required to receive requests or be booked (policy of 2026-09-26).

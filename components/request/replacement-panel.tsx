@@ -62,7 +62,7 @@ export function ReplacementPanel({ r, rep }: { r: RepairRequest; rep: Replacemen
             <h3 className="field-label">{anyStrong ? `Likely good fits for ${rep.context}` : "Closest matches we have"}</h3>
             <p className="mt-1 max-w-[62ch] text-[0.875rem] text-ink-2">
               {anyStrong
-                ? "Picked the way Best Fit is: verified experience with this car and repair, screening current, serving your area. Nobody pays to appear here."
+                ? "Picked the way Best Fit is: Clutch-verified repairs on this car and repair, serving your area, with fully verified mechanics first only at equal experience. Each shows which checks Clutch has verified. Nobody pays to appear here."
                 : `No one else has strong verified experience with ${rep.context} yet. These are the closest, based on what's on their records.`}
             </p>
             <ul className="mt-3 grid gap-3 lg:grid-cols-3">
@@ -128,7 +128,7 @@ export function ReplacementPanel({ r, rep }: { r: RepairRequest; rep: Replacemen
         {rep.broaden.length > 1 ? (
           <form action={sendToMoreMechanics.bind(null, r.id)} className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-rule-soft pt-4">
             <p className="text-[0.875rem] text-ink-2">Would you rather compare prices?</p>
-            <button className="btn btn-quiet min-h-11">Send it to {rep.broaden.length} qualified mechanics</button>
+            <button className="btn btn-quiet min-h-11">Send it to {rep.broaden.length} more mechanics who match</button>
           </form>
         ) : null}
         <p className="text-[0.75rem] text-ink-3">The mechanic you send it to sees a new request. They aren&apos;t told who passed on it.</p>

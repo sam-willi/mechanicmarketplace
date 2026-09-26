@@ -680,7 +680,7 @@ export function RequestWizard({
                 <h3 id="preview-title" className="font-bold">
                   What mechanics will see
                 </h3>
-                <p className="text-[0.8125rem] text-ink-2">{target ? `Goes to ${target.displayName}${rebook ? " again" : " only"}` : saveOnly ? "Saved until a mechanic fits it" : "Goes to a few qualified mechanics"}</p>
+                <p className="text-[0.8125rem] text-ink-2">{target ? `Goes to ${target.displayName}${rebook ? " again" : " only"}` : saveOnly ? "Saved until a mechanic fits it" : "Goes to a few available mechanics who match your car, repair and area"}</p>
               </div>
               <dl className="grid gap-x-6 px-4 py-3 text-[0.9375rem] sm:grid-cols-2">
                 {(

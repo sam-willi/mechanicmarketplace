@@ -27,7 +27,7 @@ export const WAITING_BATCH = 200;
 
 /**
  * Bookable candidates (basic profile complete, verified or not) for the matching rule
- * (qualifiedMechanics): their rows, the records behind their checks, and their verified-repair
+ * (matchingMechanics): their rows, the records behind their checks, and their verified-repair
  * counts from the database. Never their repair documents. For one request, only mechanics who
  * could qualify for it are read (they do that repair type or have verified work on the repair or make).
  */

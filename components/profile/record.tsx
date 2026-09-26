@@ -69,7 +69,7 @@ export function RecordHeader({ p }: { p: PublicMechanicProfile }) {
   );
 }
 
-/** "Safe" — identity and baseline screening, as checked boxes on the form. */
+/** Identity, background, driving record and insurance: each with its own status, never summed up as "screened". */
 export function SafetyBox({ p }: { p: PublicMechanicProfile }) {
   const s = p.safety;
   const items = [
@@ -84,7 +84,7 @@ export function SafetyBox({ p }: { p: PublicMechanicProfile }) {
         <ProvenanceMark detail={safetyEvidence("identity", s.identity, p.firstName)} size="md" className="mt-1.5" />
       </div>
       <div className="px-3.5 py-3">
-        <p className="field-label">Screened · safety baseline</p>
+        <p className="field-label">Other checks · each with its own status</p>
         <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
           {items.map((d) => (
             <ProvenanceMark key={d.title} detail={d} size="md" />

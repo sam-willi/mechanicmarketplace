@@ -22,7 +22,7 @@ export type Replacement = {
   /** Estimates the customer already has that are live again. */
   openQuotes: { q: Quote; p: PublicMechanicProfile }[];
   suggestions: Suggestion[];
-  /** Qualified mechanics who haven't seen it yet, for "send it to more mechanics". */
+  /** Matching mechanics who haven't seen it yet, for "send it to more mechanics". */
   broaden: ID[];
   context: string;
 };

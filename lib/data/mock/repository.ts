@@ -40,7 +40,7 @@ import { ACK_TEXT, checksNow, DISCLOSURE_VERSION, disclosureText, snapshotKey, t
 import type { MechanicProfile } from "@/lib/domain/types";
 import { isWaitingForMatch } from "@/lib/domain/status";
 
-/** How many qualified mechanics a posted request reaches. Small on purpose: no auction. */
+/** How many matching mechanics a posted request reaches. Small on purpose: no auction. */
 const MATCH_LIMIT = 4;
 import type { RepositoryCore } from "../repository";
 import { current, persistent } from "../store";
@@ -1231,7 +1231,7 @@ export class MockRepository implements RepositoryCore {
     let matched: ID[];
     if (directTo) matched = [directTo];
     else if (rest.rebookOf) matched = [rest.rebookOf];
-    else matched = this.qualifiedMechanics(rest.repairCategory, v.make, rest.location.area).slice(0, MATCH_LIMIT);
+    else matched = this.matchingMechanics(rest.repairCategory, v.make, rest.location.area).slice(0, MATCH_LIMIT);
     const req: RepairRequest = {
       ...rest,
       vehicleId,
@@ -1261,12 +1261,12 @@ export class MockRepository implements RepositoryCore {
   }
 
   /**
-   * Qualified = bookable under the shared rules (basic profile complete, lib/domain/eligibility.ts;
+   * Matching = bookable under the shared rules (basic profile complete, lib/domain/eligibility.ts;
    * verification is disclosed, not required), serves the area, and has verified experience with
    * this repair or make (or declares the repair type). Ordered by relevant verified experience,
    * then full verification; price is never an input.
    */
-  private qualifiedMechanics(category: RepairRequest["repairCategory"], make: Vehicle["make"], areaKey?: string): ID[] {
+  private matchingMechanics(category: RepairRequest["repairCategory"], make: Vehicle["make"], areaKey?: string): ID[] {
     const d = this.db();
     const area = findArea(areaKey);
     return d.mechanics
@@ -1350,7 +1350,7 @@ export class MockRepository implements RepositoryCore {
     if (r.status !== "open" || r.matchedMechanicIds.length) return 0;
     const v = this.getVehicle(r.vehicleId);
     if (!v) return 0;
-    const found = this.qualifiedMechanics(r.repairCategory, v.make, r.location.area)
+    const found = this.matchingMechanics(r.repairCategory, v.make, r.location.area)
       .filter((mid) => !r.declinedBy.includes(mid))
       .slice(0, MATCH_LIMIT);
     if (!found.length) return 0;

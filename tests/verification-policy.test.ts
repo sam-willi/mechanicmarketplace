@@ -243,3 +243,30 @@ test("a request saved while nobody fits goes to a new mechanic as soon as onboar
   const m = await live.upsertMechanicProfile({ userId: u!.id, displayName: "Morgan Newcomer", city: "Long Beach", neighborhood: "long-beach", serviceRadiusMi: 10, bio: "", workModel: "mobile", declaredRepairCategories: ["brakes"], declaredMakes: ["BMW"], hourlyRateCents: 9000, diagnosticFeeCents: 5000, availabilityNote: "Weekdays" });
   assert.deepEqual(live.getRequest(r.id)!.matchedMechanicIds, [m.id], "sent on first publish, no edit needed");
 });
+
+test("copy never vouches for mechanics as a group: no 'qualified', 'screened' or 'trust' claims in pages, components or domain text", async () => {
+  const { readdirSync, readFileSync, statSync } = await import("node:fs");
+  const files: string[] = [];
+  const walk = (d: string) => {
+    for (const f of readdirSync(d)) {
+      const p = `${d}/${f}`;
+      if (statSync(p).isDirectory()) walk(p);
+      else if (/\.(tsx?|mdx?)$/.test(f)) files.push(p);
+    }
+  };
+  for (const d of ["app", "components", "lib/domain"]) walk(d);
+  const banned = [/qualified mechanic/i, /screening current/i, /Screened ·/, /safety baseline/i, /someone you can trust/i, /vetted/i, /background[- ]checked mechanic/i, /verified mechanics? (near|in) /i, /someone (you|they) (can )?trust/i, /verifying our first mechanics/i];
+  const hits = files.flatMap((f) => readFileSync(f, "utf8").split("\n").map((line, i) => ({ f, i: i + 1, line })).filter(({ line }) => banned.some((b) => b.test(line))));
+  assert.deepEqual(hits.map((h) => `${h.f}:${h.i}: ${h.line.trim().slice(0, 100)}`), []);
+});
+
+test("no verification check is marked as required for work; the basic profile is what's required", async () => {
+  const { profileSteps } = await import("@/lib/domain/completeness");
+  const m = await unverifiedMechanic();
+  const steps = profileSteps(profileOf(m.id), { hasPhoto: false, hasPricing: true, shared: false });
+  const checks = steps.filter((s) => /identity|background|driving|insurance/i.test(s.label));
+  assert.equal(checks.length, 4);
+  assert.ok(checks.every((s) => !s.requiredForWork), "checks are optional");
+  assert.ok(checks.every((s) => /Not required to be booked/.test(s.why)));
+  assert.ok(!steps.some((s) => /^Required before/.test(s.why)));
+});
