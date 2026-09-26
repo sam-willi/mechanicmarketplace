@@ -26,15 +26,17 @@ export default function VerificationPage() {
       <main className="mx-auto max-w-[1000px] px-4 pt-10 sm:px-6 sm:pt-16">
         <h1 className="display max-w-[18ch] text-[2.5rem] sm:text-[3.75rem]">How Clutch verifies a mechanic.</h1>
         <p className="mt-5 max-w-[60ch] text-[1.125rem] leading-relaxed text-ink-2">
-          Two separate systems. Safety screening tells you a mechanic is who they say they are and safe to let near your car. Proven experience tells you they&apos;ve
-          actually done your kind of repair. Passing one never implies the other.
+          Two separate systems. Verification checks tell you what Clutch has confirmed about a mechanic&apos;s identity, background, driving record and insurance. Proven
+          experience tells you they&apos;ve actually done your kind of repair. One never implies the other.
         </p>
 
         <section className="mt-14 space-y-6">
           <div className="border-t-2 border-ink pt-3">
-            <h2 className="heading text-[1.75rem]">Safety screening</h2>
+            <h2 className="heading text-[1.75rem]">Verification checks</h2>
             <p className="mt-1 max-w-[62ch] text-ink-2">
-              The same kind of screening large gig and home-sharing platforms run on their providers, done by independent screening companies with the mechanic&apos;s consent.
+              Checks are run with the mechanic&apos;s consent. Mechanics can be booked before every check is verified: each profile, search result and estimate shows every
+              check&apos;s own status, and before you book a mechanic Clutch hasn&apos;t fully verified, you see exactly which checks are missing and confirm. Clutch
+              hasn&apos;t connected an independent screening company yet, so ID, background and driving record checks currently show as not completed for real mechanics.
             </p>
           </div>
           <ul className="border-t border-rule">

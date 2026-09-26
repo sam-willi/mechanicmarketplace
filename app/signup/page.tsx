@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SubmitButton } from "@/components/auth/submit-button";
+import { getAccount } from "@/lib/session";
+import { homeFor } from "@/lib/auth/provision";
+import { redirect } from "next/navigation";
 import { ArrowLeft, ArrowRight, Car, Wrench } from "lucide-react";
 import { signUpWithPassword } from "@/app/actions/account";
 import { VEHICLE_MAKES } from "@/lib/domain/types";
@@ -14,12 +18,19 @@ const SIGNUP_ERRORS: Record<string, string> = {
   missing: "Name and email are required.",
   missing_phone: "Mechanics need a mobile number so customers and Clutch can reach you about jobs.",
   weak_password: "Use a password with at least 8 characters.",
-  exists: "There's already an account with that email. Log in instead.",
+  exists: "There's already an account with that email. Log in instead, or reset your password.",
+  bad_email: "That email address doesn't look right. Check it and try again.",
+  too_many: "Too many attempts. Wait a few minutes and try again.",
+  unavailable: "We couldn't reach the sign-up service. Check your connection and try again.",
+  signup_closed: "New sign-ups are paused right now. Try again later.",
   signup_failed: "We couldn't create your account. Try again.",
 };
 
 export default async function SignupPage({ searchParams }: { searchParams: Promise<{ role?: string; next?: string; error?: string; email?: string; name?: string }> }) {
   const sp = await searchParams;
+  // Already signed in to a real account: go to it rather than sign up twice.
+  const acct = await getAccount();
+  if (acct && !acct.user.demo) redirect(homeFor(acct.user, sp.next));
   // Coming from the customer app (e.g. a car search), they're here as a customer.
   const role = sp.role === "mechanic" ? "mechanic" : sp.role === "customer" || sp.next?.startsWith("/customer") ? "customer" : null;
 
@@ -131,7 +142,9 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
                   </div>
                 </details>
               )}
-              <button className="btn btn-ink min-h-12 w-full text-[1rem]">{role === "customer" ? "Create account" : "Continue to your profile"}</button>
+              <SubmitButton className="btn btn-ink min-h-12 w-full text-[1rem]" pending="Creating your account…">
+                {role === "customer" ? "Create account" : "Continue to your profile"}
+              </SubmitButton>
               <p className="text-center text-[0.8125rem] text-ink-3">We&apos;ll email you a link to confirm your address.</p>
             </form>
           </>

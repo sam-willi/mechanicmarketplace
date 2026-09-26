@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, Check } from "lucide-react";
 import { notFound } from "next/navigation";
-import { ready, repo } from "@/lib/data";
-import { getSession } from "@/lib/session";
+import { getRepo } from "@/lib/data";
+import { getSession, needs } from "@/lib/session";
 import { REPAIR_LABEL, repairNoun } from "@/lib/domain/provenance";
 import { jobStatus, vehicleLine } from "@/lib/domain/intake";
 import { findArea, milesBetween } from "@/lib/domain/areas";
@@ -25,11 +25,12 @@ import { MediaThumb } from "@/components/request/media-capture";
 
 export const metadata: Metadata = { title: "Repair request" };
 
-export default async function RequestDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ blocked?: string; sent?: string }> }) {
-  await ready();
+export default async function RequestDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ blocked?: string; sent?: string; error?: string }> }) {
+  const repo = await getRepo();
   const s = await getSession();
   if (s.role !== "mechanic") return <NeedsPersona role="mechanic" />;
   const { id } = await params;
+  await (await needs(s)).mechanicRequest(id);
   const sp = await searchParams;
   const r = repo.getRequest(id);
   if (!r || !r.matchedMechanicIds.includes(s.mechanicId)) notFound();
@@ -63,25 +64,27 @@ export default async function RequestDetail({ params, searchParams }: { params: 
     .slice(0, 4)
     .map((o) => ({ date: o.on, time: parseTime(o.time) ?? "09:00" }));
   const firstOpening = openingSlots[0];
-  const initial: EstimateInput = draft
+  // A draft continues where it was left; a sent (not yet accepted) estimate can be revised from itself.
+  const base = draft ?? (mine?.status === "submitted" ? mine : undefined);
+  const initial: EstimateInput = base
     ? {
-        lines: draft.lineItems?.length
-          ? draft.lineItems
-          : [{ id: "l0", kind: "labor", label: "Labor", cents: draft.laborCents }, ...(draft.partsEstimateCents ? [{ id: "l1", kind: "part" as const, label: "Parts", cents: draft.partsEstimateCents }] : [])],
-        diagnosticFeeCents: draft.diagnosticFeeCents,
-        travelFeeCents: draft.travelFeeCents,
-        partsIncluded: draft.partsIncluded,
-        durationHours: draft.durationHours,
-        availableOn: draft.availableOn,
-        availableDate: (draft.availableAt ?? parseSlotText(draft.availableOn, today()))?.date ?? "",
-        availableTime: (draft.availableAt ?? parseSlotText(draft.availableOn, today()))?.time ?? "",
-        serviceMode: draft.serviceMode,
-        scope: draft.scope,
-        notes: draft.notes ?? "",
-        expiresOn: draft.expiresOn ?? inAWeek,
-        assumptions: draft.assumptions ?? "",
-        exclusions: draft.exclusions ?? "",
-        alternates: draft.alternates ?? [],
+        lines: base.lineItems?.length
+          ? base.lineItems
+          : [{ id: "l0", kind: "labor", label: "Labor", cents: base.laborCents }, ...(base.partsEstimateCents ? [{ id: "l1", kind: "part" as const, label: "Parts", cents: base.partsEstimateCents }] : [])],
+        diagnosticFeeCents: base.diagnosticFeeCents,
+        travelFeeCents: base.travelFeeCents,
+        partsIncluded: base.partsIncluded,
+        durationHours: base.durationHours,
+        availableOn: base.availableOn,
+        availableDate: (base.availableAt ?? parseSlotText(base.availableOn, today()))?.date ?? "",
+        availableTime: (base.availableAt ?? parseSlotText(base.availableOn, today()))?.time ?? "",
+        serviceMode: "mobile",
+        scope: base.scope,
+        notes: base.notes ?? "",
+        expiresOn: base.expiresOn ?? inAWeek,
+        assumptions: base.assumptions ?? "",
+        exclusions: base.exclusions ?? "",
+        alternates: base.alternates ?? [],
       }
     : {
         lines: [{ id: "l0", kind: "labor", label: fixed?.label ?? `${REPAIR_LABEL[r.repairCategory]} labor`, cents: fixed?.laborCents ?? m.hourlyRateCents * 2 }],
@@ -92,7 +95,7 @@ export default async function RequestDetail({ params, searchParams }: { params: 
         availableOn: m.nextAvailable,
         availableDate: firstOpening?.date ?? "",
         availableTime: firstOpening?.time ?? "",
-        serviceMode: m.workModel === "shop" || r.location.serviceMode === "shop" ? "shop" : "mobile",
+        serviceMode: "mobile",
         scope: "",
         notes: "",
         expiresOn: inAWeek,
@@ -116,6 +119,11 @@ export default async function RequestDetail({ params, searchParams }: { params: 
         <StatusBadge tone={status.tone}>{status.headline}</StatusBadge>
       </div>
 
+      {sp.error ? (
+        <p role="alert" className="border-l-4 border-alert bg-sheet px-4 py-3 text-[0.9375rem]">
+          {sp.error}
+        </p>
+      ) : null}
       {sp.sent ? <Notice tone="ok">Estimate sent. {first} gets a notification and sees it next to your verified record.</Notice> : null}
 
       {/* Your response: decide first, then the estimate, as one connected step. */}
@@ -126,7 +134,16 @@ export default async function RequestDetail({ params, searchParams }: { params: 
           <div className="border-2 border-brand-deep bg-sheet">
             <p className="flex items-center gap-2 bg-brand-deep px-5 py-3 font-bold text-on-brand">
               <Check size={18} className="text-brass" aria-hidden />
-              <span id="respond-title">Estimate {mine.status === "submitted" ? "sent" : mine.status === "accepted" ? "approved" : "not chosen"}</span>
+              <span id="respond-title">
+                Estimate{" "}
+                {mine.status === "submitted"
+                  ? `sent${(mine.version ?? 1) > 1 ? ` (version ${mine.version})` : ""}`
+                  : mine.status === "accepted"
+                    ? `approved (version ${mine.acceptedVersion ?? mine.version ?? 1})`
+                    : mine.status === "withdrawn"
+                      ? "withdrawn"
+                      : "not chosen"}
+              </span>
             </p>
             <div className="p-5">
               <p className="num text-[2.5rem]">{quoteTotals(mine).planFor}</p>
@@ -137,6 +154,27 @@ export default async function RequestDetail({ params, searchParams }: { params: 
               <p className="mt-1 text-[0.8125rem] text-ink-3">{mine.viewedAt ? `${first} viewed it ${dayMonth(mine.viewedAt)}` : `${first} hasn't opened it yet`}</p>
               <p className="mt-3 text-[0.9375rem]">{mine.scope}</p>
               {booked ? <p className="mt-3 text-[0.875rem] font-semibold">Booked: the address and access details are now shown below.</p> : null}
+              {mine.status === "submitted" && elig.eligible ? (
+                <details className="mt-4 border-t border-rule-soft pt-3">
+                  <summary className="min-h-11 cursor-pointer content-center font-semibold">Revise this estimate</summary>
+                  <p className="mt-1 text-[0.875rem] text-ink-2">
+                    {first} sees it as a new version, with this one kept. They have to accept the new version; once they accept, the estimate can&apos;t be changed.
+                  </p>
+                  <div className="mt-3">
+                    <EstimateBuilder
+                      requestId={r.id}
+                      customerFirst={first}
+                      initial={initial}
+                      hourlyRateCents={m.hourlyRateCents}
+                      canSend
+                      openings={openingSlots}
+                      revising
+                    />
+                  </div>
+                </details>
+              ) : booked ? (
+                <p className="mt-2 text-[0.8125rem] text-ink-3">An accepted estimate can&apos;t be changed. Extra work needs {first}&apos;s approval from the job page.</p>
+              ) : null}
             </div>
           </div>
         ) : interested ? (
@@ -160,10 +198,8 @@ export default async function RequestDetail({ params, searchParams }: { params: 
                 initial={initial}
                 hourlyRateCents={m.hourlyRateCents}
                 canSend={elig.eligible}
-                blockedReason={elig.eligible ? undefined : "You can keep writing and your draft saves, but sending is paused until your screening is current."}
+                blockedReason={elig.eligible ? undefined : `You can keep writing and your draft saves. Finish your profile to send it: ${elig.missing.map((x) => x.label.toLowerCase()).join(", ")}.`}
                 openings={openingSlots}
-                mobileAllowed={m.workModel !== "shop"}
-                shopAllowed={m.workModel !== "mobile"}
               />
             </div>
           </div>

@@ -30,7 +30,7 @@ export function inclusions(q: Pick<Quote, "diagnosticFeeCents" | "travelFeeCents
   const notIncluded: string[] = [];
   if (q.diagnosticFeeCents) included.push(`Diagnostic (${usd(q.diagnosticFeeCents)})`);
   else included.push("Diagnostic at no extra charge");
-  if (q.serviceMode === "mobile") included.push(q.travelFeeCents ? `Travel (${usd(q.travelFeeCents)})` : "Travel at no charge");
+  included.push(q.travelFeeCents ? `Travel (${usd(q.travelFeeCents)})` : "Travel at no charge");
   if (q.partsIncluded) included.push("Parts, at a fixed price");
   else notIncluded.push(q.partsEstimateCents ? `Parts: billed at cost, about ${usd(q.partsEstimateCents)}` : "Parts: billed at cost");
   if (q.exclusions) notIncluded.push(...q.exclusions.split(/\n|;/).map((x) => x.trim()).filter(Boolean));

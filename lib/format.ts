@@ -44,8 +44,5 @@ export function rating(n: number) {
   return (Math.round(n * 10) / 10).toFixed(1);
 }
 
-export const WORK_MODEL_LABEL = {
-  mobile: "Mobile mechanic",
-  shop: "Shop mechanic",
-  both: "Shop + mobile",
-} as const;
+/** Every Clutch mechanic is mobile (older records saying "shop" or "both" read the same). */
+export const WORK_MODEL_LABEL: Record<string, string> = { mobile: "Mobile mechanic" };

@@ -2,32 +2,34 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CreditCard, Eye, Lock } from "lucide-react";
-import { ready, repo } from "@/lib/data";
-import { getSession } from "@/lib/session";
+import { getRepo } from "@/lib/data";
+import { getSession, needs } from "@/lib/session";
 import { vehicleLine } from "@/lib/domain/intake";
 import { findArea, milesBetween } from "@/lib/domain/areas";
-import { jobValueCents, mechanicJobStatus } from "@/lib/domain/status";
+import { mechanicJobStatus } from "@/lib/domain/status";
 import { jobLifecycle } from "@/lib/domain/lifecycle";
-import { eligibility } from "@/lib/domain/eligibility";
 import { quoteTotals } from "@/lib/domain/quote";
-import { toPublicProfile } from "@/lib/domain/public-profile";
 import { usd } from "@/lib/format";
 import {
+  answerNewTimeAsMechanic,
   attachJobPhotos,
   cancelJobAsMechanic,
   markJobDone,
+  proposeNewTimeAsMechanic,
   recordDiagnosis,
+  reportPaymentAsMechanic,
   requestScopeChange,
   saveJobNotes,
   startJob,
 } from "@/app/actions/mechanic";
+import { HistoryList } from "@/components/app/history-list";
+import { EstimateVersions, PaymentFacts, PaymentFields, RescheduleBox, ScopeHistory } from "@/components/app/job-parts";
 import { RepairPhotoUploader } from "@/components/mechanic/photo-uploader";
 import { StatusChip } from "@/components/app/status-chip";
 import { ConfirmButton } from "@/components/app/confirm-button";
 import { DeclineForm } from "@/components/mechanic/decline-form";
 import { ConfirmDecide } from "@/components/mechanic/confirm-decide";
 import { LifecycleRail, NowPanel } from "@/components/app/job-lifecycle";
-import { EligibilityNotice } from "@/components/trust/eligibility-notice";
 import { RequestSummary } from "@/components/request/request-summary";
 import { VehicleSpecCard } from "@/components/vehicle/spec-card";
 import { configsFor, DRIVE_LABEL, ENGINES, TRANSMISSIONS } from "@/lib/vehicles/catalog";
@@ -35,11 +37,13 @@ import { MediaThumb } from "@/components/request/media-capture";
 
 export const metadata: Metadata = { title: "Job" };
 
-export default async function MechanicJob({ params }: { params: Promise<{ id: string }> }) {
-  await ready();
+export default async function MechanicJob({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string }> }) {
+  const repo = await getRepo();
   const s = await getSession();
   if (s.role !== "mechanic") return null;
   const { id } = await params;
+  await (await needs(s)).mechanicJob(id);
+  const sp = await searchParams;
   const j = repo.getJob(id);
   if (!j || j.mechanicId !== s.mechanicId) notFound();
   const m = repo.getMechanic(s.mechanicId)!;
@@ -51,12 +55,13 @@ export default async function MechanicJob({ params }: { params: Promise<{ id: st
   const status = mechanicJobStatus(j);
   const area = findArea(r.location.area);
   const first = c.displayName.split(" ")[0];
-  const open = j.status === "scheduled" || j.status === "in_progress";
   const past = repo.listCustomerHistory(c.id).filter((h) => h.mechanicId === m.id && h.jobId !== j.id);
   const { stages, current } = jobLifecycle(j, repo.getReviewForJob(j.id), { customer: first, mechanic: m.firstName }, "mechanic");
-  const elig = eligibility(toPublicProfile(repo.getMechanicSources(m.id)));
   const photos = j.photos ?? [];
   const scopePending = j.scopeChange?.status === "pending";
+  const approved = repo.approvedLaborAndFees(j);
+  // The customer sent it back: their words, shown until it's marked complete again.
+  const sentBack = j.status === "in_progress" ? [...(j.history ?? [])].reverse().find((h) => h.by === "customer" && h.action === "said it isn't finished") : undefined;
   // Open configuration items the mechanic can settle at completion (options from the factory data).
   const js = j.vehicleSpec ?? v.spec;
   const cfgs = configsFor(v.year, v.make, v.model);
@@ -81,9 +86,8 @@ export default async function MechanicJob({ params }: { params: Promise<{ id: st
       case "checked_in":
         return (
           <div className="space-y-3">
-            {!elig.eligible ? <EligibilityNotice e={elig} audience="mechanic" /> : null}
             <form action={startJob.bind(null, j.id)}>
-              <ConfirmButton disabled={!elig.eligible} message={`Check in and start now? ${first} gets a notification that you've arrived.`} className="btn btn-ink min-h-11 disabled:opacity-50">
+              <ConfirmButton message={`Check in and start now? ${first} gets a notification that you've arrived.`} className="btn btn-ink min-h-11 disabled:opacity-50">
                 Check in and start
               </ConfirmButton>
             </form>
@@ -150,8 +154,12 @@ export default async function MechanicJob({ params }: { params: Promise<{ id: st
               <p className="font-semibold">2. Final amount and notes</p>
               <label className="block">
                 <span className="field-label">Final amount for labor and fees ($)</span>
-                <input name="finalAmount" inputMode="decimal" defaultValue={q ? jobValueCents(j, q) / 100 + (j.scopeChange?.status === "approved" ? j.scopeChange.extraCents / 100 : 0) : undefined} className="input tnum mt-1" />
+                <input name="finalAmount" inputMode="decimal" defaultValue={q ? approved / 100 : undefined} className="input tnum mt-1" />
+                <span className="mt-1 block text-[0.8125rem] text-ink-3">
+                  {first} approved {usd(approved)} for labor and fees. If you enter more, {first} sees that it&apos;s above what they approved.
+                </span>
               </label>
+              <PaymentFields legend={`Has ${first} paid you? (optional)`} />
               {confirmables.length ? (
                 <fieldset className="border border-amber/60 bg-amber-wash/40 p-3">
                   <legend className="px-1 text-[0.875rem] font-bold">Confirm the car&apos;s configuration</legend>
@@ -186,7 +194,7 @@ export default async function MechanicJob({ params }: { params: Promise<{ id: st
                 Mark complete
               </ConfirmButton>
             </form>
-            {!j.scopeChange ? (
+            {!scopePending ? (
               <details className="border-t border-rule-soft pt-3">
                 <summary className="min-h-11 cursor-pointer content-center text-[0.875rem] font-semibold">Found more work? Ask {first} to approve it first</summary>
                 <form action={requestScopeChange.bind(null, j.id)} className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_9rem]">
@@ -218,7 +226,38 @@ export default async function MechanicJob({ params }: { params: Promise<{ id: st
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="min-w-0 space-y-6">
+          {sp.error ? (
+            <p role="alert" className="border-l-4 border-alert bg-sheet px-4 py-3 text-[0.9375rem]">
+              {sp.error}
+            </p>
+          ) : null}
+          {sentBack ? (
+            <p className="border-2 border-amber bg-amber-wash px-4 py-3 text-[0.9375rem]">
+              <span className="font-semibold">{first} says it isn&apos;t finished:</span> &ldquo;{sentBack.detail}&rdquo;
+            </p>
+          ) : null}
           <NowPanel current={current}>{action}</NowPanel>
+          {j.status === "scheduled" ? (
+            <RescheduleBox job={j} viewer="mechanic" otherName={first} propose={proposeNewTimeAsMechanic.bind(null, j.id)} answer={(accept) => answerNewTimeAsMechanic.bind(null, j.id, accept)} />
+          ) : null}
+          {q ? <EstimateVersions q={q} viewer="mechanic" /> : null}
+          <ScopeHistory job={j} />
+          {j.status === "awaiting_customer" || j.status === "completed" ? (
+            <section id="payment" className="scroll-mt-24 space-y-3">
+              <h2 className="heading text-[1.125rem]">Payment</h2>
+              {j.finalAmountCents !== undefined ? (
+                <p className="text-[0.9375rem]">
+                  Your final amount: <span className="font-bold">{usd(j.finalAmountCents)}</span>
+                  {j.finalExceedsApproved ? <span className="font-semibold text-alert"> · above the {usd(approved)} {first} approved</span> : null}
+                </p>
+              ) : null}
+              <PaymentFacts job={j} viewer="mechanic" otherName={first} />
+              <form action={reportPaymentAsMechanic.bind(null, j.id)} className="space-y-2">
+                <PaymentFields legend="Update payment" required />
+                <button className="btn btn-line min-h-11">Save payment note</button>
+              </form>
+            </section>
+          ) : null}
           <div className="sheet p-4">
             <VehicleSpecCard v={v} spec={j.vehicleSpec ?? v.spec} category={j.repairCategory} audience="mechanic" revealVin />
           </div>
@@ -232,8 +271,8 @@ export default async function MechanicJob({ params }: { params: Promise<{ id: st
           <p className="flex gap-2.5 border border-rule bg-sheet px-4 py-3 text-[0.875rem]">
             <CreditCard size={17} className="mt-0.5 shrink-0" aria-hidden />
             <span>
-              <span className="font-semibold">Payment:</span> collect it from {first} directly. Clutch records the final amount for your earnings and the repair record, but
-              doesn&apos;t process payments.
+              <span className="font-semibold">Payment:</span> collect it from {first} directly. Clutch records the amounts you both enter, as self-reported, but doesn&apos;t
+              process, hold or refund payments.
             </span>
           </p>
 
@@ -245,7 +284,7 @@ export default async function MechanicJob({ params }: { params: Promise<{ id: st
               ["Scope", q?.scope ?? j.title],
               ["Schedule", j.scheduledFor],
               ["Location", `${r.location.address ?? "Address to follow"}${area ? ` · ${area.label} · ${Math.round(milesBetween(m, area))} mi` : ""}`],
-              ["Access", r.location.accessInstructions ?? (r.location.serviceMode === "shop" ? "Customer brings it to your shop" : "Customer will be there")],
+              ["Access", r.location.accessInstructions ?? (r.location.accessAvailable === false ? "No one will be there" : "Customer will be there")],
             ].map(([k, val]) => (
               <div key={k} className="grid gap-1 border-b border-rule-soft py-3 sm:grid-cols-[9rem_minmax(0,1fr)]">
                 <dt className="field-label pt-0.5">{k}</dt>
@@ -292,7 +331,7 @@ export default async function MechanicJob({ params }: { params: Promise<{ id: st
             </div>
           </details>
 
-          {open && current?.key !== "confirmed" && (
+          {j.status === "scheduled" && current?.key !== "confirmed" && (
             <div className="border-t border-rule pt-4">
               <DeclineForm
                 danger
@@ -306,8 +345,9 @@ export default async function MechanicJob({ params }: { params: Promise<{ id: st
           )}
         </div>
 
-        <aside className="lg:sticky lg:top-6 lg:self-start">
+        <aside className="space-y-6 lg:sticky lg:top-6 lg:self-start">
           <LifecycleRail stages={stages} />
+          <HistoryList entries={j.history ?? []} names={{ mechanic: "You", customer: first }} title="History" />
         </aside>
       </div>
     </div>

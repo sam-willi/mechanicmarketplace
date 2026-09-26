@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ready, repo } from "@/lib/data";
-import { getSession } from "@/lib/session";
+import { getRepo } from "@/lib/data";
+import { getSession, needs } from "@/lib/session";
 import { REPAIR_LABEL } from "@/lib/domain/provenance";
 import { REPAIR_CATEGORIES, VEHICLE_MAKES, type PastRepair } from "@/lib/domain/types";
 import { monthYear } from "@/lib/format";
@@ -14,9 +14,10 @@ import { Tick } from "@/components/trust/marks";
 export const metadata: Metadata = { title: "Repair record" };
 
 export default async function RepairsPage() {
-  await ready();
+  const repo = await getRepo();
   const s = await getSession();
   if (s.role !== "mechanic") return <NeedsPersona role="mechanic" />;
+  await (await needs(s)).ownSources();
   const src = repo.getMechanicSources(s.mechanicId);
   const confs = repo.listConfirmations(s.mechanicId);
   const byDate = (a: PastRepair, b: PastRepair) => (a.performedOn < b.performedOn ? 1 : -1);
@@ -115,10 +116,10 @@ export default async function RepairsPage() {
                   {pc ? (
                     <div className="space-y-1.5 text-[0.875rem]">
                       <p className="text-ink-2">
-                        Confirmation sent to {pc.contactName} on {monthYear(pc.sentAt)}. Waiting for their answer.
+                        Confirmation link for {pc.contactName}, created {monthYear(pc.sentAt)}. Waiting for their answer.
                       </p>
                       <p className="text-ink-3">
-                        Demo: SMS isn&apos;t sent. Open the link they&apos;d receive:{" "}
+                        Clutch doesn&apos;t send texts or emails yet. Send them this link yourself:{" "}
                         <Link href={`/confirm/${pc.token}`} className="link text-ink">
                           /confirm/{pc.token}
                         </Link>
@@ -130,7 +131,7 @@ export default async function RepairsPage() {
                     <form action={requestConfirmation.bind(null, r.id)} className="grid gap-2 sm:grid-cols-[8rem_minmax(0,1fr)_auto]">
                       <input name="contactName" placeholder="First name" className="input min-h-11 py-1 text-sm" required />
                       <input name="contact" placeholder="Phone or email" className="input min-h-11 py-1 text-sm" required />
-                      <button className="btn btn-line min-h-11 text-sm">Ask to confirm</button>
+                      <button className="btn btn-line min-h-11 text-sm">Create confirmation link</button>
                       {d ? <p className="text-[0.8125rem] text-alert sm:col-span-3">{d.contactName} didn&apos;t recognise this repair last time.</p> : null}
                     </form>
                   )}

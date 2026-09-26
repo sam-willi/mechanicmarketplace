@@ -37,7 +37,6 @@ export function draftToRequest(draft: IntakeDraft, customerId: string, saved: Ve
   const lights = draft.warningLights.includes("None") && draft.warningLights.length > 1 ? draft.warningLights.filter((l) => l !== "None") : draft.warningLights;
   const known = REPAIR_CATEGORIES.includes(draft.knownService as RepairCategory) ? (draft.knownService as RepairCategory) : undefined;
   const text = [draft.symptomDescription, draft.suspectedIssue, draft.soundKinds.join(" "), draft.smells.join(" ")].join(" ");
-  const mobile = draft.serviceMode === "mobile";
   const priorPrice = Math.round((Number(draft.priorPrice.replace(/[^0-9.]/g, "")) || 0) * 100) || undefined;
   const yes = (x: string) => x === "yes";
 
@@ -73,16 +72,16 @@ export function draftToRequest(draft: IntakeDraft, customerId: string, saved: Ve
         : undefined,
     customerParts: yes(draft.hasParts) ? draft.parts.filter((x) => x.description.trim()) : [],
     location: {
-      serviceMode: mobile ? ("mobile" as const) : ("shop" as const),
+      serviceMode: "mobile" as const,
       area: findArea(draft.area)?.key,
-      address: mobile ? draft.address.trim() || undefined : undefined,
-      parkingType: mobile ? draft.parkingType || undefined : undefined,
-      flatGround: mobile ? draft.flatGround || undefined : undefined,
-      workSpace: mobile ? draft.workSpace || undefined : undefined,
-      repairsAllowed: mobile ? draft.repairsAllowed || undefined : undefined,
+      address: draft.address.trim() || undefined,
+      parkingType: draft.parkingType || undefined,
+      flatGround: draft.flatGround || undefined,
+      workSpace: draft.workSpace || undefined,
+      repairsAllowed: draft.repairsAllowed || undefined,
       notes: draft.locationNotes.trim() || undefined,
       accessAvailable: draft.accessAvailable ? yes(draft.accessAvailable) : undefined,
-      accessInstructions: mobile ? draft.accessInstructions.trim() || undefined : undefined,
+      accessInstructions: draft.accessInstructions.trim() || undefined,
     },
     urgency: draft.urgency || undefined,
     preferredTimes: draft.preferredTimes.trim() || undefined,

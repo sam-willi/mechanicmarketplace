@@ -1,6 +1,6 @@
 "use server";
 
-import { ready, repo } from "@/lib/data";
+import { getRepo } from "@/lib/data";
 import { getSession, getSessionId } from "@/lib/session";
 import type { AnalyticsEventName, EvidenceVariant } from "@/lib/domain/types";
 
@@ -16,7 +16,7 @@ export async function trackClient(
   name: AnalyticsEventName,
   props: { mechanicId?: string; variant?: EvidenceVariant; [k: string]: string | number | boolean | undefined },
 ) {
-  await ready();
+  const repo = await getRepo();
   if (!CLIENT_EVENTS.includes(name)) return;
   const session = await getSession();
   const sessionId = await getSessionId();

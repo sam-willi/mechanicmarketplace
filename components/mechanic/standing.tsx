@@ -42,10 +42,11 @@ export function Standing({ p, steps }: { p: PublicMechanicProfile; steps: Profil
         )}
       </div>
       <div className={`${box} ${e.tone === "stop" ? "border-alert" : e.tone === "warn" ? "border-amber" : ""}`}>
-        <p className="field-label">Safety screening</p>
+        <p className="field-label">Verification checks</p>
         <p className={`mt-1 font-bold ${e.tone === "stop" ? "text-alert" : e.tone === "warn" ? "text-amber" : ""}`}>
-          {e.eligible ? (e.tone === "warn" ? "You can quote and be booked. Renewal due." : "You can quote and be booked") : "You can't quote or be booked yet"}
+          {!e.eligible ? "Finish your profile to be booked" : e.fullyVerified ? "All checks verified" : `${e.checks.length - e.unverified.length} of ${e.checks.length} checks verified`}
         </p>
+        <p className="text-[0.8125rem] text-ink-2">Checks aren&apos;t required to be booked. Customers see each one, and verified checks improve your ranking.</p>
         <ul className="mt-2 space-y-1 text-[0.8125rem]">
           {items.map((i) => {
             const S = SCREENING_STYLE[i.state];
@@ -59,7 +60,7 @@ export function Standing({ p, steps }: { p: PublicMechanicProfile; steps: Profil
                       ? "text-carbon"
                       : i.state === "expiring"
                         ? "text-amber"
-                        : i.state === "expired" || i.state === "rejected"
+                        : i.state === "expired" || i.state === "rejected" || i.state === "unavailable" || i.state === "pending" || i.state === "missing"
                           ? "text-alert"
                           : "text-ink-3"
                   }

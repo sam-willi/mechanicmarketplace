@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { ready, repo } from "@/lib/data";
-import { getAccount, getAuthUser, getSession } from "@/lib/session";
+import { getRepo } from "@/lib/data";
+import { getAccount, getAuthUser, getSession, needs } from "@/lib/session";
 import { addCustomerRole } from "@/app/actions/account";
 import { Wordmark } from "@/components/brand/wordmark";
 import { AccountMenu } from "@/components/app/account-menu";
@@ -16,7 +16,7 @@ import { needsNewMechanic } from "@/lib/domain/status";
  * Calm, low-density shell. No mechanic-business features live here.
  */
 export default async function CustomerLayout({ children }: { children: React.ReactNode }) {
-  await ready();
+  const repo = await getRepo();
   const s = await getSession();
   const path = (await headers()).get("x-clutch-path") ?? "/customer";
   const switched = (await headers()).get("x-clutch-switched") === "customer" ? "customer" : "";
@@ -49,6 +49,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
     );
   }
 
+  await (await needs(s)).customerShell();
   const unread = repo.listNotifications(s.userId, "customer").filter((n) => !n.read).length;
   // Requests that need the customer: new estimates to compare, or a pick who couldn't take it.
   const needsYou = repo

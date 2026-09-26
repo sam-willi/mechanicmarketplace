@@ -1,4 +1,4 @@
-import { CalendarClock, ChevronDown, MapPin, ShieldAlert, ShieldCheck } from "lucide-react";
+import { CalendarClock, MapPin, ShieldAlert, ShieldCheck } from "lucide-react";
 import { StarRating } from "@/components/visual/stars";
 import type { PublicMechanicProfile } from "@/lib/domain/public-profile";
 import type { FitInput } from "@/lib/domain/recommend";
@@ -24,7 +24,7 @@ export function TrustOverview({ p, fit, ctx }: { p: PublicMechanicProfile; fit: 
   const s = screeningSummary(p);
   const o = soonest(p.openings);
   const place = p.neighborhood ? `${p.neighborhood}, ${p.city}` : p.city;
-  const reach = p.workModel === "shop" ? "at their shop" : `within ${p.serviceRadiusMi} mi`;
+  const reach = `comes to you within ${p.serviceRadiusMi} mi`;
   const job = [ctx.make, ctx.repair ? repairNoun(ctx.repair, 1) : "repair"].filter(Boolean).join(" ");
   const strong = dom ? isStrongFit(fit, ctx) : false;
   const rating = r.rating ? `${r.rating.average.toFixed(1)} from ${r.rating.count} verified reviews` : "No verified reviews yet";
@@ -102,19 +102,19 @@ export function TrustOverview({ p, fit, ctx }: { p: PublicMechanicProfile; fit: 
         ))}
       </dl>
 
-      <details className="group border-y border-rule-soft">
-        <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 text-[0.9375rem] [&::-webkit-details-marker]:hidden">
+      {/* Each check always visible: never folded into one badge. */}
+      <div className="border-y border-rule-soft py-3">
+        <p className="flex items-center gap-2 text-[0.9375rem]">
           {s.current ? <ShieldCheck size={18} className="text-carbon" aria-hidden /> : <ShieldAlert size={18} className="text-amber" aria-hidden />}
           <span>
-            <span className="font-semibold">Safety screening:</span> {s.ok} of {s.total} current
+            <span className="font-semibold">Clutch verification:</span> {s.ok} of {s.total} checks verified
           </span>
-          <ChevronDown size={16} className="ml-auto text-ink-3 transition-transform group-open:rotate-180" aria-hidden />
-        </summary>
-        <div className="pb-3">
+        </p>
+        <div className="mt-2">
           <ScreeningList p={p} />
         </div>
-      </details>
-      {!e.eligible ? <EligibilityNotice e={e} /> : null}
+      </div>
+      <EligibilityNotice e={e} />
     </section>
   );
 }

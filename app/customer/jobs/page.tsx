@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ready, repo } from "@/lib/data";
-import { getSession } from "@/lib/session";
+import { getRepo } from "@/lib/data";
+import { getSession, needs } from "@/lib/session";
+import { paginate, parseCursor } from "@/lib/data/page";
+import { Pager } from "@/components/app/pager";
 import { primarySymptom, vehicleLine } from "@/lib/domain/intake";
 import { customerRepairStatus } from "@/lib/domain/status";
 import { dayMonth, monthYear, usd } from "@/lib/format";
@@ -10,14 +12,22 @@ import { PhotoPrint } from "@/components/profile/photo";
 
 export const metadata: Metadata = { title: "My Repairs" };
 
+const DONE_PAGE = 20;
+const FINAL = ["completed", "cancelled"];
+
 const ORDER = ["Confirm Completion", "In Progress", "Scheduled", "Mechanic Selected", "Responses In", "Requested", "Completed", "Cancelled"];
 
-export default async function MyRepairs() {
-  await ready();
+export default async function MyRepairs({ searchParams }: { searchParams: Promise<{ before?: string }> }) {
+  const repo = await getRepo();
   const s = await getSession();
   if (s.role !== "customer") return null;
+  const before = parseCursor((await searchParams).before);
+  await (await needs(s)).customerRepairs(before, DONE_PAGE);
   const jobs = repo.listJobsForCustomer(s.customerId);
-  const requests = repo.listRequestsForCustomer(s.customerId);
+  const all = repo.listRequestsForCustomer(s.customerId);
+  // Finished repairs grow without limit: every unfinished one, then finished ones a page at a time.
+  const finished = paginate(all.filter((r) => FINAL.includes(r.status)), (r) => r.createdAt, DONE_PAGE, before);
+  const requests = [...(before ? [] : all.filter((r) => !FINAL.includes(r.status))), ...finished.items];
   const rows = requests
     .map((r) => {
       const job = jobs.find((j) => j.requestId === r.id);
@@ -62,8 +72,9 @@ export default async function MyRepairs() {
             </li>
           );
         })}
-        {rows.length === 0 && <li className="border-y border-rule py-5 text-ink-3">No repairs yet.</li>}
+        {rows.length === 0 && <li className="border-y border-rule py-5 text-ink-3">No repairs yet. When you approve an estimate, the booking and its paperwork are kept here.</li>}
       </ul>
+      <Pager href="/customer/jobs" next={finished.next} paged={Boolean(before)} olderLabel="Older repairs" />
       {history.length > 0 && (
         <section>
           <h2 className="heading text-[1.25rem]">Earlier Clutch repairs</h2>

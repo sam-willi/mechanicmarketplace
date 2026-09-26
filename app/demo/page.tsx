@@ -2,9 +2,9 @@ import { notFound } from "next/navigation";
 import { demoLoginsEnabled } from "@/lib/supabase/config";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ready, repo } from "@/lib/data";
+import { readyRepo } from "@/lib/data";
 import { getAccount } from "@/lib/session";
-import { demoSignIn } from "@/app/actions/account";
+import { demoSignIn, enterDemo } from "@/app/actions/account";
 import { SiteFooter, SiteHeader } from "@/components/site/site-header";
 
 export const metadata: Metadata = { title: "Demo accounts" };
@@ -25,9 +25,22 @@ function Account({ userId, mode, title, detail, current }: { userId: string; mod
   );
 }
 
+/** Opens a page inside the demo marketplace (sets the demo scope first). */
+function DemoLink({ next, children }: { next: string; children: React.ReactNode }) {
+  return (
+    <form action={enterDemo} className="contents">
+      <input type="hidden" name="next" value={next} />
+      <button type="submit" className="link text-left">
+        {children}
+      </button>
+    </form>
+  );
+}
+
 export default async function DemoPage() {
-  await ready();
   if (!demoLoginsEnabled()) notFound();
+  // The chooser lists the demo store's accounts, whichever marketplace this browser is in now.
+  const repo = await readyRepo("demo");
   const acct = await getAccount();
   const mechanics = repo.listPublicProfiles();
   const current = acct?.user.id;
@@ -36,10 +49,17 @@ export default async function DemoPage() {
     <>
       <SiteHeader />
       <main className="mx-auto max-w-[760px] px-4 pt-10 sm:px-6">
-        <h1 className="display text-[2.5rem]">Demo accounts</h1>
+        <p className="flex items-center gap-2 text-[0.8125rem] font-semibold text-ink-3">
+          <span className="border border-ink-3 px-1.5 text-[0.6875rem] font-extrabold tracking-[0.08em] uppercase">Demo</span>
+          Testing only
+        </p>
+        <h1 className="display mt-2 text-[2.5rem]">Demo accounts</h1>
         <p className="mt-3 max-w-[60ch] text-ink-2">
-          Shared sample accounts with fictional data, for trying Clutch without signing up. Anyone can use them, so don&apos;t enter anything real. One login can hold both roles;
-          Derek is set up that way, so you can switch between his mechanic and customer modes.
+          A separate, fictional marketplace for trying both sides of Clutch. Nothing here is real, and nothing you do here reaches real customers or mechanics. Anyone can use
+          these accounts, so don&apos;t enter anything real. One login can hold both roles; Derek is set up that way, so you can switch between his mechanic and customer modes.
+        </p>
+        <p className="mt-3 max-w-[60ch] text-[0.9375rem] text-ink-2">
+          Looking for a mechanic for your own car? <Link className="link" href="/signup">Create a real account</Link> instead.
         </p>
 
         <h2 className="field-label mt-10">Customer app</h2>
@@ -70,16 +90,16 @@ export default async function DemoPage() {
         <h2 className="field-label mt-12">Also try</h2>
         <ul className="mt-2 space-y-2 text-[0.9375rem]">
           <li>
-            <Link className="link" href="/signup">Sign up as a new customer or mechanic</Link>
+            <DemoLink next="/mechanics">Browse the demo marketplace without an account</DemoLink>
           </li>
           <li>
-            <Link className="link" href="/mechanics/derek-hall?repair=brakes&make=BMW">A public profile opened from a BMW brake-job link</Link>
+            <DemoLink next="/mechanics/derek-hall?repair=brakes&make=BMW">A public profile opened from a BMW brake-job link</DemoLink>
           </li>
           <li>
-            <Link className="link" href="/mechanics/derek-hall?variant=low">The low-evidence experiment arm</Link>
+            <DemoLink next="/mechanics/derek-hall?variant=low">The low-evidence experiment arm</DemoLink>
           </li>
           <li>
-            <Link className="link" href="/confirm/derek-c300">A past customer confirming a repair</Link>
+            <DemoLink next="/confirm/derek-c300">A past customer confirming a repair</DemoLink>
           </li>
         </ul>
       </main>

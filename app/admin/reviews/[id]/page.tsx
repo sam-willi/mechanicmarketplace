@@ -3,8 +3,8 @@ import Link from "next/link";
 import { ArrowLeft, Check, ExternalLink, FileText, MessageCircleQuestion, X } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { ready, repo } from "@/lib/data";
-import { getSession, isStaff } from "@/lib/session";
+import { getRepo } from "@/lib/data";
+import { getSession, isStaff, needs } from "@/lib/session";
 import { CATEGORY_LABEL, METHOD_LABEL, PROVENANCE, methodToProvenance } from "@/lib/domain/provenance";
 import type { VerificationCategory } from "@/lib/domain/types";
 import { screeningItems } from "@/lib/domain/eligibility";
@@ -25,7 +25,7 @@ const CHECKLIST: Record<VerificationCategory, string[]> = {
   insurance: [
     "Named insured matches the mechanic or their business",
     "Policy is active today",
-    "Coverage fits their work (mobile or garage liability)",
+    "Coverage fits mobile work at customers' locations",
     "Set “Valid until” to the policy end date",
   ],
   credential: ["Issuer and code match the document", "Name on it matches the mechanic", "Not expired: set “Valid until”", "Confirmed with the issuer where possible"],
@@ -34,7 +34,7 @@ const CHECKLIST: Record<VerificationCategory, string[]> = {
 };
 
 export default async function ReviewDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ done?: string; err?: string }> }) {
-  await ready();
+  const repo = await getRepo();
   const s = await getSession();
   if (!isStaff(s))
     return (
@@ -45,6 +45,7 @@ export default async function ReviewDetail({ params, searchParams }: { params: P
     );
   const { id } = await params;
   const sp = await searchParams;
+  await (await needs(s)).verificationReview(id);
   const v = repo.getVerification(id);
   if (!v) notFound();
   const m = repo.getMechanic(v.mechanicId)!;
@@ -58,21 +59,25 @@ export default async function ReviewDetail({ params, searchParams }: { params: P
   const isSafety = ["identity", "background", "driving_record", "insurance"].includes(v.category);
   const publicAs = isSafety ? "an outcome status only (never the details)" : `“${PROVENANCE[methodToProvenance(v.method)].label}”`;
   const decided = status === "verified" || status === "rejected";
+  // Started before a real screening provider was connected: nothing was checked, so it can't be approved.
+  const unrun = repo.unrunScreening(v);
 
   async function decide(formData: FormData) {
     "use server";
     const decision = String(formData.get("decision")) as "verified" | "rejected" | "needs_info";
     const s2 = await getSession();
     if (!isStaff(s2)) return;
+    // This action runs in its own request: read through that request's repository.
+    const repo = await getRepo();
+    const mechanicId = String(formData.get("mechanicId") ?? "");
     const notes = String(formData.get("notes") ?? "").trim();
     // The mechanic needs to know why: a reason is required for anything but approval.
     if (decision !== "verified" && !notes) redirect(`/admin/reviews/${id}?err=notes#decision`);
     await repo.decideVerification(id, decision, s2.userId, notes, String(formData.get("expiresAt") ?? "") || undefined);
     revalidatePath("/admin");
-    // Keep going: this mechanic's next item, then the oldest in the queue.
-    const pending = repo.listVerifications().filter((x) => x.id !== id && effectiveStatus(x.status, x.expiresAt) === "pending");
-    const next = pending.find((x) => x.mechanicId === v!.mechanicId) ?? pending.sort((a, b) => (a.submittedAt ?? "").localeCompare(b.submittedAt ?? ""))[0];
-    redirect(next ? `/admin/reviews/${next.id}?done=${decision}` : `/admin?f=queue&done=${decision}`);
+    // Keep going: this mechanic's next item, then the oldest in the queue (looked up, not loaded).
+    const next = await repo.nextPendingVerification(id, mechanicId, new Date().toISOString());
+    redirect(next ? `/admin/reviews/${next}?done=${decision}` : `/admin?f=queue&done=${decision}`);
   }
 
   const DONE: Record<string, { cls: string; icon: typeof Check; text: string }> = {
@@ -198,6 +203,7 @@ export default async function ReviewDetail({ params, searchParams }: { params: P
               <Notice>Waiting for the prior customer to respond to their link. You can still decide if needed.</Notice>
             ) : null}
             <form action={decide} className="mt-3 space-y-4 border-2 border-ink bg-sheet p-4">
+              <input type="hidden" name="mechanicId" value={m.id} />
               <p className="heading text-[1.25rem]">{decided ? "Change the decision" : "Your decision"}</p>
               {sp.err === "notes" ? (
                 <p role="alert" className="border-2 border-alert bg-alert-wash px-3 py-2 text-[0.875rem] font-semibold text-alert">
@@ -214,9 +220,15 @@ export default async function ReviewDetail({ params, searchParams }: { params: P
                 <span className="mt-1 block text-[0.75rem] text-ink-3">For certifications, insurance and screenings.</span>
               </label>
               <div className="grid gap-2.5">
-                <button name="decision" value="verified" className="flex min-h-14 items-center justify-center gap-2 border-2 border-go bg-go text-[1.0625rem] font-bold text-white hover:brightness-110">
-                  <Check size={22} strokeWidth={3} aria-hidden /> Approve
-                </button>
+                {unrun ? (
+                  <p className="border-2 border-amber bg-amber-wash px-3 py-2 text-[0.875rem]">
+                    No screening provider ran this check, so it can&apos;t be approved. Ask {m.firstName} to run it again once screening opens, or reject it.
+                  </p>
+                ) : (
+                  <button name="decision" value="verified" className="flex min-h-14 items-center justify-center gap-2 border-2 border-go bg-go text-[1.0625rem] font-bold text-white hover:brightness-110">
+                    <Check size={22} strokeWidth={3} aria-hidden /> Approve
+                  </button>
+                )}
                 <button name="decision" value="needs_info" className="flex min-h-12 items-center justify-center gap-2 border-2 border-amber bg-amber-wash font-bold text-amber hover:brightness-95">
                   <MessageCircleQuestion size={19} aria-hidden /> Ask for more info
                 </button>

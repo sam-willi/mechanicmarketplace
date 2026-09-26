@@ -37,12 +37,7 @@ export function PersonFacts({ p }: { p: PublicMechanicProfile }) {
 /** "Who" — the record header. */
 export function RecordHeader({ p }: { p: PublicMechanicProfile }) {
   const place = p.neighborhood ? `${p.neighborhood}, ${p.city}` : p.city;
-  const reach =
-    p.workModel === "shop"
-      ? "Shop only"
-      : p.workModel === "both"
-        ? `Shop, or comes to you within ${p.serviceRadiusMi} mi`
-        : `Comes to you within ${p.serviceRadiusMi} mi`;
+  const reach = `Comes to you within ${p.serviceRadiusMi} mi`;
   return (
     <div className="flex items-start gap-4 sm:gap-6">
       <div className="sm:hidden">
@@ -55,8 +50,7 @@ export function RecordHeader({ p }: { p: PublicMechanicProfile }) {
         <h1 className="display text-[2.125rem] text-ink sm:text-[3rem]">{p.displayName}</h1>
         {p.tagline ? <p className="mt-1.5 max-w-[52ch] text-[1rem] leading-snug text-ink-2 sm:text-[1.0625rem]">{p.tagline}</p> : null}
         <p className="mt-2 text-[0.9375rem] font-semibold text-ink">
-          {WORK_MODEL_LABEL[p.workModel]}
-          {p.shopName ? <span className="font-normal text-ink-2"> · {p.shopName.replace(" (demo)", "")}</span> : null}
+          {WORK_MODEL_LABEL.mobile}
         </p>
         <p className="mt-0.5 flex items-start gap-1 text-[0.875rem] text-ink-2">
           <MapPin size={14} strokeWidth={1.75} className="mt-[3px] shrink-0 text-ink-3" aria-hidden />

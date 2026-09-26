@@ -13,18 +13,23 @@ export type SearchValues = {
   model?: string;
   repair?: string;
   area?: string;
-  mode?: string;
   within?: string;
   maxMi?: string;
   lang?: string;
+  /** "1": fully verified only. */
+  verified?: string;
+  /** Checks that must be verified. */
+  check?: string[];
 };
 
-const YEARS = Array.from({ length: new Date().getFullYear() + 2 - 1990 }, (_, i) => String(new Date().getFullYear() + 1 - i));
-const MODES: Opt[] = [
-  { id: "", label: "Either" },
-  { id: "mobile", label: "Comes to me" },
-  { id: "shop", label: "At a shop" },
+const CHECKS: Opt[] = [
+  { id: "identity", label: "Identity" },
+  { id: "background", label: "Background check" },
+  { id: "driving_record", label: "Driving record" },
+  { id: "insurance", label: "Insurance" },
 ];
+
+const YEARS = Array.from({ length: new Date().getFullYear() + 2 - 1990 }, (_, i) => String(new Date().getFullYear() + 1 - i));
 const WITHIN: Opt[] = [
   { id: "", label: "Any time" },
   { id: "3", label: "Within 3 days" },
@@ -66,7 +71,7 @@ export function SearchBar({
   const set = (patch: SearchValues) => setV((cur) => ({ ...cur, ...patch }));
   const applied = variant === "results" && Boolean(initial.vehicle || initial.make || initial.repair || initial.area);
   const [editing, setEditing] = useState(!applied);
-  const extras = [initial.mode, initial.within, initial.maxMi, initial.lang].filter(Boolean).length;
+  const extras = [initial.within, initial.maxMi, initial.lang, initial.verified].filter(Boolean).length + (initial.check?.length ?? 0);
   const [more, setMore] = useState(false);
 
   const vehicleLabel = v.vehicle ? (vehicles.find((x) => x.id === v.vehicle)?.label ?? "Your vehicle") : [v.year, v.make, v.model].filter(Boolean).join(" ") || "";
@@ -77,15 +82,16 @@ export function SearchBar({
       vehicleLabel || "Any vehicle",
       label(repairs, v.repair) ?? "Any repair",
       label(areas, v.area) ?? "Anywhere in LA",
-      ...(v.mode ? [label(MODES, v.mode)!] : []),
       ...(v.within ? [label(WITHIN, v.within)!] : []),
       ...(v.maxMi ? [label(DISTANCE, v.maxMi)!] : []),
       ...(v.lang ? [v.lang] : []),
+      ...(v.verified === "1" ? ["Fully verified only"] : []),
+      ...(v.check?.length ? [`${v.check.map((c) => label(CHECKS, c)).join(", ")} verified`] : []),
     ];
     return (
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border border-rule bg-sheet px-4 py-3">
         <Search size={17} className="shrink-0 text-ink-3" aria-hidden />
-        <p className="min-w-0 flex-1 text-[1rem] font-semibold">
+        <p className="flex min-w-0 flex-1 flex-wrap text-[1rem] font-semibold">
           {parts.map((t, i) => (
             <span key={t + i} className="whitespace-nowrap">
               {i ? <span className="px-1.5 text-rule" aria-hidden>·</span> : null}
@@ -143,17 +149,41 @@ export function SearchBar({
             <SlidersHorizontal size={15} aria-hidden /> More filters{extras ? ` (${extras})` : ""}
             <ChevronDown size={15} className={`transition-transform ${more ? "rotate-180" : ""}`} aria-hidden />
           </button>
-          <div hidden={!more} className="mt-1 grid grid-cols-2 gap-px border border-rule bg-rule-soft lg:grid-cols-4">
-            <Select name="mode" label="Mobile or shop" options={MODES} value={v.mode} onChange={(x) => set({ mode: x })} />
+          <div hidden={!more} className="mt-1 grid grid-cols-2 gap-px border border-rule bg-rule-soft sm:grid-cols-3">
             <Select name="within" label="Availability" options={WITHIN} value={v.within} onChange={(x) => set({ within: x })} />
             <Select name="maxMi" label="Distance" options={DISTANCE} value={v.maxMi} onChange={(x) => set({ maxMi: x })} disabled={!v.area} />
             <Select
               name="lang"
               label="Language"
+              className="col-span-2 sm:col-span-1"
               options={[{ id: "", label: "Any language" }, ...languages.map((l) => ({ id: l, label: l }))]}
               value={v.lang}
               onChange={(x) => set({ lang: x })}
             />
+            <fieldset className={`${cell} col-span-2 sm:col-span-3`}>
+              <legend className="field-label float-left mb-1 w-full">Clutch verification</legend>
+              <p className="clear-both text-[0.8125rem] text-ink-2">By default every available mechanic is shown, each with which checks Clutch has and hasn&apos;t verified.</p>
+              <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2 text-[0.9375rem]">
+                <label className="inline-flex min-h-11 items-center gap-2 font-semibold">
+                  <input type="checkbox" name="verified" value="1" checked={v.verified === "1"} onChange={(e) => set({ verified: e.target.checked ? "1" : "" })} className="size-5 accent-brand" />
+                  Fully verified only
+                </label>
+                {CHECKS.map((c) => (
+                  <label key={c.id} className="inline-flex min-h-11 items-center gap-2">
+                    <input
+                      type="checkbox"
+                      name="check"
+                      value={c.id}
+                      checked={Boolean(v.check?.includes(c.id))}
+                      disabled={v.verified === "1"}
+                      onChange={(e) => set({ check: e.target.checked ? [...(v.check ?? []), c.id] : (v.check ?? []).filter((x) => x !== c.id) })}
+                      className="size-5 accent-brand"
+                    />
+                    {c.label} verified
+                  </label>
+                ))}
+              </div>
+            </fieldset>
           </div>
         </div>
       ) : null}
@@ -161,9 +191,9 @@ export function SearchBar({
   );
 }
 
-function Select({ name, label, options, value, onChange, disabled }: { name: string; label: string; options: Opt[]; value?: string; onChange: (v: string) => void; disabled?: boolean }) {
+function Select({ name, label, options, value, onChange, disabled, className = "" }: { name: string; label: string; options: Opt[]; value?: string; onChange: (v: string) => void; disabled?: boolean; className?: string }) {
   return (
-    <label className={cell}>
+    <label className={`${cell} ${className}`}>
       <span className="field-label">{label}</span>
       {/* An unset filter sends nothing, so URLs stay short. */}
       <select name={value ? name : undefined} value={value ?? ""} disabled={disabled} onChange={(e) => onChange(e.target.value)} className={SEARCH_CONTROL}>

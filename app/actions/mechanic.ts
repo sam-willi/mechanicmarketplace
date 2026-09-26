@@ -3,9 +3,11 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { ready, repo } from "@/lib/data";
+import { getRepo } from "@/lib/data";
+import { orBack } from "@/lib/lifecycle-action";
+import { LifecycleError } from "@/lib/domain/transitions";
 import { getMedia } from "@/lib/data/mock/media-store";
-import { getAccount, getSession, MODE_COOKIE, PERSONA_COOKIE } from "@/lib/session";
+import { getAccount, getSession, MODE_COOKIE, needs, PERSONA_COOKIE } from "@/lib/session";
 import { toPublicProfile } from "@/lib/domain/public-profile";
 import { eligibility } from "@/lib/domain/eligibility";
 import { DECLINE_REASONS } from "@/lib/domain/decline";
@@ -17,13 +19,19 @@ import {
   type RepairCategory,
   type ScreeningKind,
   type VehicleMake,
-  type WorkModel,
 } from "@/lib/domain/types";
 
 async function mechanicId() {
   const s = await getSession();
-  if (s.role !== "mechanic") throw new Error("Switch to a mechanic demo persona to do this.");
+  if (s.role !== "mechanic") throw new Error("Log in with a mechanic account to do this.");
   return s.mechanicId;
+}
+
+/** The signed-in mechanic and this request's loaders (their own records and requests sent to them only). */
+async function mechanic() {
+  const s = await getSession();
+  if (s.role !== "mechanic") throw new Error("Log in with a mechanic account to do this.");
+  return { id: s.mechanicId, n: await needs(s) };
 }
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -39,7 +47,7 @@ function refresh() {
 
 // ---------------------------------------------------------------- onboarding
 export async function saveOnboarding(formData: FormData) {
-  await ready();
+  const repo = await getRepo();
   const s = await getSession();
   const categories = formData.getAll("categories").map(String).filter((c): c is RepairCategory => REPAIR_CATEGORIES.includes(c as RepairCategory));
   const makes = formData.getAll("makes").map(String).filter((m): m is VehicleMake => VEHICLE_MAKES.includes(m as VehicleMake));
@@ -48,7 +56,7 @@ export async function saveOnboarding(formData: FormData) {
   if (!acct) redirect("/signup?role=mechanic");
   // A portrait uploaded during onboarding: only the uploader's own image.
   const photoMediaId = str(formData, "photoUrl").replace(/^\/api\/media\//, "");
-  const photo = photoMediaId ? await getMedia(photoMediaId) : undefined;
+  const photo = photoMediaId ? await getMedia(repo.scope, photoMediaId) : undefined;
   const photoUrl = photo && photo.ownerId === acct.user.id && photo.meta.contentType.startsWith("image/") ? photo.meta.url : undefined;
   const m = await repo.upsertMechanicProfile({
     id: s.role === "mechanic" && str(formData, "mode") === "edit" ? s.mechanicId : undefined,
@@ -60,8 +68,7 @@ export async function saveOnboarding(formData: FormData) {
     neighborhood: str(formData, "neighborhood") || undefined,
     serviceRadiusMi: Number(str(formData, "serviceRadiusMi")) || 10,
     bio: str(formData, "bio"),
-    workModel: (str(formData, "workModel") as WorkModel) || "mobile",
-    shopName: str(formData, "shopName") || undefined,
+    workModel: "mobile",
     declaredRepairCategories: categories,
     declaredMakes: makes,
     hourlyRateCents: cents(formData, "hourlyRate"),
@@ -101,21 +108,21 @@ export async function saveOnboarding(formData: FormData) {
 
 // -------------------------------------------------------------- verification
 export async function startScreening(kind: ScreeningKind, formData: FormData) {
-  await ready();
+  const repo = await getRepo();
   const id = await mechanicId();
   await repo.startScreening(id, kind, str(formData, "consent") === "on" || kind === "identity");
   refresh();
 }
 
 export async function refreshScreening(kind: ScreeningKind) {
-  await ready();
+  const repo = await getRepo();
   const id = await mechanicId();
   await repo.refreshScreening(id, kind);
   refresh();
 }
 
 export async function submitCredential(formData: FormData) {
-  await ready();
+  const repo = await getRepo();
   const id = await mechanicId();
   await repo.submitCredential(id, {
     issuer: str(formData, "issuer"),
@@ -129,7 +136,7 @@ export async function submitCredential(formData: FormData) {
 }
 
 export async function submitEmployment(formData: FormData) {
-  await ready();
+  const repo = await getRepo();
   const id = await mechanicId();
   await repo.submitEmployment(id, {
     employer: str(formData, "employer"),
@@ -142,7 +149,7 @@ export async function submitEmployment(formData: FormData) {
 }
 
 export async function submitInsurance(formData: FormData) {
-  await ready();
+  const repo = await getRepo();
   const id = await mechanicId();
   await repo.submitInsurance(id, {
     carrier: str(formData, "carrier"),
@@ -153,8 +160,9 @@ export async function submitInsurance(formData: FormData) {
 }
 
 export async function resubmitVerification(verificationId: string, formData: FormData) {
-  await ready();
-  const id = await mechanicId();
+  const repo = await getRepo();
+  const { id, n } = await mechanic();
+  await n.ownSources();
   const v = repo.getVerification(verificationId);
   if (!v || v.mechanicId !== id) return;
   await repo.resubmit(verificationId, str(formData, "note"));
@@ -163,7 +171,7 @@ export async function resubmitVerification(verificationId: string, formData: For
 
 // ---------------------------------------------------------------- past repairs
 export async function addPastRepair(formData: FormData) {
-  await ready();
+  const repo = await getRepo();
   const id = await mechanicId();
   const make = str(formData, "make") as VehicleMake;
   const category = str(formData, "repairCategory") as RepairCategory;
@@ -184,8 +192,9 @@ export async function addPastRepair(formData: FormData) {
 }
 
 export async function requestConfirmation(pastRepairId: string, formData: FormData) {
-  await ready();
-  const id = await mechanicId();
+  const repo = await getRepo();
+  const { id, n } = await mechanic();
+  await n.ownSources();
   const r = repo.getMechanicSources(id).pastRepairs.find((x) => x.id === pastRepairId);
   if (!r) return;
   await repo.requestCustomerConfirmation(pastRepairId, str(formData, "contactName") || "your customer", str(formData, "contact"));
@@ -195,7 +204,9 @@ export async function requestConfirmation(pastRepairId: string, formData: FormDa
 // ---------------------------------------------------------------- marketplace
 /** Mechanics only ever act on requests Clutch sent them. */
 async function matchedRequest(requestId: string) {
-  const id = await mechanicId();
+  const repo = await getRepo();
+  const { id, n } = await mechanic();
+  await n.mechanicRequest(requestId);
   const r = repo.getRequest(requestId);
   if (!r || !r.matchedMechanicIds.includes(id)) throw new Error("This request wasn't sent to you.");
   return { id, r };
@@ -208,41 +219,42 @@ const reasonOf = (formData?: FormData) => {
 };
 
 export async function declineRequest(requestId: string, formData?: FormData) {
-  await ready();
+  const repo = await getRepo();
   const { id } = await matchedRequest(requestId);
-  await repo.declineRequest(requestId, id, reasonOf(formData));
+  await orBack(`/mechanic/requests/${requestId}`, () => repo.declineRequest(requestId, id, reasonOf(formData)));
   refresh();
   redirect("/mechanic/requests");
 }
 
 export async function askQuestion(requestId: string, formData: FormData) {
-  await ready();
+  const repo = await getRepo();
   const { id } = await matchedRequest(requestId);
   const q = str(formData, "question");
-  if (q) await repo.askQuestion(requestId, id, q);
+  if (q) await orBack(`/mechanic/requests/${requestId}`, () => repo.askQuestion(requestId, id, q));
   refresh();
 }
 
 export async function markInterested(requestId: string, formData: FormData) {
-  await ready();
-  const id = await mechanicId();
+  const repo = await getRepo();
+  const { id, n } = await mechanic();
+  await n.ownRecords({ requestId });
   const r = repo.getRequest(requestId);
   if (!r || !r.matchedMechanicIds.includes(id)) return;
-  await repo.markInterested(requestId, id, str(formData, "note"));
+  await orBack(`/mechanic/requests/${requestId}`, () => repo.markInterested(requestId, id, str(formData, "note")));
   refresh();
   // Straight into the estimate: interest and estimate are one step.
   redirect(`/mechanic/requests/${requestId}#estimate`);
 }
 
 export async function submitQuote(requestId: string, formData: FormData) {
-  await ready();
+  const repo = await getRepo();
   const { id } = await matchedRequest(requestId);
   const draft = str(formData, "intent") === "draft";
   if (!draft) {
-    // Estimates for real work need required screening current (lib/domain/eligibility.ts). Drafts are always allowed.
+    // Sending needs a complete basic profile (lib/domain/eligibility.ts); verification is shown to customers, not required. Drafts are always allowed.
     if (!eligibility(toPublicProfile(repo.getMechanicSources(id))).eligible) redirect(`/mechanic/requests/${requestId}?blocked=1#estimate`);
   }
-  await repo.submitQuote({
+  await orBack(`/mechanic/requests/${requestId}#estimate`, () => repo.submitQuote({
     requestId,
     mechanicId: id,
     laborCents: cents(formData, "labor"),
@@ -252,10 +264,10 @@ export async function submitQuote(requestId: string, formData: FormData) {
     partsEstimateCents: cents(formData, "partsEstimate"),
     durationHours: Number(str(formData, "duration")) || 1,
     availableOn: str(formData, "availableOn"),
-    serviceMode: (str(formData, "serviceMode") as "mobile" | "shop") || "mobile",
+    serviceMode: "mobile",
     scope: str(formData, "scope"),
     notes: str(formData, "notes") || undefined,
-  }, { draft });
+  }, { draft }));
   refresh();
   redirect(draft ? "/mechanic/quotes?saved=1" : "/mechanic/quotes?sent=1");
 }
@@ -270,7 +282,8 @@ export interface EstimateInput {
   /** The appointment you're offering, for both calendars: "YYYY-MM-DD" and "HH:MM". */
   availableDate: string;
   availableTime: string;
-  serviceMode: "mobile" | "shop";
+  /** Always "mobile": the mechanic goes to the car. Kept so older drafts still load. */
+  serviceMode: "mobile";
   scope: string;
   notes: string;
   expiresOn: string;
@@ -287,7 +300,7 @@ const text = (v: unknown, max = 2000) => String(v ?? "").trim().slice(0, max);
  * redirecting so the builder can show "Saved" and errors inline.
  */
 export async function saveEstimate(requestId: string, input: EstimateInput, intent: "draft" | "send"): Promise<{ ok: boolean; savedAt?: string; error?: string }> {
-  await ready();
+  const repo = await getRepo();
   const { id, r } = await matchedRequest(requestId);
   const existing = repo.listQuotesForRequest(requestId).find((q) => q.mechanicId === id);
   if (existing && existing.status !== "draft" && intent === "draft") return { ok: false, error: "This estimate was already sent." };
@@ -304,12 +317,13 @@ export async function saveEstimate(requestId: string, input: EstimateInput, inte
   const partsCents = lines.filter((l) => l.kind === "part").reduce((n, l) => n + l.cents, 0);
   const scope = text(input.scope);
   if (intent === "send") {
-    if (!eligibility(toPublicProfile(repo.getMechanicSources(id))).eligible) return { ok: false, error: "Your screening isn't current, so you can't send estimates yet. Your draft is saved." };
+    if (!eligibility(toPublicProfile(repo.getMechanicSources(id))).eligible) return { ok: false, error: "Finish your profile (service area, repairs, pricing, availability) to send estimates. Your draft is saved." };
     if (!laborCents) return { ok: false, error: "Add at least one labor line with a price." };
     if (!scope) return { ok: false, error: "Describe the scope of work." };
     if (!slot) return { ok: false, error: "Pick the date and time you can do it." };
   }
   const expires = /^\d{4}-\d{2}-\d{2}$/.test(text(input.expiresOn)) ? text(input.expiresOn) : undefined;
+  try {
   await repo.submitQuote(
     {
       requestId,
@@ -322,7 +336,7 @@ export async function saveEstimate(requestId: string, input: EstimateInput, inte
       durationHours: Math.max(0.25, Math.min(100, Number(input.durationHours) || 1)),
       availableOn: slot ? slotLabel(slot) : text(input.availableOn, 120),
       availableAt: slot,
-      serviceMode: input.serviceMode === "shop" ? "shop" : "mobile",
+      serviceMode: "mobile",
       scope,
       notes: text(input.notes) || undefined,
       lineItems: lines,
@@ -336,57 +350,92 @@ export async function saveEstimate(requestId: string, input: EstimateInput, inte
     },
     { draft: intent === "draft" },
   );
+  } catch (e) {
+    // Accepted, withdrawn or closed since the builder was opened: say so instead of saving.
+    if (e instanceof LifecycleError) return { ok: false, error: e.message };
+    throw e;
+  }
   refresh();
   if (intent === "send") redirect(`/mechanic/requests/${requestId}?sent=1#estimate`);
   return { ok: true, savedAt: new Date().toISOString() };
 }
 
 export async function answerQuoteQuestion(quoteId: string, index: number, formData: FormData) {
-  await ready();
+  const repo = await getRepo();
   const id = await mechanicId();
-  const q = repo.getQuote(quoteId);
-  if (!q || q.mechanicId !== id) return;
-  await repo.answerQuoteQuestion(quoteId, index, str(formData, "answer"));
+  await orBack("/mechanic/quotes", () => repo.answerQuoteQuestion(quoteId, id, index, str(formData, "answer")));
   refresh();
 }
 
 // ---------------------------------------------------------------- jobs
 async function myJob(jobId: string) {
-  const id = await mechanicId();
+  const repo = await getRepo();
+  const { id, n } = await mechanic();
+  await n.ownRecords({ jobId });
   const job = repo.getJob(jobId);
   if (!job || job.mechanicId !== id) throw new Error("Not your job.");
   return job;
 }
 
-export async function startJob(jobId: string) {
-  await ready();
-  await myJob(jobId);
-  await repo.startJob(jobId);
+/** Every job action: this mechanic's own job, and the rules decide inside the transaction. */
+async function onJob(jobId: string, fn: (repo: Awaited<ReturnType<typeof getRepo>>, mechanicId: string) => unknown, hash = "") {
+  const repo = await getRepo();
+  const id = await mechanicId();
+  await orBack(`/mechanic/jobs/${jobId}${hash}`, async () => {
+    await fn(repo, id);
+  });
   refresh();
+  revalidatePath(`/customer/jobs/${jobId}`);
+}
+
+export async function startJob(jobId: string) {
+  await onJob(jobId, (repo, id) => repo.startJob(jobId, id));
 }
 
 /** Mechanic marks complete; the customer confirms, which creates the Platform Verified entry. */
 export async function markJobDone(jobId: string, formData: FormData) {
-  await ready();
-  await myJob(jobId);
-  const amount = cents(formData, "finalAmount");
-  await repo.markJobDone(jobId, amount || undefined, str(formData, "completionNotes") || undefined, {
-    engine: str(formData, "confirm_engine") || undefined,
-    transmission: str(formData, "confirm_transmission") || undefined,
-    drivetrain: str(formData, "confirm_drivetrain") || undefined,
-  });
-  refresh();
+  const raw = str(formData, "finalAmount");
+  const paid = str(formData, "paid");
+  await onJob(jobId, (repo, id) =>
+    repo.markJobDone(
+      jobId,
+      id,
+      raw ? cents(formData, "finalAmount") : undefined,
+      str(formData, "completionNotes") || undefined,
+      {
+        engine: str(formData, "confirm_engine") || undefined,
+        transmission: str(formData, "confirm_transmission") || undefined,
+        drivetrain: str(formData, "confirm_drivetrain") || undefined,
+      },
+      paid === "paid" || paid === "not_paid" ? { status: paid, amountCents: str(formData, "paidAmount") ? cents(formData, "paidAmount") : raw ? cents(formData, "finalAmount") : undefined } : undefined,
+    ),
+  );
 }
 
 export async function cancelJobAsMechanic(jobId: string, formData?: FormData) {
-  await ready();
-  await myJob(jobId);
-  await repo.cancelJob(jobId, "mechanic", reasonOf(formData));
-  refresh();
+  await onJob(jobId, (repo, id) => repo.cancelJob(jobId, { role: "mechanic", mechanicId: id }, reasonOf(formData)));
+}
+
+export async function proposeNewTimeAsMechanic(jobId: string, formData: FormData) {
+  const date = str(formData, "date");
+  const time = str(formData, "time");
+  const slot = /^\d{4}-\d{2}-\d{2}$/.test(date) && /^\d{2}:\d{2}$/.test(time) ? { date, time } : undefined;
+  await onJob(jobId, (repo, id) => repo.proposeReschedule(jobId, { role: "mechanic", mechanicId: id }, slot ? slotLabel(slot) : str(formData, "when"), slot, str(formData, "note")), "#reschedule");
+}
+
+export async function answerNewTimeAsMechanic(jobId: string, accept: boolean) {
+  await onJob(jobId, (repo, id) => repo.respondReschedule(jobId, { role: "mechanic", mechanicId: id }, accept), "#reschedule");
+}
+
+export async function reportPaymentAsMechanic(jobId: string, formData: FormData) {
+  const paid = str(formData, "paid");
+  if (paid !== "paid" && paid !== "not_paid") return;
+  const raw = str(formData, "paidAmount");
+  await onJob(jobId, (repo, id) => repo.reportPayment(jobId, { role: "mechanic", mechanicId: id }, { status: paid, amountCents: raw ? cents(formData, "paidAmount") : undefined }), "#payment");
 }
 
 export async function saveJobNotes(jobId: string, formData: FormData) {
-  await ready();
+  const repo = await getRepo();
   await myJob(jobId);
   await repo.setJobNotes(jobId, str(formData, "notes"));
   refresh();
@@ -394,8 +443,9 @@ export async function saveJobNotes(jobId: string, formData: FormData) {
 
 /** Private notes about the mechanic's own customers. */
 export async function saveCustomerNote(customerId: string, formData: FormData) {
-  await ready();
-  const id = await mechanicId();
+  const repo = await getRepo();
+  const { id, n } = await mechanic();
+  await n.mechanicCustomer(customerId);
   const isMine = repo.listMechanicCustomers(id).some((c) => c.customer.id === customerId);
   if (!isMine) return;
   await repo.setCustomerNote(id, customerId, str(formData, "note"));
@@ -403,7 +453,7 @@ export async function saveCustomerNote(customerId: string, formData: FormData) {
 }
 
 export async function updatePricing(formData: FormData) {
-  await ready();
+  const repo = await getRepo();
   const id = await mechanicId();
   const labels = formData.getAll("fixedLabel").map(String);
   const cats = formData.getAll("fixedCategory").map(String);
@@ -422,9 +472,9 @@ export async function updatePricing(formData: FormData) {
 }
 
 export async function confirmAppointment(jobId: string) {
-  await ready();
-  await myJob(jobId);
-  await repo.confirmAppointment(jobId);
+  const repo = await getRepo();
+  const id = await mechanicId();
+  await orBack(`/mechanic/jobs/${jobId}`, () => repo.confirmAppointment(jobId, id));
   refresh();
 }
 
@@ -432,11 +482,11 @@ const PHOTO_KINDS = ["before", "after", "parts", "completed", "diagnostic", "veh
 
 /** Attach photos the mechanic just uploaded to a job. Only their own uploads, only repair-photo tags. */
 export async function attachJobPhotos(jobId: string, items: { id: string; kind: string; caption?: string }[]) {
-  await ready();
+  const repo = await getRepo();
   const s = await getSession();
   if (s.role !== "mechanic") throw new Error("Switch to your mechanic account to do this.");
   await myJob(jobId);
-  const media = await Promise.all(items.map((it) => getMedia(it.id)));
+  const media = await Promise.all(items.map((it) => getMedia(repo.scope, it.id)));
   const photos = items.flatMap((it, i) => {
     const m = media[i];
     if (!m || m.ownerId !== s.userId || !/^(image|video)\//.test(m.meta.contentType)) return [];
@@ -450,13 +500,14 @@ export async function attachJobPhotos(jobId: string, items: { id: string; kind: 
 
 /** Photos added to an existing record are labelled mechanic-uploaded, never "verified repair photo". */
 export async function attachRepairPhotos(pastRepairId: string, items: { id: string; kind: string; caption?: string }[]) {
-  await ready();
+  const repo = await getRepo();
   const s = await getSession();
   if (s.role !== "mechanic") throw new Error("Switch to your mechanic account to do this.");
   const mid = s.mechanicId;
+  await (await needs(s)).ownSources();
   const rec = repo.getMechanicSources(mid).pastRepairs.find((r) => r.id === pastRepairId);
   if (!rec) throw new Error("Not your repair record.");
-  const media = await Promise.all(items.map((it) => getMedia(it.id)));
+  const media = await Promise.all(items.map((it) => getMedia(repo.scope, it.id)));
   const photos = items.flatMap((it, i) => {
     const m = media[i];
     if (!m || m.ownerId !== s.userId || !/^(image|video)\//.test(m.meta.contentType)) return [];
@@ -469,21 +520,21 @@ export async function attachRepairPhotos(pastRepairId: string, items: { id: stri
 }
 
 export async function recordDiagnosis(jobId: string, formData: FormData) {
-  await ready();
-  await myJob(jobId);
+  const repo = await getRepo();
+  const id = await mechanicId();
   const note = str(formData, "note");
   if (!note) return;
-  await repo.recordDiagnosis(jobId, note, str(formData, "matches") !== "no");
+  await orBack(`/mechanic/jobs/${jobId}`, () => repo.recordDiagnosis(jobId, id, note, str(formData, "matches") !== "no"));
   refresh();
   revalidatePath(`/customer/jobs/${jobId}`);
 }
 
 export async function requestScopeChange(jobId: string, formData: FormData) {
-  await ready();
-  await myJob(jobId);
+  const repo = await getRepo();
+  const id = await mechanicId();
   const description = str(formData, "description");
   if (!description) return;
-  await repo.requestScopeChange(jobId, description, cents(formData, "extra"));
+  await orBack(`/mechanic/jobs/${jobId}`, () => repo.requestScopeChange(jobId, id, description, cents(formData, "extra")));
   refresh();
   revalidatePath(`/customer/jobs/${jobId}`);
 }

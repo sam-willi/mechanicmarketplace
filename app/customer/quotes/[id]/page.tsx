@@ -3,8 +3,8 @@ import { StarRating } from "@/components/visual/stars";
 import Link from "next/link";
 import { ArrowLeft, CalendarClock, Check, MessageCircleQuestion, Minus } from "lucide-react";
 import { notFound } from "next/navigation";
-import { ready, repo } from "@/lib/data";
-import { getSession } from "@/lib/session";
+import { getRepo } from "@/lib/data";
+import { getSession, needs } from "@/lib/session";
 import { REPAIR_LABEL, repairNoun } from "@/lib/domain/provenance";
 import { dayMonth, plural, rating, usd, WORK_MODEL_LABEL } from "@/lib/format";
 import { acceptQuote, askAboutQuote, declineQuote } from "@/app/actions/customer";
@@ -14,6 +14,7 @@ import { EvidenceProvider } from "@/components/trust/evidence-sheet";
 import { RepairIcon } from "@/components/visual/icons";
 import { VehicleTile } from "@/components/visual/vehicle-glyph";
 import { Policies } from "@/components/app/policies";
+import { EstimateVersions } from "@/components/app/job-parts";
 import { ConfirmButton } from "@/components/app/confirm-button";
 import { EligibilityNotice } from "@/components/trust/eligibility-notice";
 import { ScreeningList } from "@/components/trust/screening-list";
@@ -28,11 +29,13 @@ export const metadata: Metadata = { title: "Written estimate" };
  * they're trusted, what they'll do, when, and every line of the price. Three
  * clear choices at the bottom: approve, ask a question, or decline.
  */
-export default async function EstimatePage({ params }: { params: Promise<{ id: string }> }) {
-  await ready();
+export default async function EstimatePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string }> }) {
+  const repo = await getRepo();
   const s = await getSession();
   if (s.role !== "customer") return null;
   const { id } = await params;
+  await (await needs(s)).customerQuote(id);
+  const sp = await searchParams;
   const q = repo.getQuote(id);
   if (!q || q.status === "draft") notFound();
   const r = repo.getRequest(q.requestId)!;
@@ -60,9 +63,9 @@ export default async function EstimatePage({ params }: { params: Promise<{ id: s
           ["Parts", q.partsIncluded ? usd(q.partsEstimateCents) : `about ${usd(q.partsEstimateCents)}`, q.partsIncluded ? "included at a fixed price" : "estimate, billed at cost with receipts"],
         ] as [string, string, string?][])),
     ["Diagnostic fee", q.diagnosticFeeCents ? usd(q.diagnosticFeeCents) : "No charge"],
-    ["Travel fee", q.travelFeeCents ? usd(q.travelFeeCents) : q.serviceMode === "shop" ? "Shop visit" : "No charge"],
+    ["Travel fee", q.travelFeeCents ? usd(q.travelFeeCents) : "No charge"],
   ];
-  const where = q.serviceMode === "mobile" ? `At your location${findArea(r.location.area) ? ` in ${findArea(r.location.area)!.label}` : ""}` : `At ${p.shopName?.replace(" (demo)", "") ?? "the mechanic's shop"}`;
+  const where = `At your location${findArea(r.location.area) ? ` in ${findArea(r.location.area)!.label}` : ""}`;
 
   return (
     <EvidenceProvider mechanicId={p.id} variant="high">
@@ -70,6 +73,20 @@ export default async function EstimatePage({ params }: { params: Promise<{ id: s
         <Link href={`/customer/requests/${r.id}`} className="inline-flex items-center gap-1.5 text-[0.875rem] text-ink-3 hover:text-ink">
           <ArrowLeft size={14} aria-hidden /> Back to your request
         </Link>
+        {sp.error ? (
+          <p role="alert" className="mt-4 border-l-4 border-alert bg-sheet px-4 py-3 text-[0.9375rem]">
+            {sp.error}
+          </p>
+        ) : null}
+        {q.revisions?.length && q.status === "submitted" ? (
+          <p className="mt-4 border-l-4 border-brass bg-sheet px-4 py-3 text-[0.9375rem]">
+            <span className="font-semibold">
+              {p.firstName} revised this estimate (version {q.version ?? 1}
+              {q.revisedAt ? `, ${dayMonth(q.revisedAt)}` : ""}).
+            </span>{" "}
+            You&apos;re reading the current version. Earlier versions are listed at the bottom.
+          </p>
+        ) : null}
         <article className="sheet perf-top mt-4">
           {/* Document head */}
           <header className="flex flex-wrap items-start justify-between gap-4 border-b border-rule px-5 pt-7 pb-5 sm:px-7">
@@ -138,7 +155,7 @@ export default async function EstimatePage({ params }: { params: Promise<{ id: s
             <div>
               <p className="field-label">Where</p>
               <p className="mt-1 text-[1.0625rem] font-bold">{where}</p>
-              {q.serviceMode === "mobile" && <p className="text-[0.8125rem] text-ink-3">Your exact address is shared only after you book.</p>}
+              <p className="text-[0.8125rem] text-ink-3">Your exact address is shared only after you book.</p>
             </div>
           </section>
 
@@ -248,15 +265,34 @@ export default async function EstimatePage({ params }: { params: Promise<{ id: s
           {/* Decide */}
           <footer className="border-t border-dashed border-rule px-5 py-5 sm:px-7">
             {q.status === "accepted" ? (
-              <p className="font-semibold text-ink">You approved this estimate. {p.firstName} is booked.</p>
-            ) : q.status === "declined" ? (
+              <p className="font-semibold text-ink">
+                You accepted version {q.acceptedVersion ?? q.version ?? 1}
+                {q.acceptedAt ? ` on ${dayMonth(q.acceptedAt)}` : ""}. {p.firstName} is booked. An accepted estimate can&apos;t be changed; extra work needs your approval on the repair page.
+              </p>
+            ) : q.status === "withdrawn" ? (
+              <p className="text-ink-2">{p.firstName} withdrew this estimate. It can&apos;t be accepted.</p>
+            ) : q.status === "expired" ? (
+              <p className="text-ink-2">This estimate expired.</p>
+            ) : q.status === "declined" && q.closedReason === "request_cancelled" ? (
+              <p className="text-ink-2">You cancelled this request, so this estimate is closed.</p>
+            ) : q.status === "declined" && q.closedReason === "customer_declined" ? (
               <p className="text-ink-2">You declined this estimate.</p>
             ) : !open ? (
               <p className="text-ink-3">You chose a different mechanic for this job.</p>
             ) : (
               <div className="space-y-4">
                 <EligibilityNotice e={elig} />
+                {elig.eligible && !elig.fullyVerified ? (
+                  <div className="space-y-2">
+                    <Link href={`/customer/quotes/${q.id}/book`} className="btn btn-ink min-h-12 w-full text-[1rem]">
+                      Review verification and book {p.firstName}
+                    </Link>
+                    <p className="text-[0.8125rem] text-ink-3">Next, you&apos;ll see exactly which checks Clutch hasn&apos;t verified and confirm before booking. No payment is taken on Clutch.</p>
+                  </div>
+                ) : (
                 <form action={acceptQuote.bind(null, q.id)} className="space-y-2">
+                  {/* The version being read. If the mechanic revises it meanwhile, accepting is refused and the new version shown. */}
+                  <input type="hidden" name="version" value={q.version ?? 1} />
                   <ConfirmButton
                     disabled={!elig.eligible}
                     message={`Book ${p.firstName} for ${q.availableOn}?\n\nEstimated total: ${t.planFor}\n${t.partsLine}\n\n${p.firstName} gets your address and access notes. Other mechanics are told you chose someone else.`}
@@ -266,6 +302,7 @@ export default async function EstimatePage({ params }: { params: Promise<{ id: s
                   </ConfirmButton>
                   <p className="text-[0.8125rem] text-ink-3">No payment is taken on Clutch. You pay {p.firstName} directly after the work.</p>
                 </form>
+                )}
                 <details className="group border border-rule">
                   <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center gap-2 px-3 text-[0.9375rem] font-semibold [&::-webkit-details-marker]:hidden">
                     <MessageCircleQuestion size={17} aria-hidden /> Ask {p.firstName} a question
@@ -285,10 +322,15 @@ export default async function EstimatePage({ params }: { params: Promise<{ id: s
                 </form>
               </div>
             )}
+            {q.revisions?.length ? (
+              <div className="mt-5 border-t border-rule-soft pt-4">
+                <EstimateVersions q={q} viewer="customer" />
+              </div>
+            ) : null}
           </footer>
         </article>
         <p className="mt-4 text-center text-[0.8125rem] text-ink-3">
-          Something wrong with this estimate? <Link href={`/customer/help?request=${r.id}`} className="link">Contact Clutch support</Link>
+          Something wrong with this estimate? <Link href={`/customer/help?request=${r.id}`} className="link">Report it to Clutch staff</Link>. They reply in the app.
         </p>
       </div>
     </EvidenceProvider>

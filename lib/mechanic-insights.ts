@@ -1,5 +1,5 @@
 import "server-only";
-import { repo } from "@/lib/data";
+import type { Repository } from "@/lib/data/repository";
 import { findArea, milesBetween, serves } from "@/lib/domain/areas";
 import { vehicleEvidence } from "@/lib/domain/vehicle-evidence";
 import { REPAIR_LABEL, repairNoun } from "@/lib/domain/provenance";
@@ -15,7 +15,6 @@ export interface Opportunity {
   crossCount: number;
   modelCount: number;
   inRadius: boolean;
-  modeFits: boolean;
   reason: string;
   /** Verified experience with this exact car, most specific first. */
   vehicleReasons: string[];
@@ -25,10 +24,10 @@ export interface Opportunity {
 
 /**
  * The mechanic's opportunity feed. Ordered by fit (service radius, vehicle
- * experience, repair experience, timing, mobile/shop compatibility), and each
+ * experience, repair experience, timing), and each
  * card says why it matched, in terms of the mechanic's own verified work.
  */
-export function opportunities(m: MechanicProfile, p: PublicMechanicProfile): Opportunity[] {
+export function opportunities(repo: Repository, m: MechanicProfile, p: PublicMechanicProfile): Opportunity[] {
   const quotes = repo.listQuotesForMechanic(m.id);
   const urgency = { stranded: 4, today: 3, one_two_days: 2, this_week: 1, flexible: 0 } as const;
   return repo
@@ -46,7 +45,6 @@ export function opportunities(m: MechanicProfile, p: PublicMechanicProfile): Opp
       const vehicleEv = vehicleEvidence(w, { year: v.year, make: v.make, model: v.model, spec: r.vehicleSpec ?? v.spec }, r.repairCategory);
       const specificity = vehicleEv.filter((e) => e.level !== "model").reduce((n, e) => n + e.n, 0);
       const inRadius = area ? serves(m, area) : true;
-      const modeFits = r.location.serviceMode === "mobile" ? m.workModel !== "shop" : m.workModel !== "mobile";
       const parts = [
         makeCount ? `${makeCount} verified ${v.make} ${makeCount === 1 ? "repair" : "repairs"}` : null,
         categoryCount ? `${categoryCount} verified ${repairNoun(r.repairCategory, categoryCount)}` : null,
@@ -64,10 +62,9 @@ export function opportunities(m: MechanicProfile, p: PublicMechanicProfile): Opp
         crossCount,
         modelCount,
         inRadius,
-        modeFits,
         reason,
         vehicleReasons: vehicleEv.slice(0, 2).map((e) => e.text),
-        score: [r.rebookOf === m.id ? 1 : 0, inRadius ? 1 : 0, modeFits ? 1 : 0, crossCount, specificity, makeCount + categoryCount, urgency[r.urgency ?? "flexible"]],
+        score: [r.rebookOf === m.id ? 1 : 0, inRadius ? 1 : 0, crossCount, specificity, makeCount + categoryCount, urgency[r.urgency ?? "flexible"]],
         state: quotes.some((q) => q.requestId === r.id && q.status === "draft") ? ("draft" as const) : r.interested.some((i) => i.mechanicId === m.id) ? ("interested" as const) : ("new" as const),
       };
     })
@@ -81,7 +78,7 @@ export function opportunities(m: MechanicProfile, p: PublicMechanicProfile): Opp
  * Earnings as job-value estimates. Clutch doesn't process payments yet, so
  * these are approved-estimate / final job amounts, never payouts.
  */
-export function earnings(mechanicId: string) {
+export function earnings(repo: Repository, mechanicId: string) {
   const repairs = repo.getMechanicSources(mechanicId).pastRepairs.filter((r) => r.source === "platform" && r.valueCents);
   const customers = repo.listMechanicCustomers(mechanicId);
   const repeatIds = new Set(customers.filter((c) => c.isRepeat).map((c) => c.customer.id));

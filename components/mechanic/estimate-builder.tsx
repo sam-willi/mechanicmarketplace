@@ -26,9 +26,8 @@ export function EstimateBuilder({
   hourlyRateCents,
   canSend,
   blockedReason,
-  mobileAllowed,
-  shopAllowed,
   openings = [],
+  revising = false,
 }: {
   requestId: string;
   customerFirst: string;
@@ -36,10 +35,10 @@ export function EstimateBuilder({
   hourlyRateCents: number;
   canSend: boolean;
   blockedReason?: string;
-  mobileAllowed: boolean;
-  shopAllowed: boolean;
   /** The mechanic's posted openings, offered as one-tap times. */
   openings?: Slot[];
+  /** Revising a sent estimate: no draft autosave (the sent version stays until the new one is sent). */
+  revising?: boolean;
 }) {
   const [v, setV] = useState<EstimateInput>(initial);
   const [dirty, setDirty] = useState(false);
@@ -66,7 +65,7 @@ export function EstimateBuilder({
 
   // Autosave: a quiet draft save a moment after typing stops.
   useEffect(() => {
-    if (!dirty) return;
+    if (!dirty || revising) return;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       startSave(async () => {
@@ -77,14 +76,14 @@ export function EstimateBuilder({
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [v, dirty, requestId]);
+  }, [v, dirty, requestId, revising]);
 
   const labor = v.lines.filter((l) => l.kind === "labor").reduce((n, l) => n + l.cents, 0);
   const parts = v.lines.filter((l) => l.kind === "part").reduce((n, l) => n + l.cents, 0);
   const totals = quoteTotals({
     laborCents: labor,
     diagnosticFeeCents: v.diagnosticFeeCents,
-    travelFeeCents: v.serviceMode === "mobile" ? v.travelFeeCents : 0,
+    travelFeeCents: v.travelFeeCents,
     partsIncluded: v.partsIncluded,
     partsEstimateCents: parts,
   });
@@ -103,7 +102,9 @@ export function EstimateBuilder({
 
   function send() {
     setError(null);
-    const msg = `Send this estimate to ${customerFirst}?\n\nTotal: ${totals.planFor}\n${totals.partsLine}\nValid until ${v.expiresOn || "no date"}\n\n${customerFirst} will be notified. You can update it later, and they'll see that it changed.`;
+    const msg = revising
+      ? `Send the revised estimate to ${customerFirst}?\n\nNew total: ${totals.planFor}\n${totals.partsLine}\n\n${customerFirst} sees it's a new version, with the earlier one kept. They have to accept the new version; an estimate they already opened can't be accepted at the old price.`
+      : `Send this estimate to ${customerFirst}?\n\nTotal: ${totals.planFor}\n${totals.partsLine}\nValid until ${v.expiresOn || "no date"}\n\n${customerFirst} will be notified. You can update it until they accept it, and they'll see that it changed.`;
     if (!window.confirm(msg)) return;
     startSend(async () => {
       const res = await saveEstimate(requestId, v, "send");
@@ -245,24 +246,9 @@ export function EstimateBuilder({
             />
           </label>
           <label className="block">
-            <span className="field-label">Where</span>
-            <select value={v.serviceMode} onChange={(e) => set("serviceMode", e.target.value as "mobile" | "shop")} className="input mt-1">
-              {mobileAllowed && <option value="mobile">At the customer&apos;s location</option>}
-              {shopAllowed && <option value="shop">At my shop</option>}
-            </select>
+            <span className="field-label">Travel fee ($)</span>
+            <input inputMode="decimal" value={dollars(v.travelFeeCents)} onChange={(e) => set("travelFeeCents", cents(e.target.value))} className={`${money} mt-1`} placeholder="0" />
           </label>
-          {v.serviceMode === "mobile" && (
-            <label className="block">
-              <span className="field-label">Travel fee ($)</span>
-              <input
-                inputMode="decimal"
-                value={dollars(v.travelFeeCents)}
-                onChange={(e) => set("travelFeeCents", cents(e.target.value))}
-                className={`${money} mt-1`}
-                placeholder="0"
-              />
-            </label>
-          )}
           <fieldset className="block sm:col-span-2">
             <legend className="field-label">When you can do it</legend>
             {openings.length ? (
@@ -427,7 +413,7 @@ export function EstimateBuilder({
                 <dd className="tnum">{usd(v.diagnosticFeeCents)}</dd>
               </div>
             ) : null}
-            {v.serviceMode === "mobile" && v.travelFeeCents ? (
+            {v.travelFeeCents ? (
               <div className="flex justify-between gap-3">
                 <dt>Travel</dt>
                 <dd className="tnum">{usd(v.travelFeeCents)}</dd>
@@ -449,7 +435,7 @@ export function EstimateBuilder({
                 .map((a, i) => (
                   <li key={i}>
                     <span className="font-semibold">Or:</span> {a.label} ·{" "}
-                    {usd(a.laborCents + a.partsCents + v.diagnosticFeeCents + (v.serviceMode === "mobile" ? v.travelFeeCents : 0))}
+                    {usd(a.laborCents + a.partsCents + v.diagnosticFeeCents + v.travelFeeCents)}
                   </li>
                 ))}
             </ul>
@@ -466,7 +452,7 @@ export function EstimateBuilder({
         ) : null}
         {!canSend && blockedReason ? <p className="text-[0.8125rem] text-alert">{blockedReason}</p> : null}
         <button type="button" onClick={send} disabled={!canSend || sending} className="btn btn-ink min-h-12 w-full">
-          {sending ? <Loader2 size={16} className="animate-spin" aria-hidden /> : null} Review and send
+          {sending ? <Loader2 size={16} className="animate-spin" aria-hidden /> : null} {revising ? "Send revised estimate" : "Review and send"}
         </button>
         <p className="flex items-center gap-1.5 text-[0.8125rem] text-ink-3" role="status">
           {saving ? (

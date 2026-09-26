@@ -118,10 +118,10 @@ export function ReplacementPanel({ r, rep }: { r: RepairRequest; rep: Replacemen
           </div>
         ) : !rep.openQuotes.length ? (
           <p className="text-[0.9375rem] text-ink-2">
-            We don&apos;t have another mechanic with verified experience for {rep.context} who serves your area yet.
+            There&apos;s no other mechanic with verified {rep.context} work who serves your area yet.
             {rep.broaden.length
               ? " You can still send it to mechanics who list this kind of work."
-              : " Try widening your location or switching to a shop visit."}
+              : " Your request stays open. You can edit it, for example to a nearby area, or cancel it."}
           </p>
         ) : null}
 
@@ -145,7 +145,7 @@ export function HandoffNote({ r, names }: { r: RepairRequest; names: string[] })
     <p className="mt-6 flex items-start gap-2 border border-rule bg-sheet px-4 py-3 text-[0.9375rem]">
       <Send size={16} className="mt-0.5 shrink-0 text-brand" aria-hidden />
       <span>
-        Sent to {names.length === 1 ? names[0] : `${names.length} more mechanics`}. You&apos;ll get a notification when{" "}
+        Sent to {names.length === 1 ? names[0] : `${names.length} more mechanics`}. You&apos;ll see it here and in Notifications when{" "}
         {names.length === 1 ? "they reply" : "someone replies"}.
       </span>
     </p>

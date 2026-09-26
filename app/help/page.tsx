@@ -19,7 +19,7 @@ export default function HelpPage() {
         </div>
         <Protections />
         <CommonAnswers area="public" />
-        <ContactSupport />
+        <ContactSupport signedIn={false} />
       </main>
       <SiteFooter />
     </>

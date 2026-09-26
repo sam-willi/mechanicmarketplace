@@ -3,15 +3,27 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { ready, repo } from "@/lib/data";
+import { getRepo, readyRepo } from "@/lib/data";
+import { SCOPE_COOKIE } from "@/lib/data/scope";
+import { TEST_USER_COOKIE } from "@/lib/auth/test-login";
 import { getAccount, getAuthUser, MODE_COOKIE, PERSONA_COOKIE, USER_COOKIE } from "@/lib/session";
 import { sign } from "@/lib/auth/signing";
 import { homeFor, provisionUser } from "@/lib/auth/provision";
+import { authErrorCode, EMAIL } from "@/lib/auth/errors";
 import { authConfigured, demoLoginsEnabled } from "@/lib/supabase/config";
 import { createSupabase, siteOrigin } from "@/lib/supabase/server";
 import { VEHICLE_MAKES, type AppMode, type VehicleMake } from "@/lib/domain/types";
 
 const YEAR = 60 * 60 * 24 * 365;
+const SCOPE_OPTS = { path: "/", sameSite: "lax" as const, maxAge: 60 * 60 * 24 * 30, httpOnly: true, secure: process.env.NODE_ENV === "production" };
+
+/** Leave the demo marketplace: drop the demo account and the demo scope, so this browser is back on real data. */
+function leaveDemo(jar: Awaited<ReturnType<typeof cookies>>) {
+  jar.delete(TEST_USER_COOKIE);
+  jar.delete(USER_COOKIE);
+  jar.delete(PERSONA_COOKIE);
+  jar.delete(SCOPE_COOKIE);
+}
 
 function safeNext(next: string | null | undefined, fallback: string) {
   return next && next.startsWith("/") && !next.startsWith("//") ? next : fallback;
@@ -20,6 +32,16 @@ function safeNext(next: string | null | undefined, fallback: string) {
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const back = (path: string, params: Record<string, string | undefined>) =>
   `${path}?${new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][])}`;
+
+/** Create the Clutch account for a signed-in Supabase user; undefined if we still need a role, "failed" if the database step failed. */
+async function provisionSafely(auth: Parameters<typeof provisionUser>[0], role?: "customer" | "mechanic") {
+  try {
+    return await provisionUser(auth, role);
+  } catch (e) {
+    console.error("[auth] account setup failed:", (e as Error).message);
+    return "failed" as const;
+  }
+}
 
 async function requireAuth() {
   if (!authConfigured()) redirect("/login?error=auth_unconfigured");
@@ -38,6 +60,7 @@ export async function signUpWithPassword(formData: FormData) {
   const next = safeNext(str(formData, "next"), "");
   const err = (error: string) => redirect(back("/signup", { role, error, next, email, name }));
   if (!name || !email) err("missing");
+  if (!EMAIL.test(email)) err("bad_email");
   if (password.length < 8) err("weak_password");
   if (role === "mechanic" && !phone) err("missing_phone");
 
@@ -56,17 +79,20 @@ export async function signUpWithPassword(formData: FormData) {
   });
   if (error) {
     console.error("[auth] sign-up failed:", error.message);
-    err(/already|registered|exists/i.test(error.message) ? "exists" : /password/i.test(error.message) ? "weak_password" : "signup_failed");
+    err(authErrorCode(error, "signup_failed"));
   }
-  // Existing emails come back with no identities (Supabase hides whether an account exists); treat as "check your email".
+  // When confirmation is off, Supabase signs them straight in.
   if (data.session && data.user) {
-    await ready();
-    const user = await provisionUser({ id: data.user.id, email, meta: data.user.user_metadata ?? {} });
+    const user = await provisionSafely({ id: data.user.id, email, meta: data.user.user_metadata ?? {}, emailVerified: Boolean(data.user.email_confirmed_at) }, role);
+    if (!user || user === "failed") redirect(back("/welcome", { error: "setup_failed", next }));
     const jar = await cookies();
+    leaveDemo(jar);
     jar.set(MODE_COOKIE, role, { path: "/", sameSite: "lax", maxAge: YEAR });
-    redirect(role === "mechanic" ? "/mechanic/onboarding" : homeFor(user!, next || "/customer?welcome=1"));
+    redirect(role === "mechanic" ? "/mechanic/onboarding" : homeFor(user, next || "/customer?welcome=1"));
   }
-  redirect(back("/signup/check-email", { email }));
+  // An email that's already registered comes back looking like a fresh sign-up (Supabase doesn't reveal
+  // which emails have accounts). The next page covers both cases in plain words.
+  redirect(back("/signup/check-email", { email, role }));
 }
 
 export async function signInWithPassword(formData: FormData) {
@@ -76,18 +102,14 @@ export async function signInWithPassword(formData: FormData) {
   const supabase = await requireAuth();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error || !data.user) {
-    const code =
-      error?.name === "AuthRetryableFetchError" || (error?.status ?? 0) >= 500
-        ? "unavailable"
-        : error?.code === "email_not_confirmed" || /confirm/i.test(error?.message ?? "")
-          ? "unconfirmed"
-          : "invalid";
-    redirect(back("/login", { email, error: code, next }));
+    const code = authErrorCode(error, "invalid");
+    redirect(back("/login", { email, error: code === "weak_password" || code === "exists" ? "invalid" : code, next }));
   }
-  await ready();
   const jar = await cookies();
-  jar.delete(USER_COOKIE);
-  const user = await provisionUser({ id: data.user.id, email, meta: data.user.user_metadata ?? {} });
+  // A real sign-in always lands in the real marketplace.
+  leaveDemo(jar);
+  const user = await provisionSafely({ id: data.user.id, email, meta: data.user.user_metadata ?? {}, emailVerified: Boolean(data.user.email_confirmed_at) });
+  if (user === "failed") redirect(back("/welcome", { error: "setup_failed", next }));
   if (!user) redirect(back("/welcome", { next }));
   jar.set(MODE_COOKIE, user.roles.includes("customer") ? "customer" : "mechanic", { path: "/", sameSite: "lax", maxAge: YEAR });
   redirect(homeFor(user, next));
@@ -115,7 +137,11 @@ export async function signInWithGoogle(formData: FormData) {
 export async function resendConfirmation(formData: FormData) {
   const email = str(formData, "email").toLowerCase();
   const supabase = await requireAuth();
-  await supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo: `${await siteOrigin()}/auth/callback` } });
+  const { error } = await supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo: `${await siteOrigin()}/auth/callback` } });
+  if (error) {
+    console.error("[auth] resend failed:", error.message);
+    redirect(back("/signup/check-email", { email, error: authErrorCode(error, "resend_failed") }));
+  }
   redirect(back("/signup/check-email", { email, resent: "1" }));
 }
 
@@ -123,9 +149,13 @@ export async function resendConfirmation(formData: FormData) {
 export async function requestPasswordReset(formData: FormData) {
   const email = str(formData, "email").toLowerCase();
   const supabase = await requireAuth();
-  if (email) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${await siteOrigin()}/auth/callback?next=/reset-password` });
-    if (error) console.error("[auth] reset email failed:", error.message);
+  if (!EMAIL.test(email)) redirect(back("/forgot-password", { error: "bad_email", email }));
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${await siteOrigin()}/auth/callback?next=/reset-password` });
+  if (error) {
+    console.error("[auth] reset email failed:", error.message);
+    // Only say something when it's a problem on our side; never whether the email has an account.
+    const code = authErrorCode(error, "");
+    if (code === "unavailable" || code === "too_many") redirect(back("/forgot-password", { error: code, email }));
   }
   redirect(back("/forgot-password", { sent: "1", email }));
 }
@@ -138,30 +168,31 @@ export async function updatePassword(formData: FormData) {
   const { error } = await supabase.auth.updateUser({ password });
   if (error) {
     console.error("[auth] password update failed:", error.message);
-    redirect(`/reset-password?error=${/session|jwt|auth/i.test(error.message) ? "expired" : "failed"}`);
+    redirect(`/reset-password?error=${/different from the old|same_password/i.test(error.message) || error.code === "same_password" ? "same" : /session|jwt|auth/i.test(error.message) ? "expired" : authErrorCode(error, "failed") === "unavailable" ? "unavailable" : "failed"}`);
   }
-  await ready();
   const acct = await getAccount();
   redirect(acct ? `${homeFor(acct.user)}` : "/welcome");
 }
 
 /** First sign-in with Google (or any auth user without a Clutch account yet): pick a role. */
 export async function completeSignup(role: "customer" | "mechanic", next: string) {
-  await ready();
   const auth = await getAuthUser();
   if (!auth) redirect("/login");
-  const user = await provisionUser(auth, role);
+  const user = await provisionSafely(auth, role);
+  if (!user || user === "failed") redirect(back("/welcome", { error: "setup_failed", next }));
   const jar = await cookies();
+  leaveDemo(jar);
   jar.set(MODE_COOKIE, role, { path: "/", sameSite: "lax", maxAge: YEAR });
-  redirect(role === "mechanic" ? "/mechanic/onboarding" : homeFor(user!, safeNext(next, "/customer?welcome=1")));
+  redirect(role === "mechanic" ? "/mechanic/onboarding" : homeFor(user, safeNext(next, "/customer?welcome=1")));
 }
 
 // ------------------------------------------------------------ demo accounts
 
 /** One-click sign-in for the seeded demo accounts only. Real accounts always go through Supabase. */
 export async function demoSignIn(formData: FormData) {
-  await ready();
   if (!demoLoginsEnabled()) redirect("/login");
+  // Demo accounts exist only in the demo store.
+  const repo = await readyRepo("demo");
   const userId = str(formData, "userId");
   const mode = str(formData, "mode") as AppMode | "admin";
   const next = str(formData, "next");
@@ -170,6 +201,7 @@ export async function demoSignIn(formData: FormData) {
   if (authConfigured()) await (await createSupabase()).auth.signOut();
   const jar = await cookies();
   jar.set(USER_COOKIE, sign(user.id), { path: "/", sameSite: "lax", maxAge: YEAR, httpOnly: true, secure: process.env.NODE_ENV === "production" });
+  jar.set(SCOPE_COOKIE, sign("demo"), SCOPE_OPTS);
   jar.delete(PERSONA_COOKIE);
   if (mode && mode !== "admin") jar.set(MODE_COOKIE, mode, { path: "/", sameSite: "lax", maxAge: YEAR });
   const home = mode === "admin" || !(user.roles.includes("customer") || user.roles.includes("mechanic")) ? "/admin" : mode === "mechanic" ? "/mechanic" : "/customer";
@@ -179,8 +211,27 @@ export async function demoSignIn(formData: FormData) {
 export async function signOut() {
   if (authConfigured()) await (await createSupabase()).auth.signOut();
   const jar = await cookies();
-  jar.delete(USER_COOKIE);
-  jar.delete(PERSONA_COOKIE);
+  leaveDemo(jar);
+  jar.delete(MODE_COOKIE);
+  redirect("/");
+}
+
+/**
+ * Browse the fictional demo marketplace without signing in. Sets the demo
+ * scope (signed, HttpOnly); a real session stays signed in with Supabase but
+ * is a guest inside the demo and can't act on demo records.
+ */
+export async function enterDemo(formData: FormData) {
+  if (!demoLoginsEnabled()) redirect("/");
+  const jar = await cookies();
+  jar.set(SCOPE_COOKIE, sign("demo"), SCOPE_OPTS);
+  redirect(safeNext(str(formData, "next"), "/demo"));
+}
+
+/** Back to the real marketplace (and out of any demo account). */
+export async function exitDemo() {
+  const jar = await cookies();
+  leaveDemo(jar);
   jar.delete(MODE_COOKIE);
   redirect("/");
 }
@@ -194,7 +245,7 @@ const EQUIVALENT: [string, string][] = [
 ];
 
 export async function switchMode(mode: AppMode, fromPath?: string) {
-  await ready();
+  const repo = await getRepo();
   const acct = await getAccount();
   if (!acct) redirect("/login");
   const jar = await cookies();
@@ -208,7 +259,7 @@ export async function switchMode(mode: AppMode, fromPath?: string) {
 
 /** Mechanic who also wants to hire mechanics (or vice versa): add the role to the same account. */
 export async function addCustomerRole() {
-  await ready();
+  const repo = await getRepo();
   const acct = await getAccount();
   if (!acct) redirect("/login");
   await repo.addCustomerProfile(acct.user.id);
@@ -218,7 +269,7 @@ export async function addCustomerRole() {
 }
 
 export async function updateAccount(formData: FormData) {
-  await ready();
+  const repo = await getRepo();
   const acct = await getAccount();
   if (!acct) redirect("/login");
   const str = (k: string) => String(formData.get(k) ?? "").trim();
@@ -226,14 +277,15 @@ export async function updateAccount(formData: FormData) {
   await repo.updateUser(acct.user.id, {
     name: str("name") || acct.user.name,
     phone: str("phone") || undefined,
-    notificationPrefs: { email: formData.get("notifyEmail") === "on", sms: formData.get("notifySms") === "on", push: formData.get("notifyPush") === "on" },
+    // The email-alert choice is only on the form when alerts can actually be sent.
+    ...(str("prefs") === "1" ? { notificationPrefs: { ...acct.user.notificationPrefs, email: formData.get("notifyEmail") === "on" } } : {}),
   });
   revalidatePath("/", "layout");
   redirect(`${str("back") || "/customer/profile"}?saved=1`);
 }
 
 export async function markNotificationsRead(mode: AppMode) {
-  await ready();
+  const repo = await getRepo();
   const acct = await getAccount();
   if (!acct) return;
   await repo.markNotificationsRead(acct.user.id, mode);

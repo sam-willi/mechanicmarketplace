@@ -26,6 +26,7 @@ const SAFETY: Record<ScreeningState, { cls: string; icon: typeof Check; word: st
   verified: { cls: "border-go bg-go-wash text-go", icon: Check, word: "passed" },
   expiring: { cls: "border-amber bg-amber-wash text-amber", icon: RotateCcw, word: "renewal due" },
   pending: { cls: "border-amber bg-amber-wash text-amber", icon: Hourglass, word: "in progress" },
+  unavailable: { cls: "border-amber bg-amber-wash text-amber", icon: Clock, word: "could not be verified (no provider)" },
   missing: { cls: "border-rule bg-sheet text-ink-3", icon: Clock, word: "not submitted" },
   expired: { cls: "border-alert bg-alert-wash text-alert", icon: X, word: "expired" },
   rejected: { cls: "border-alert bg-alert-wash text-alert", icon: X, word: "not approved" },
@@ -34,7 +35,7 @@ const SAFETY: Record<ScreeningState, { cls: string; icon: typeof Check; word: st
 /** The four safety checks at a glance: green ✓, amber waiting, red ✕. */
 export function SafetyChips({ items }: { items: ScreeningItem[] }) {
   return (
-    <ul className="flex flex-wrap gap-1.5" aria-label="Safety screening">
+    <ul className="flex flex-wrap gap-1.5" aria-label="Verification checks">
       {items.map((i) => {
         const s = SAFETY[i.state];
         return (

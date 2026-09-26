@@ -78,7 +78,6 @@ export function SiteFooter() {
         <div className="space-y-2">
           <Wordmark />
           <p className="max-w-[46ch]">One network, two products: find someone you trust to fix your car, or build your independent mechanic business. Launching in Los Angeles.</p>
-          <p className="text-ink-3">Demo build: every mechanic, shop, customer and review on this site is fictional.</p>
         </div>
         <nav aria-label="Footer" className="grid grid-cols-2 gap-x-8 gap-y-2">
           <Link href="/customer/mechanics" className="hover:text-ink">Find a Mechanic</Link>
@@ -87,7 +86,7 @@ export function SiteFooter() {
           <Link href="/verification" className="hover:text-ink">Verification</Link>
           <Link href="/help" className="hover:text-ink">Help &amp; safety</Link>
           <Link href="/login" className="hover:text-ink">Log in</Link>
-          <Link href="/demo" className="hover:text-ink">Demo accounts</Link>
+          <Link href="/demo" className="text-ink-3 hover:text-ink">Try the demo <span className="text-[0.75rem]">(test data)</span></Link>
         </nav>
       </div>
     </footer>

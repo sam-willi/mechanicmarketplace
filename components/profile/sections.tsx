@@ -404,8 +404,8 @@ export function PricingSection({ p }: { p: PublicMechanicProfile }) {
           [
             ["Labor rate", `${usd(pr.hourlyRateCents)}/hr`],
             ["Diagnostic fee", usd(pr.diagnosticFeeCents)],
-            ["Travel fee", pr.travelFeeCents ? usd(pr.travelFeeCents) : p.workModel === "shop" ? "Shop only" : "None"],
-            ["Service area", p.workModel === "shop" ? p.city : `${p.serviceRadiusMi} mi of ${p.neighborhood ?? p.city}`],
+            ["Travel fee", pr.travelFeeCents ? usd(pr.travelFeeCents) : "None"],
+            ["Service area", `${p.serviceRadiusMi} mi of ${p.neighborhood ?? p.city}`],
           ] as const
         ).map(([k, v]) => (
           <div key={k} className="border-b border-rule-soft py-2.5 pr-3">
@@ -456,9 +456,7 @@ export function PricingSection({ p }: { p: PublicMechanicProfile }) {
             <span className="font-semibold text-ink">Usual hours:</span> {p.availabilityNote}.
           </p>
         </div>
-        {p.workModel !== "shop" ? (
-          <ServiceAreaMap lat={p.lat} lng={p.lng} radiusMi={p.serviceRadiusMi} label={p.neighborhood ?? p.city} />
-        ) : null}
+        <ServiceAreaMap lat={p.lat} lng={p.lng} radiusMi={p.serviceRadiusMi} label={p.neighborhood ?? p.city} />
       </div>
       {p.guarantee ? (
         <div className="sheet px-4 py-3.5">

@@ -68,7 +68,6 @@ export function RequestCard({
           {distanceMi !== undefined ? (
             <span className="inline-flex items-center gap-1.5">
               <MapPin size={14} aria-hidden /> {distanceMi < 1 ? "Under a mile" : `${distanceMi.toFixed(1)} mi`}
-              {r.location.serviceMode === "shop" ? " · to your shop" : ""}
             </span>
           ) : null}
           <span className={`inline-flex items-center gap-1.5 ${r.urgency === "stranded" ? "font-semibold text-alert" : ""}`}>

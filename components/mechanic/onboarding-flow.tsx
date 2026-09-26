@@ -2,6 +2,7 @@
 
 import { Children, useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
+import { findArea } from "@/lib/domain/areas";
 
 type StepMeta = { title: string; why: string; minutes: number; required?: string[] };
 
@@ -201,7 +202,7 @@ export function ProfilePreview() {
       f.removeEventListener("change", read);
     };
   }, []);
-  const model = { mobile: "Mobile mechanic", shop: "Shop mechanic", both: "Shop + mobile" }[v.workModel as "mobile"] ?? "Mobile mechanic";
+  const model = "Mobile mechanic";
   return (
     <div ref={ref} className="sheet p-4">
       <p className="field-label">Your public profile, as customers will see it</p>
@@ -221,7 +222,7 @@ export function ProfilePreview() {
         <div className="min-w-0">
           <p className="heading text-[1.25rem]">{v.displayName || "Your name"}</p>
           <p className="text-[0.875rem] text-ink-2">
-            {model} · {v.neighborhood ? `${v.neighborhood}, ` : ""}
+            {model} · {v.neighborhood ? `${findArea(v.neighborhood)?.label ?? v.neighborhood}, ` : ""}
             {v.city || "Los Angeles"} · within {v.serviceRadiusMi || 15} mi
           </p>
           <p className="mt-1 text-[0.875rem]">
@@ -232,7 +233,7 @@ export function ProfilePreview() {
       </div>
       {v.bio ? <p className="mt-3 line-clamp-3 text-[0.875rem] text-ink-2">{v.bio}</p> : null}
       <p className="mt-3 border-t border-rule-soft pt-2 text-[0.8125rem] text-ink-3">
-        Services and makes you pick show as self-reported until real jobs verify them. Screening shows as &ldquo;not provided&rdquo; until each check is done.
+        Services and makes you pick show as self-reported until real jobs verify them. Each verification check shows as &ldquo;Not completed&rdquo; until it&apos;s done; customers can still book you once your profile is complete.
       </p>
     </div>
   );

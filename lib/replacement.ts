@@ -1,5 +1,5 @@
 import "server-only";
-import { repo } from "@/lib/data";
+import type { Repository } from "@/lib/data/repository";
 import { findArea, milesBetween, serves } from "@/lib/domain/areas";
 import { daysUntil, soonest } from "@/lib/domain/availability";
 import { eligibility } from "@/lib/domain/eligibility";
@@ -35,15 +35,17 @@ const BROADEN_LIMIT = 4;
  * declined or cancelled, or when everyone it went to declined — and the
  * customer hasn't already sent it on since.
  */
-export function replacementFor(r: RepairRequest): Replacement | null {
+export async function replacementFor(repo: Repository, r: RepairRequest): Promise<Replacement | null> {
   const quotes = repo.listQuotesForRequest(r.id);
   if (!needsNewMechanic(r, quotes)) return null;
+  // Candidates and the numbers to rank them (targeted live mode reads no repair documents here); see Repository.searchPool.
+  const v0 = repo.getVehicle(r.vehicleId)!;
+  const pool = await repo.searchPool({ repair: r.repairCategory, make: v0.make, model: v0.model });
   const last = r.declines!.at(-1)!;
 
   const v = repo.getVehicle(r.vehicleId)!;
   const who = repo.getMechanic(last.mechanicId);
   const area = findArea(r.location.area);
-  const mobile = r.location.serviceMode === "mobile";
   const model = v.model.toLowerCase();
   const ctx = {
     repair: r.repairCategory,
@@ -52,24 +54,24 @@ export function replacementFor(r: RepairRequest): Replacement | null {
     vehicle: { year: v.year, make: v.make, model: v.model, spec: r.vehicleSpec ?? v.spec },
   };
 
-  const rows = repo
-    .listPublicProfiles()
+  const rows = pool.profiles
     .filter((p) => !r.matchedMechanicIds.includes(p.id) && !r.declinedBy.includes(p.id))
     .map((p) => {
       const m = repo.getMechanic(p.id)!;
       const w = p.verifiedWork;
+      const given = pool.counts?.get(p.id);
       const fit: FitInput = {
         p,
-        cross: w.filter((x) => x.category === r.repairCategory && x.make === v.make).length,
-        cat: w.filter((x) => x.category === r.repairCategory).length,
-        mk: w.filter((x) => x.make === v.make).length,
-        mdl: w.filter((x) => x.make === v.make && x.model.toLowerCase().includes(model)).length,
+        cross: given?.cross ?? w.filter((x) => x.category === r.repairCategory && x.make === v.make).length,
+        cat: given?.cat ?? w.filter((x) => x.category === r.repairCategory).length,
+        mk: given?.mk ?? w.filter((x) => x.make === v.make).length,
+        mdl: given?.mdl ?? w.filter((x) => x.make === v.make && x.model.toLowerCase().includes(model)).length,
         miles: area ? milesBetween(m, area) : undefined,
       };
       const o = soonest(p.openings);
       const days = o ? Math.max(0, daysUntil(o.on)) : 99;
-      const reachable = (!area || serves(m, area)) && (!mobile || m.workModel !== "shop") && eligibility(p).eligible;
-      return { fit, days, reachable, declared: m.declaredRepairCategories.includes(r.repairCategory) };
+      const reachable = (!area || serves(m, area)) && eligibility(p).eligible;
+      return { fit, days, reachable, verified: eligibility(p).fullyVerified, declared: m.declaredRepairCategories.includes(r.repairCategory) };
     })
     .filter((x) => x.reachable);
 
@@ -83,6 +85,8 @@ export function replacementFor(r: RepairRequest): Replacement | null {
     tier(x.fit.mdl),
     tier(x.fit.mk),
     tier(x.fit.cat),
+    // Full verification: a trust advantage at equal experience, never an exclusion.
+    x.verified ? 1 : 0,
     -Math.round(x.fit.miles ?? 0),
     -x.days,
     x.fit.p.reputation.rating?.average ?? 0,
@@ -97,12 +101,12 @@ export function replacementFor(r: RepairRequest): Replacement | null {
   const strong = rows.filter((x) => isStrongFit(x.fit, ctx));
   // Without strong fits, offer the closest relevant ones — clearly labelled, never dressed up.
   const shown = (strong.length ? strong : rows.filter((x) => x.fit.cat > 0 || x.fit.mk > 0)).slice(0, 3);
-  const suggestions = shown.map((x) => ({
-    fit: x.fit,
-    strong: strong.includes(x),
-    dominant: dominantReason(x.fit, ctx),
-    reasons: fitReasons(x.fit, ctx).slice(0, 3),
-  }));
+  // The few shown get their full record (reasons about this exact car need the repair list).
+  const full = new Map((await repo.publicProfiles(shown.map((x) => x.fit.p.id))).map((p) => [p.id, p]));
+  const suggestions = shown.map((x) => {
+    const fit = { ...x.fit, p: full.get(x.fit.p.id) ?? x.fit.p };
+    return { fit, strong: strong.includes(x), dominant: dominantReason(fit, ctx), reasons: fitReasons(fit, ctx).slice(0, 3) };
+  });
   const broaden = rows
     .filter((x) => x.fit.cat > 0 || x.fit.mk > 0 || x.declared)
     .slice(0, BROADEN_LIMIT)

@@ -1,4 +1,5 @@
 import { effectiveStatus, isPubliclyValid } from "@/lib/verification/lifecycle";
+import { screeningOpen } from "@/lib/verification/providers/registry";
 import { platformFor } from "@/lib/vehicles/catalog";
 import { methodToProvenance, repairSourceToProvenance } from "./provenance";
 import {
@@ -38,6 +39,8 @@ export interface PublicStatus {
   status: VerificationStatus;
   verifiedAt?: ISODate;
   expiresAt?: ISODate;
+  /** Started, but no screening provider can run it in this marketplace: "Could not be verified". */
+  unavailable?: true;
 }
 
 export interface PublicClaim {
@@ -111,7 +114,6 @@ export interface PublicMechanicProfile {
   neighborhood?: string;
   serviceRadiusMi: number;
   workModel: WorkModel;
-  shopName?: string;
   bio: string;
   availabilityNote: string;
   nextAvailable: string;
@@ -181,6 +183,8 @@ export interface ProfileSources {
   pastRepairs: PastRepair[];
   reviews: Review[];
   verifications: VerificationRecord[];
+  /** Which marketplace these come from; decides whether a pending check can actually run. */
+  scope?: "live" | "demo";
 }
 
 const NONE: PublicStatus = { status: "not_submitted" };
@@ -192,7 +196,10 @@ export function toPublicProfile(src: ProfileSources, now = new Date()): PublicMe
   const screening = (kind: ScreeningCheck["kind"]): PublicStatus => {
     const sc = src.screenings.filter((s) => s.kind === kind).sort((a, b) => ((a.completedAt ?? "") < (b.completedAt ?? "") ? 1 : -1))[0];
     if (!sc) return NONE;
-    return { status: effectiveStatus(sc.status, sc.expiresAt, now), verifiedAt: sc.completedAt, expiresAt: sc.expiresAt };
+    const status = effectiveStatus(sc.status, sc.expiresAt, now);
+    // No provider can run this check here (the real marketplace has none connected yet): it was never run.
+    const unavailable = status === "pending" && src.scope !== undefined && !screeningOpen(kind, src.scope);
+    return { status, verifiedAt: sc.completedAt, expiresAt: sc.expiresAt, ...(unavailable ? { unavailable: true as const } : {}) };
   };
   const insurance = (): PublicStatus => {
     const ins = [...src.insurance].sort((a, b) => (a.expiresOn < b.expiresOn ? 1 : -1))[0];
@@ -282,13 +289,14 @@ export function toPublicProfile(src: ProfileSources, now = new Date()): PublicMe
     city: m.city,
     neighborhood: m.neighborhood,
     serviceRadiusMi: m.serviceRadiusMi,
-    workModel: m.workModel,
-    shopName: m.shopName,
+    // Every mechanic goes to the car; a legacy "shop"/"both" record or shop name is not shown.
+    workModel: "mobile",
     bio: m.bio,
     availabilityNote: m.availabilityNote,
     nextAvailable: m.nextAvailable,
     nextAvailableOn: m.nextAvailableOn,
-    openings: m.openings ?? [{ on: m.nextAvailableOn, time: "" }],
+    // Only times the mechanic actually posted; never an invented "open today".
+    openings: m.openings ?? [],
     tagline: m.tagline,
     languages: m.languages ?? [],
     trainedAt: m.trainedAt,
@@ -308,7 +316,7 @@ export function toPublicProfile(src: ProfileSources, now = new Date()): PublicMe
       background: screening("background"),
       driving_record: screening("driving_record"),
       insurance: insurance(),
-      drivingApplies: m.workModel !== "shop",
+      drivingApplies: true,
     },
     credentials: src.credentials
       .map((c) => ({ id: c.id, issuer: c.issuer, name: c.name, code: c.code, issuedOn: c.issuedOn, ...claim(c.id, c.expiresOn) }))

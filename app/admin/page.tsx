@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ready, repo } from "@/lib/data";
-import { getSession, isStaff } from "@/lib/session";
+import { getRepo } from "@/lib/data";
+import { getSession, isStaff, needs } from "@/lib/session";
+import { QUEUE_FILTERS, inQueue } from "@/lib/admin-queue";
+import { paginateAsc, parseCursor } from "@/lib/data/page";
+import { Pager } from "@/components/app/pager";
 import { CATEGORY_LABEL, METHOD_LABEL } from "@/lib/domain/provenance";
-import type { VerificationCategory, VerificationStatus } from "@/lib/domain/types";
+import type { VerificationCategory } from "@/lib/domain/types";
 import { effectiveStatus } from "@/lib/verification/lifecycle";
 import { dayMonth, plural, WORK_MODEL_LABEL } from "@/lib/format";
 import { ArrowRight, Check, Clock, Hourglass, MessageCircleQuestion, X } from "lucide-react";
@@ -16,15 +19,12 @@ import { NeedsPersona, PageTitle } from "@/components/workspace/ui";
 
 export const metadata: Metadata = { title: "Verification review" };
 
-const FILTERS: { key: string; label: string; statuses: VerificationStatus[] }[] = [
-  { key: "queue", label: "Needs review", statuses: ["pending"] },
-  { key: "waiting", label: "Waiting on mechanic", statuses: ["needs_info"] },
-  { key: "expiring", label: "Expiring / expired", statuses: ["verified", "expired", "reverification_required"] },
-  { key: "done", label: "Decided", statuses: ["verified", "rejected"] },
-];
+const FILTERS = QUEUE_FILTERS;
+/** Items per page of a queue tab, oldest submission first. */
+const QUEUE_PAGE = 60;
 
-export default async function AdminQueue({ searchParams }: { searchParams: Promise<{ f?: string; cat?: string; done?: string }> }) {
-  await ready();
+export default async function AdminQueue({ searchParams }: { searchParams: Promise<{ f?: string; cat?: string; done?: string; after?: string }> }) {
+  const repo = await getRepo();
   const s = await getSession();
   if (!isStaff(s))
     return (
@@ -35,35 +35,31 @@ export default async function AdminQueue({ searchParams }: { searchParams: Promi
     );
   const sp = await searchParams;
   const filter = FILTERS.find((f) => f.key === sp.f) ?? FILTERS[0];
-  let rows = repo
-    .listVerifications()
-    .map((v) => ({ v, status: effectiveStatus(v.status, v.expiresAt) }))
-    .filter(({ v, status }) => {
-      if (filter.key === "expiring") return status === "expired" || status === "reverification_required";
-      if (filter.key === "done") return (status === "verified" || status === "rejected") && v.method !== "platform_job" && v.method !== "customer_confirmation";
-      return filter.statuses.includes(status);
-    });
-  if (sp.cat) rows = rows.filter(({ v }) => v.category === sp.cat);
-  const counts = Object.fromEntries(
-    FILTERS.map((f) => [
-      f.key,
-      repo
-        .listVerifications()
-        .map((v) => ({ v, status: effectiveStatus(v.status, v.expiresAt) }))
-        .filter(({ v, status }) =>
-          f.key === "expiring"
-            ? status === "expired" || status === "reverification_required"
-            : f.key === "done"
-              ? (status === "verified" || status === "rejected") && v.method !== "platform_job" && v.method !== "customer_confirmation"
-              : f.statuses.includes(status),
-        ).length,
-    ]),
-  );
   const cats: VerificationCategory[] = ["identity", "background", "driving_record", "insurance", "credential", "employment", "past_repair"];
+  const cat = cats.find((c) => c === sp.cat);
+  const after = parseCursor(sp.after);
+  const at = new Date();
+  const nowIso = at.toISOString();
   const now = today();
   const waited = (d?: string) => (d ? Math.max(0, Math.round((new Date(now).getTime() - new Date(d.slice(0, 10)).getTime()) / 86_400_000)) : 0);
   const weekAgo = new Date(new Date(now).getTime() - 7 * 86_400_000).toISOString().slice(0, 10);
-  const approvedThisWeek = repo.listVerifications().filter((v) => v.status === "verified" && (v.verifiedAt ?? "") >= weekAgo && v.method !== "platform_job").length;
+  // One page of this tab (oldest submission first) and the mechanics behind it; the tiles are counted, not loaded.
+  await (await needs(s)).verificationQueue(filter.key, cat, after, QUEUE_PAGE, nowIso);
+  const matching = repo
+    .listVerifications()
+    .map((v) => ({ v, status: effectiveStatus(v.status, v.expiresAt, at) }))
+    .filter(({ v, status }) => inQueue(filter.key, status, v.method) && (!cat || v.category === cat));
+  const page = paginateAsc(
+    matching.map((r) => r.v),
+    (v) => v.submittedAt,
+    QUEUE_PAGE,
+    after,
+  );
+  const onPage = new Set(page.items.map((v) => v.id));
+  const rows = matching.filter((r) => onPage.has(r.v.id));
+  const counts = await repo.verificationCounts(nowIso, weekAgo);
+  const approvedThisWeek = counts.approvedThisWeek;
+  const openSupport = await repo.openSupportCount();
 
   // One card per mechanic, longest-waiting first.
   const groups = [...new Set(rows.map((r) => r.v.mechanicId))]
@@ -89,9 +85,14 @@ export default async function AdminQueue({ searchParams }: { searchParams: Promi
         <PageTitle
           title="Verification review"
           action={
-            <Link href="/admin/support" className="btn btn-quiet min-h-11">
-              Support reports ({repo.listSupportReports().filter((r) => r.status !== "resolved").length} open)
-            </Link>
+            <span className="flex flex-wrap gap-2">
+              <Link href="/admin/demand" className="btn btn-quiet min-h-11">
+                Unmatched demand
+              </Link>
+              <Link href="/admin/support" className="btn btn-quiet min-h-11">
+                Support reports ({openSupport} open)
+              </Link>
+            </span>
           }
         />
 
@@ -132,7 +133,8 @@ export default async function AdminQueue({ searchParams }: { searchParams: Promi
         </div>
 
         <h2 className="heading text-[1.25rem]">
-          {filter.label} · {plural(rows.length, "item")} from {plural(groups.length, "mechanic")}
+          {filter.label} · {cat ? plural(rows.length, "item") : plural(counts[filter.key] ?? rows.length, "item")}
+          {page.next || after ? ` (showing ${rows.length}, from ${plural(groups.length, "mechanic")})` : ` from ${plural(groups.length, "mechanic")}`}
         </h2>
 
         {groups.length ? (
@@ -189,6 +191,7 @@ export default async function AdminQueue({ searchParams }: { searchParams: Promi
             <Check size={20} strokeWidth={3} aria-hidden /> Nothing here. The queue is clear.
           </p>
         )}
+        <Pager href={`/admin?f=${filter.key}${cat ? `&cat=${cat}` : ""}`} param="after" next={page.next} paged={Boolean(after)} olderLabel="Next items" newestLabel="Back to the oldest" />
       </main>
     </>
   );

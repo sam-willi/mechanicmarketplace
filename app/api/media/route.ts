@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAccount, getSession } from "@/lib/session";
+import { requestScope } from "@/lib/data";
 import { MAX_MEDIA_BYTES, putMedia } from "@/lib/data/mock/media-store";
 import type { MediaTag } from "@/lib/domain/types";
 
@@ -23,6 +24,6 @@ export async function POST(request: Request) {
   if (acct && tag !== "portrait") return NextResponse.json({ error: "Finish your profile first." }, { status: 403 });
   if (s.role === "mechanic" && !MECHANIC_TAGS.includes(tag)) return NextResponse.json({ error: "Mechanics can upload repair photos only." }, { status: 403 });
   const ownerId = s.role === "guest" ? acct!.user.id : s.userId;
-  const meta = await putMedia(ownerId, { name: file.name, type: file.type, bytes: new Uint8Array(await file.arrayBuffer()) }, tag, String(form.get("description") ?? "") || undefined);
+  const meta = await putMedia(await requestScope(), ownerId, { name: file.name, type: file.type, bytes: new Uint8Array(await file.arrayBuffer()) }, tag, String(form.get("description") ?? "") || undefined);
   return NextResponse.json(meta);
 }

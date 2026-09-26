@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { ready, repo } from "@/lib/data";
-import { getSession } from "@/lib/session";
+import { getRepo } from "@/lib/data";
+import { getSession, needs } from "@/lib/session";
 import { vehicleLine } from "@/lib/domain/intake";
 import { dayMonth } from "@/lib/format";
 import { CommonAnswers, ContactSupport, Protections } from "@/components/help/help-content";
@@ -10,15 +10,16 @@ import { SupportReports } from "@/components/help/support-reports";
 export const metadata: Metadata = { title: "Help" };
 
 export default async function CustomerHelp({ searchParams }: { searchParams: Promise<{ job?: string; request?: string; sent?: string }> }) {
-  await ready();
+  const repo = await getRepo();
   const s = await getSession();
   if (s.role !== "customer") return null;
+  await (await needs(s)).customerHelp();
   const sp = await searchParams;
   const jobs = repo.listJobsForCustomer(s.customerId).map((j) => ({
     id: j.id,
     label: `${j.title} · ${vehicleLine(repo.getVehicle(j.vehicleId)!)} · ${repo.getMechanic(j.mechanicId)?.displayName}`,
   }));
-  const mine = repo.listSupportReports().filter((r) => r.userId === s.userId);
+  const mine = repo.listSupportReports({ userId: s.userId });
   return (
     <div className="mx-auto max-w-[920px] space-y-12">
       <div>
@@ -27,7 +28,7 @@ export default async function CustomerHelp({ searchParams }: { searchParams: Pro
       </div>
       {sp.sent ? (
         <p className="border-2 border-ink bg-sheet px-4 py-3 text-[0.9375rem]" role="status">
-          Report sent. The trust team will reply by email, usually within one business day. Reference {sp.sent.toUpperCase()}.
+          Report saved. Clutch staff review reports in the order they arrive, and its status shows on this page. Reference {sp.sent.toUpperCase()}.
         </p>
       ) : null}
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">

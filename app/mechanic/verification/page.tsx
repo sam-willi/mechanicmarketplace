@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ready, repo } from "@/lib/data";
-import { getSession } from "@/lib/session";
+import { getRepo } from "@/lib/data";
+import { getSession, needs } from "@/lib/session";
 import { toPublicProfile } from "@/lib/domain/public-profile";
 import { METHOD_LABEL, PROVENANCE, SAFETY } from "@/lib/domain/provenance";
 import { methodToProvenance } from "@/lib/domain/provenance";
 import { effectiveStatus } from "@/lib/verification/lifecycle";
 import type { ScreeningKind, VerificationRecord } from "@/lib/domain/types";
 import { monthYear } from "@/lib/format";
+import { screeningOpen } from "@/lib/verification/providers/registry";
 import {
   refreshScreening,
   resubmitVerification,
@@ -22,9 +23,10 @@ import { completeness, profileSteps } from "@/lib/domain/completeness";
 export const metadata: Metadata = { title: "Verification Center" };
 
 export default async function VerificationCenter({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
-  await ready();
+  const repo = await getRepo();
   const s = await getSession();
   if (s.role !== "mechanic") return <NeedsPersona role="mechanic" />;
+  await (await needs(s)).ownSources();
   const sp = await searchParams;
   const src = repo.getMechanicSources(s.mechanicId);
   const pub = toPublicProfile(src);
@@ -37,7 +39,7 @@ export default async function VerificationCenter({ searchParams }: { searchParam
   const safetyRows: { kind: ScreeningKind | "insurance"; v?: VerificationRecord; applies: boolean }[] = [
     { kind: "identity", v: latestFor("identity"), applies: true },
     { kind: "background", v: latestFor("background"), applies: true },
-    { kind: "driving_record", v: latestFor("driving_record"), applies: src.mechanic.workModel !== "shop" },
+    { kind: "driving_record", v: latestFor("driving_record"), applies: true },
     { kind: "insurance", v: latestFor("insurance"), applies: true },
   ];
 
@@ -53,7 +55,7 @@ export default async function VerificationCenter({ searchParams }: { searchParam
     <div className="space-y-12">
       <PageTitle
         title="Verification Center"
-        note="Safety screening lets you be booked. Proven experience makes you stand out."
+        note="Verification checks aren't required to be booked: customers see each one's status, and verified checks improve your ranking. Proven experience makes you stand out."
         action={
           <Link href={`/mechanics/${src.mechanic.slug}`} className="btn btn-quiet min-h-11 text-sm">
             See your public profile
@@ -87,7 +89,7 @@ export default async function VerificationCenter({ searchParams }: { searchParam
       {/* SAFETY TRACK */}
       <section className="space-y-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="heading text-[1.375rem]">Safety screening</h2>
+          <h2 className="heading text-[1.375rem]">Verification checks</h2>
           <p className="text-[0.8125rem] text-ink-3">Customers see only the outcome, never your documents or reports.</p>
         </div>
         <ul className="border-t border-rule">
@@ -98,6 +100,8 @@ export default async function VerificationCenter({ searchParams }: { searchParam
               const info = SAFETY[kind];
               const canStart = kind !== "insurance" && (status === "not_submitted" || status === "expired" || status === "reverification_required" || status === "rejected");
               const pendingMock = kind !== "insurance" && v?.status === "pending" && v.method === "vendor_screening";
+              // Real mechanics: only when a real screening provider is connected for this kind.
+              const closed = kind !== "insurance" && !screeningOpen(kind, repo.scope) && status !== "verified";
               return (
                 <li key={kind} className="grid gap-3 border-b border-rule-soft py-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] md:gap-8">
                   <div>
@@ -135,6 +139,12 @@ export default async function VerificationCenter({ searchParams }: { searchParam
                           </button>
                         </form>
                       )
+                    ) : closed ? (
+                      <p className="border-l-4 border-brass pl-3 text-[0.875rem] text-ink-2">
+                        <span className="font-semibold text-ink">Opens soon.</span> Clutch is connecting an independent screening company. Until then no one can complete
+                        this check. Customers see it as {v?.status === "pending" ? "could not be verified" : "not completed"}, and you can still be booked once your profile is complete.{" "}
+                        {v?.status === "pending" ? "The check you started earlier will need to be run again then." : ""}
+                      </p>
                     ) : pendingMock ? (
                       <form action={refreshScreening.bind(null, kind)} className="flex flex-wrap items-center gap-3">
                         <p className="text-[0.875rem] text-ink-2">Waiting on the screening provider.</p>

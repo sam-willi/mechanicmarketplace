@@ -1,6 +1,6 @@
 /**
  * Demo seed. Every person, shop, review and repair here is fictional.
- * Shop and dealership names carry "(demo)" in the admin view and are invented.
+ * Employer and dealership names carry "(demo)" in the admin view and are invented.
  */
 import { configsFor } from "@/lib/vehicles/catalog";
 import { buildSpec, type Selection } from "@/lib/vehicles/spec";
@@ -256,18 +256,17 @@ const SPECS: MechSpec[] = [
     profile: {
       slug: "rosa-delgado",
       openings: [{"on": "2026-09-30", "time": "8:30 AM"}, {"on": "2026-10-01", "time": "1:00 PM"}],
-      tagline: "Hybrid and Toyota/Lexus diagnostics specialist with her own two-bay shop.",
+      tagline: "Hybrid and Toyota/Lexus diagnostics specialist who comes to you.",
       languages: ["English", "Spanish"],
       trainedAt: "Toyota T-TEN program, then eleven years as a dealership master technician.",
-      guarantee: "24-month / 24,000-mile guarantee on parts and labor for repairs done in my shop.",
+      guarantee: "24-month / 24,000-mile guarantee on parts and labor.",
       displayName: "Rosa Delgado",
       firstName: "Rosa",
       photoUrl: "/mechanics/rosa-delgado.webp",
       city: "Pasadena",
       serviceRadiusMi: 10,
-      bio: "Hybrid and Toyota/Lexus diagnostics are my focus — eleven years at a Toyota dealership, now running my own two-bay shop. I also do mobile diagnostics around Pasadena and Altadena.",
-      workModel: "both",
-      shopName: "Delgado Hybrid Service (demo)",
+      bio: "Hybrid and Toyota/Lexus diagnostics are my focus — eleven years at a Toyota dealership, now fully mobile around Pasadena and Altadena with hybrid-capable diagnostic equipment in the van.",
+      workModel: "mobile",
       hourlyRateCents: 12000,
       diagnosticFeeCents: 9500,
       travelFeeCents: 3500,
@@ -275,7 +274,7 @@ const SPECS: MechSpec[] = [
         { category: "diagnostics", label: "Hybrid system diagnosis", labor: 14500 },
         { category: "cooling", label: "Inverter coolant pump (labor)", labor: 24000 },
       ],
-      availabilityNote: "Shop Mon–Fri 8am–5pm; mobile Tue & Thu",
+      availabilityNote: "Mon–Fri 8am–5pm",
       nextAvailable: "Tue, Sep 30",
       nextAvailableOn: "2026-09-30",
       declaredRepairCategories: ["diagnostics", "cooling", "electrical", "brakes", "engine"],
@@ -431,10 +430,9 @@ const SPECS: MechSpec[] = [
       firstName: "Samuel",
       photoUrl: "/mechanics/samuel-okafor.webp",
       city: "Long Beach",
-      serviceRadiusMi: 8,
-      bio: "European specialist. Nine years as a BMW master technician, now in my own shop in Bixby Knolls with factory-level diagnostic equipment for BMW, Mercedes, Audi and VW.",
-      workModel: "shop",
-      shopName: "Okafor European (demo)",
+      serviceRadiusMi: 20,
+      bio: "European specialist. Nine years as a BMW master technician, now mobile around Long Beach with factory-level diagnostic equipment for BMW, Mercedes, Audi and VW.",
+      workModel: "mobile",
       hourlyRateCents: 14000,
       diagnosticFeeCents: 15000,
       fixedPrices: [
@@ -596,9 +594,8 @@ const SPECS: MechSpec[] = [
       photoUrl: "",
       city: "Culver City",
       serviceRadiusMi: 12,
-      bio: "Cooling systems and A/C, year-round. EPA 609 certified for refrigerant work. Shop in Culver City, mobile across the Westside for diagnosis and recharges.",
-      workModel: "both",
-      shopName: "Nair Auto Climate (demo)",
+      bio: "Cooling systems and A/C, year-round. EPA 609 certified for refrigerant work. Mobile across the Westside for diagnosis, recharges and repairs.",
+      workModel: "mobile",
       hourlyRateCents: 10500,
       diagnosticFeeCents: 8500,
       travelFeeCents: 3000,
@@ -909,6 +906,8 @@ export function buildSeed(): DB {
       const cid = customerFor[i];
       if (cid && cid !== "cust-maya" && !db.customers.some((c) => c.id === cid)) {
         db.customers.push({ id: cid, userId: `user-${cid}`, displayName: nameOf(cid), city: spec.profile.city });
+        // A fictional demo account, so anything that notifies this customer (a review reply, a rebook) works.
+        db.users.push({ id: `user-${cid}`, demo: true, roles: ["customer"], email: `${cid}@clutch.demo`, name: nameOf(cid), notificationPrefs: { email: true, sms: false, push: true } });
       }
       db.pastRepairs.push({
         id: rid,
@@ -1172,16 +1171,20 @@ export function buildSeed(): DB {
       partsIncluded: true,
       partsEstimateCents: 38000,
       durationHours: 3,
-      availableOn: "Mon, Sep 29 · drop-off 8am",
-      serviceMode: "shop",
+      availableOn: "Mon, Sep 29 · 8am",
+      serviceMode: "mobile",
       scope: "Front pads, rotors, wear sensor (genuine BMW parts included), brake fluid test, road test.",
-      notes: "Drop-off at the shop in Long Beach; ready same day.",
+      notes: "I bring the parts; about three hours in your driveway.",
       status: "submitted",
       createdAt: "2026-09-24",
       customerQuestions: [],
     },
   );
-  // Incoming requests for Derek to quote.
+  // Incoming requests for Derek to quote. Their customers are fictional demo accounts too, so
+  // estimates, questions and bookings on these requests can notify them like anyone else.
+  for (const [n, name] of [[1, "Jordan P."], [2, "Sofia M."], [3, "Elena R."], [4, "Chris T."]] as const) {
+    db.users.push({ id: `user-cust-req-${n}`, demo: true, roles: ["customer"], email: `customer${n}@clutch.demo`, name, notificationPrefs: { email: true, sms: false, push: true } });
+  }
   db.customers.push(
     { id: "cust-req-1", userId: "user-cust-req-1", displayName: "Jordan P.", city: "Los Angeles" },
     { id: "cust-req-2", userId: "user-cust-req-2", displayName: "Sofia M.", city: "Culver City" },

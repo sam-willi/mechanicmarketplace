@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { StarRating } from "@/components/visual/stars";
 import Link from "next/link";
-import { ready, repo } from "@/lib/data";
-import { getSession } from "@/lib/session";
+import { getRepo } from "@/lib/data";
+import { getSession, needs } from "@/lib/session";
 import { monthYear, plural, usd } from "@/lib/format";
 import { PhotoPrint } from "@/components/profile/photo";
 import { SaveMechanicButton } from "@/components/profile/save-button";
@@ -10,9 +10,10 @@ import { SaveMechanicButton } from "@/components/profile/save-button";
 export const metadata: Metadata = { title: "Saved Mechanics" };
 
 export default async function SavedMechanics() {
-  await ready();
+  const repo = await getRepo();
   const s = await getSession();
   if (s.role !== "customer") return null;
+  await (await needs(s)).customerSaved();
   const saved = repo.listSaved(s.customerId);
   const history = repo.listCustomerHistory(s.customerId);
   const ids = [...new Set([...saved, ...history.map((h) => h.mechanicId)])];

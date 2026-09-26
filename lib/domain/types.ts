@@ -1,5 +1,8 @@
+import type { AuditEntry } from "./transitions";
+export type { AuditEntry } from "./transitions";
+
 import type { RecordedSpec, VehicleSpec } from "@/lib/vehicles/types";
-// Domain model for Clutch. Mirrors supabase/migrations/0001_init.sql one to one
+// Domain model for Clutch. Follows the original design in supabase/migrations/0001_init.sql (reference only)
 // (camelCase here, snake_case in Postgres). Money is always integer cents.
 
 export type ID = string;
@@ -45,7 +48,10 @@ export const VEHICLE_MAKES = [
 ] as const;
 export type VehicleMake = (typeof VEHICLE_MAKES)[number];
 
-export type WorkModel = "mobile" | "shop" | "both";
+/** Every Clutch mechanic is mobile: they go to the car (policy since 2026-09-26). Older records may hold "shop" or "both"; nothing reads them differently. */
+export type WorkModel = "mobile";
+/** Every repair happens where the car is. Older requests and estimates may hold "shop"; nothing reads them differently. */
+export type ServiceMode = "mobile";
 
 // ---------------------------------------------------------------------------
 // Provenance & verification
@@ -132,6 +138,8 @@ export interface User {
   phone?: string;
   name: string;
   notificationPrefs: { email: boolean; sms: boolean; push: boolean };
+  /** When the sign-in email was verified (Supabase Auth confirmation or Google). Alerts go only to verified contacts. */
+  emailVerifiedAt?: ISODate;
   createdAt?: ISODate;
   avatarUrl?: string;
   /** Seeded demo account (one-click sign-in, no password). Real accounts use Supabase Auth and their id is the auth user id. */
@@ -166,7 +174,11 @@ export type NotificationKind =
   | "diagnosis_shared"
   | "scope_change_requested"
   | "scope_change_answered"
-  | "mechanic_declined";
+  | "mechanic_declined"
+  | "reschedule_proposed"
+  | "reschedule_answered"
+  | "support_update"
+  | "payment_mismatch";
 
 /** A customer's "something went wrong" report. Goes to Clutch support (admin). */
 export interface SupportReport {
@@ -178,6 +190,12 @@ export interface SupportReport {
   details: string;
   createdAt: ISODate;
   status: "open" | "in_review" | "resolved";
+  /** Which side of the account filed it. */
+  reporterRole?: "customer" | "mechanic";
+  /** In-app conversation between the reporter and Clutch staff. Nothing is emailed or texted. */
+  messages?: { at: ISODate; from: "reporter" | "staff"; body: string }[];
+  updatedAt?: ISODate;
+  history?: AuditEntry[];
 }
 
 /** Role-aware: a dual-role user sees customer notifications only in customer mode, and vice versa. */
@@ -191,6 +209,8 @@ export interface AppNotification {
   href: string;
   createdAt: ISODate;
   read: boolean;
+  /** Which optional alert this may also send (lib/notify/events.ts); "none" = in-app only. Defaults from `kind`. */
+  event?: string;
 }
 
 export interface FixedPrice {
@@ -212,6 +232,7 @@ export interface MechanicProfile {
   serviceRadiusMi: number;
   bio: string;
   workModel: WorkModel;
+  /** Legacy: from when some mechanics worked from a shop. Not shown or collected. */
   shopName?: string;
   hourlyRateCents: number;
   diagnosticFeeCents: number;
@@ -239,7 +260,8 @@ export interface MechanicProfile {
   /** Distance used by demo matching; stands in for real geo. */
   lat: number;
   lng: number;
-  isDemo: true;
+  /** Seeded fictional profile (demo scope only). */
+  isDemo?: boolean;
 }
 
 export interface CustomerProfile {
@@ -439,7 +461,7 @@ export interface RepairMedia {
 }
 
 export interface RepairLocation {
-  serviceMode: "mobile" | "shop";
+  serviceMode: ServiceMode;
   /** Launch-market area key (lib/domain/areas.ts) — public to matched mechanics. */
   area?: string;
   /** Street address. PRIVATE: shown to a mechanic only after the customer books them. */
@@ -541,6 +563,28 @@ export interface RepairRequest {
   declines?: { mechanicId: ID; reason?: DeclineReason; at: ISODate; cancelledJob?: boolean }[];
   /** The customer re-sent this request after their pick couldn't take it. */
   handoffs?: { to: ID[]; at: ISODate; kind: "replacement" | "broaden" }[];
+  /** Last time the customer edited it. */
+  updatedAt?: ISODate;
+  /** When the customer cancelled it. */
+  cancelledAt?: ISODate;
+  /**
+   * Saved while no mechanic matched. Clutch sends it on automatically when one
+   * does (lib/data/mock/repository.ts `matchWaiting`); cleared once it's been sent.
+   */
+  waitingSince?: ISODate;
+  /** Idempotency key from the intake draft, so a double submit can't create two requests. */
+  idempotencyKey?: string;
+  history?: AuditEntry[];
+}
+
+/** What a customer can change on a request before any mechanic has responded. */
+export interface RequestEdit {
+  symptomDescription: string;
+  repairCategory: RepairCategory;
+  area?: string;
+  serviceMode: ServiceMode;
+  urgency?: Urgency;
+  preferredTimes?: string;
 }
 
 /** A mechanic's reason for declining or cancelling. Shared with the customer in plain words. */
@@ -562,7 +606,7 @@ export interface Quote {
   availableOn: string;
   /** The same time, structured, for calendars. Older estimates only have the text. */
   availableAt?: Slot;
-  serviceMode: "mobile" | "shop";
+  serviceMode: ServiceMode;
   scope: string;
   notes?: string;
   status: QuoteStatus;
@@ -582,7 +626,45 @@ export interface Quote {
   /** Other outcomes when the diagnosis is uncertain, each with its own price. */
   alternates?: QuoteAlternate[];
   /** Why a declined estimate was closed: the customer booked someone else, or turned it down. */
-  closedReason?: "chose_other" | "customer_declined";
+  closedReason?: "chose_other" | "customer_declined" | "request_cancelled";
+  /** 1 for the first version sent; +1 each time the mechanic revises it before it's accepted. */
+  version?: number;
+  /** Earlier sent versions, oldest first. Accepted estimates can't be revised. */
+  revisions?: QuoteRevision[];
+  revisedAt?: ISODate;
+  /** What the customer accepted: the version and its total at that moment. */
+  acceptedAt?: ISODate;
+  acceptedVersion?: number;
+  acceptedTotalCents?: number;
+  history?: AuditEntry[];
+}
+
+export interface QuoteRevision {
+  version: number;
+  sentAt: ISODate;
+  totalCents: number;
+  laborCents: number;
+  partsEstimateCents: number;
+  diagnosticFeeCents: number;
+  travelFeeCents: number;
+  partsIncluded: boolean;
+  scope: string;
+  availableOn: string;
+}
+
+/** Customer- or mechanic-entered payment facts. Clutch doesn't process, hold or refund money. */
+export interface PaymentReport {
+  status: "paid" | "not_paid";
+  amountCents?: number;
+  at: ISODate;
+}
+
+export interface ScopeChange {
+  description: string;
+  extraCents: number;
+  status: "pending" | "approved" | "declined";
+  requestedAt: ISODate;
+  respondedAt?: ISODate;
 }
 
 export interface QuoteLine {
@@ -605,7 +687,35 @@ export interface QuoteAlternate {
  */
 export type JobStatus = "scheduled" | "in_progress" | "awaiting_customer" | "completed" | "cancelled";
 
+/** One verification check as a customer saw it when booking (kept with the booking; never changes). */
+export interface CheckSnapshot {
+  key: "identity" | "background" | "driving_record" | "insurance";
+  name: string;
+  state: "verified" | "expiring" | "pending" | "unavailable" | "missing" | "expired" | "rejected";
+  /** The words the customer saw, e.g. "Not completed", "Expired Sep 2026". */
+  status: string;
+  verified: boolean;
+}
+
+/** The mechanic's verification when the customer booked, and what they acknowledged if it wasn't complete. */
+export interface VerificationAtBooking {
+  checks: CheckSnapshot[];
+  fullyVerified: boolean;
+  capturedAt: ISODate;
+  acknowledgement?: {
+    version: string;
+    text: string;
+    /** The full disclosure the confirmation step showed. */
+    disclosure: string;
+    customerId: ID;
+    userId?: ID;
+    at: ISODate;
+  };
+}
+
 export interface Job {
+  /** Verification at booking time, as the customer saw and acknowledged it. Set once, never changed. */
+  verificationAtBooking?: VerificationAtBooking;
   id: ID;
   quoteId: ID;
   requestId: ID;
@@ -637,7 +747,18 @@ export interface Job {
   /** The car's configuration for this job; the mechanic can confirm open items at completion. */
   vehicleSpec?: VehicleSpec;
   /** Work beyond the approved estimate needs the customer's approval first. */
-  scopeChange?: { description: string; extraCents: number; status: "pending" | "approved" | "declined"; requestedAt: ISODate; respondedAt?: ISODate };
+  scopeChange?: ScopeChange;
+  /** Earlier extra-work requests on this job, oldest first. */
+  scopeChangeHistory?: ScopeChange[];
+  /** A proposed new appointment time. It only replaces the booked time once the other side accepts. */
+  reschedule?: { proposedBy: "customer" | "mechanic"; when: string; slot?: Slot; note?: string; at: ISODate; status: "pending" | "accepted" | "declined"; respondedAt?: ISODate };
+  /** Self-reported by each side; never processed by Clutch. */
+  payment?: { mechanic?: PaymentReport; customer?: PaymentReport };
+  /** Both sides were told their payment notes don't match (once). */
+  paymentMismatchNotifiedAt?: ISODate;
+  /** The mechanic's final amount was above the estimate plus approved extra work. */
+  finalExceedsApproved?: boolean;
+  history?: AuditEntry[];
 }
 
 export type ReviewKind = "verified_job" | "customer_confirmed" | "testimonial";
@@ -658,6 +779,9 @@ export interface Review {
   vehicleLabel?: string;
   repairLabel?: string;
   createdAt: ISODate;
+  /** Edits by the same customer: each earlier version, oldest first. One review per job, always. */
+  edits?: { at: ISODate; overall: number; comment: string }[];
+  updatedAt?: ISODate;
 }
 
 export interface SavedMechanic {
@@ -682,7 +806,10 @@ export type AnalyticsEventName =
   | "repeat_booking"
   | "review_submitted"
   | "quote_declined"
-  | "replacement_sent";
+  | "replacement_sent"
+  | "request_edited"
+  | "request_cancelled"
+  | "request_rematched";
 
 export type EvidenceVariant = "high" | "low";
 

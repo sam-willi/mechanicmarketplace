@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Car, Plus } from "lucide-react";
-import { ready, repo } from "@/lib/data";
-import { getSession } from "@/lib/session";
+import { getRepo } from "@/lib/data";
+import { getSession, needs } from "@/lib/session";
 import { transmissionLabel, vehicleLine } from "@/lib/domain/intake";
 import { monthYear } from "@/lib/format";
 import { addVehicle } from "@/app/actions/customer";
@@ -11,9 +11,10 @@ import { VehicleFields } from "@/components/app/vehicle-form";
 export const metadata: Metadata = { title: "My Vehicles" };
 
 export default async function Vehicles({ searchParams }: { searchParams: Promise<{ add?: string; error?: string }> }) {
-  await ready();
+  const repo = await getRepo();
   const s = await getSession();
   if (s.role !== "customer") return null;
+  await (await needs(s)).customerVehicles();
   const sp = await searchParams;
   const vehicles = repo.listVehicles(s.customerId);
 

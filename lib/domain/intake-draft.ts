@@ -20,6 +20,8 @@ import type {
  */
 export interface IntakeDraft {
   step: number;
+  /** Random per draft; sent with the submit so a double click or retry creates one request. */
+  key?: string;
   vehicleId: string; // saved vehicle id, or "new"
   vehicle: {
     year: string;
@@ -71,7 +73,6 @@ export interface IntakeDraft {
   hasParts: "yes" | "no" | "";
   parts: CustomerPart[];
 
-  serviceMode: "mobile" | "shop" | "";
   area: string;
   address: string;
   parkingType: ParkingType | "";
@@ -94,6 +95,7 @@ export interface IntakeDraft {
 export function emptyDraft(partial: Partial<IntakeDraft> = {}): IntakeDraft {
   return {
     step: 0,
+    key: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`,
     vehicleId: "new",
     vehicle: { year: "", make: "", model: "", trim: "", engine: "", transmission: "", vin: "", mileage: "" },
     symptomDescription: "",
@@ -128,7 +130,6 @@ export function emptyDraft(partial: Partial<IntakeDraft> = {}): IntakeDraft {
     priorPrice: "",
     hasParts: "",
     parts: [],
-    serviceMode: "",
     area: "",
     address: "",
     parkingType: "",
@@ -165,7 +166,6 @@ export function stepErrors(d: IntakeDraft, step: number, hasSavedVehicle: boolea
     if (!d.startsStatus) e.push("Say whether the car starts, or pick what happens when you try.");
   }
   if (step === 2) {
-    if (!d.serviceMode) e.push("Choose where the repair should happen.");
     if (!d.area) e.push("Choose the area the car is in.");
   }
   if (step === 3) {

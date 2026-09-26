@@ -3,7 +3,7 @@ import { StarRating } from "@/components/visual/stars";
 import { CalendarClock, ChevronDown, ShieldAlert, ShieldCheck } from "lucide-react";
 import type { PublicMechanicProfile } from "@/lib/domain/public-profile";
 import type { RepairCategory, VehicleMake } from "@/lib/domain/types";
-import { eligibility, notBookableStatus, screeningSummary } from "@/lib/domain/eligibility";
+import { eligibility, notBookableStatus, screeningItems, screeningSummary, STATUS_WORD } from "@/lib/domain/eligibility";
 import { openingLabel, soonest } from "@/lib/domain/availability";
 import type { FitInput, PickKind } from "@/lib/domain/recommend";
 import { dominantReason, rankingFactors } from "@/lib/domain/recommend";
@@ -24,6 +24,24 @@ export function startingPrice(p: PublicMechanicProfile, repair?: RepairCategory)
   return fixed ? { amount: usd(fixed.laborCents), unit: "fixed labor" } : { amount: usd(p.pricing.hourlyRateCents), unit: "/hr labor" };
 }
 
+/** Each check with its own status (never one vague badge). */
+function Checks({ p }: { p: PublicMechanicProfile }) {
+  const items = screeningItems(p);
+  const insurance = items.find((i) => i.key === "insurance");
+  return (
+    <div className="text-[0.8125rem]">
+      <ul className="flex flex-wrap gap-x-3 gap-y-1" aria-label="Clutch verification checks">
+        {items.map((i) => (
+          <li key={i.key} className={i.verified ? "text-ink-2" : "font-semibold text-amber"}>
+            {i.name}: {i.state === "expiring" ? "Verified" : STATUS_WORD[i.state]}
+          </li>
+        ))}
+      </ul>
+      {insurance && !insurance.verified ? <p className="mt-0.5 text-ink-3">Clutch has not verified active insurance coverage.</p> : null}
+    </div>
+  );
+}
+
 function Facts({ p, extra }: { p: PublicMechanicProfile; extra?: React.ReactNode }) {
   const o = soonest(p.openings);
   const s = screeningSummary(p);
@@ -40,7 +58,7 @@ function Facts({ p, extra }: { p: PublicMechanicProfile; extra?: React.ReactNode
           <span className="text-ink-2">No reviews yet</span>
         )}
       </li>
-      <li className="inline-flex items-center gap-1.5">
+      <li className={`inline-flex items-center gap-1.5 ${s.current ? "" : "font-semibold text-amber"}`}>
         {s.current ? <ShieldCheck size={15} className="text-carbon" aria-hidden /> : <ShieldAlert size={15} className="text-amber" aria-hidden />}
         {s.label}
       </li>
@@ -96,6 +114,7 @@ export function RecommendationCard({ fit, ctx, profileHref, quoteHref, kind, tit
         </div>
         <Reason fit={fit} ctx={ctx} big />
         <Facts p={p} />
+        <Checks p={p} />
         <div className="mt-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-t border-rule-soft pt-4">
           <Price p={p} repair={ctx.repair} big />
           <div className="flex flex-wrap items-center gap-2">
@@ -113,7 +132,10 @@ export function RecommendationCard({ fit, ctx, profileHref, quoteHref, kind, tit
             Why this match?
           </summary>
           <div className="pb-1 text-[0.875rem]">
-            <p className="text-ink-2">{definition} Ranked by verified experience; price and payment never affect order.</p>
+            <p className="text-ink-2">
+              {definition} &ldquo;Verified experience&rdquo; means repairs confirmed on Clutch; it says nothing about the checks listed on the card. Ranked by that experience,
+              then full verification; price and payment never affect order.
+            </p>
             <dl className="mt-2">
               {factors.map((f) => (
                 <div key={f.label} className="flex justify-between gap-3 border-b border-rule-soft py-1.5">
@@ -148,6 +170,7 @@ export function MechanicCard({ fit, ctx, profileHref, quoteHref }: Common) {
           </div>
           <Reason fit={fit} ctx={ctx} />
           <Facts p={p} extra={fit.miles !== undefined ? <li className="text-ink-2">{fit.miles < 1 ? "Under a mile" : `${fit.miles.toFixed(1)} mi`}</li> : null} />
+          <Checks p={p} />
         </div>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-rule-soft pt-3 sm:flex-col sm:flex-nowrap sm:items-end sm:border-t-0 sm:pt-0">
@@ -160,7 +183,7 @@ export function MechanicCard({ fit, ctx, profileHref, quoteHref }: Common) {
   );
 }
 
-/** Can't be booked: the reason as one status, no estimate action. */
+/** Can't be booked (profile incomplete), or outside the chosen availability: the reason as one status. */
 export function UnbookableCard({ fit, ctx, profileHref, status }: Omit<Common, "quoteHref"> & { status?: string }) {
   const p = fit.p;
   const why = status ?? notBookableStatus(eligibility(p));

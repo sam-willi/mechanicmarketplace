@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ready, repo } from "@/lib/data";
-import { getSession } from "@/lib/session";
+import { getRepo } from "@/lib/data";
+import { getSession, needs } from "@/lib/session";
+import { paginate, parseCursor } from "@/lib/data/page";
+import { Pager } from "@/components/app/pager";
 import { vehicleLine } from "@/lib/domain/intake";
 import type { Quote } from "@/lib/domain/types";
 import { dayMonth, usd } from "@/lib/format";
@@ -11,21 +13,30 @@ import { StatusChip } from "@/components/app/status-chip";
 
 export const metadata: Metadata = { title: "Estimates" };
 
-const TABS = [
-  { key: "sent", label: "Customer deciding", match: (q: Quote) => q.status === "submitted" },
-  { key: "draft", label: "Drafts", match: (q: Quote) => q.status === "draft" },
-  { key: "accepted", label: "Accepted", match: (q: Quote) => q.status === "accepted" },
-  { key: "closed", label: "Declined / expired", match: (q: Quote) => q.status === "declined" || q.status === "expired" || q.status === "withdrawn" },
+const TABS: { key: string; label: string; statuses: Quote["status"][] }[] = [
+  { key: "sent", label: "Customer deciding", statuses: ["submitted"] },
+  { key: "draft", label: "Drafts", statuses: ["draft"] },
+  { key: "accepted", label: "Accepted", statuses: ["accepted"] },
+  { key: "closed", label: "Declined / expired", statuses: ["declined", "expired", "withdrawn"] },
 ];
+const PAGE = 25;
 
-export default async function MechanicQuotes({ searchParams }: { searchParams: Promise<{ tab?: string; sent?: string; saved?: string }> }) {
-  await ready();
+export default async function MechanicQuotes({ searchParams }: { searchParams: Promise<{ tab?: string; sent?: string; saved?: string; before?: string }> }) {
+  const repo = await getRepo();
   const s = await getSession();
   if (s.role !== "mechanic") return null;
   const sp = await searchParams;
-  const all = repo.listQuotesForMechanic(s.mechanicId).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   const tab = TABS.find((t) => t.key === (sp.tab ?? (sp.saved ? "draft" : "sent"))) ?? TABS[0];
-  const list = all.filter(tab.match);
+  const before = parseCursor(sp.before);
+  // One tab, one page at a time; the tab counts are counted, not loaded.
+  await (await needs(s)).mechanicQuotes(tab.statuses, before, PAGE);
+  const counts = await repo.quoteStatusCounts(s.mechanicId);
+  const { items: list, next } = paginate(
+    repo.listQuotesForMechanic(s.mechanicId).filter((q) => tab.statuses.includes(q.status)),
+    (q) => q.createdAt,
+    PAGE,
+    before,
+  );
 
   return (
     <div className="space-y-6">
@@ -34,7 +45,7 @@ export default async function MechanicQuotes({ searchParams }: { searchParams: P
       {sp.saved ? <Notice>Draft saved. Only you can see it.</Notice> : null}
       <nav aria-label="Estimate status" className="flex gap-1 overflow-x-auto border-b border-rule">
         {TABS.map((t) => {
-          const n = all.filter(t.match).length;
+          const n = t.statuses.reduce((sum, st) => sum + (counts[st] ?? 0), 0);
           return (
             <Link
               key={t.key}
@@ -111,8 +122,9 @@ export default async function MechanicQuotes({ searchParams }: { searchParams: P
             })}
           </tbody>
         </table>
-        {list.length === 0 && <p className="py-6 text-ink-3">Nothing here.</p>}
+        {list.length === 0 && <p className="py-6 text-ink-3">No estimates here yet. Estimates you send from a repair request are listed here.</p>}
       </div>
+      <Pager href={`/mechanic/quotes?tab=${tab.key}`} next={next} paged={Boolean(before)} />
     </div>
   );
 }

@@ -1,26 +1,30 @@
 import type { Metadata } from "next";
-import { ready, repo } from "@/lib/data";
-import { getSession } from "@/lib/session";
+import { getRepo } from "@/lib/data";
+import { getSession, needs } from "@/lib/session";
+import { findArea } from "@/lib/domain/areas";
 import { KNOWN_SERVICES } from "@/lib/domain/intake";
 import { emptyDraft } from "@/lib/domain/intake-draft";
 import { PhotoPrint } from "@/components/profile/photo";
 import { RequestWizard } from "@/components/request/request-wizard";
+import { emailAlertsOn } from "@/lib/notify/config";
 
 export const metadata: Metadata = { title: "Request a repair" };
 
 export default async function RequestPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mechanic?: string; repair?: string; make?: string; rebook?: string; new?: string }>;
+  searchParams: Promise<{ mechanic?: string; repair?: string; make?: string; rebook?: string; new?: string; area?: string; mode?: string }>;
 }) {
-  await ready();
+  const repo = await getRepo();
   const s = await getSession();
   const sp = await searchParams;
   if (s.role !== "customer") return null;
-  const vehicles = repo.listVehicles(s.customerId);
   const slug = sp.rebook ?? sp.mechanic;
+  await (await needs(s)).newRequest(slug);
+  const vehicles = repo.listVehicles(s.customerId);
   const target = slug ? repo.getPublicProfile(slug) : null;
   const rebook = Boolean(sp.rebook && target);
+  const noSupply = !(await repo.anyBookable());
 
   // Resume a saved draft for the same destination; otherwise start fresh.
   const saved = repo.getDraft(s.customerId);
@@ -42,7 +46,8 @@ export default async function RequestPage({
           mileage: matchCar?.mileage ? matchCar.mileage.toLocaleString() : "",
         },
         knownService: KNOWN_SERVICES.some((k) => k.value === sp.repair) ? sp.repair! : "",
-        serviceMode: target?.workModel === "shop" ? "shop" : "",
+        // Carried over from a search, so nothing has to be entered twice.
+        area: findArea(sp.area)?.key ?? "",
         directTo: rebook ? undefined : target?.id,
         rebookOf: rebook ? target?.id : undefined,
       });
@@ -51,7 +56,7 @@ export default async function RequestPage({
     <>
       <div className="mx-auto max-w-[760px]">
         <h1 className="text-[0.9375rem] font-bold text-ink-2">
-          {target ? (rebook ? `Book ${target.firstName} again` : `Request an estimate from ${target.firstName}`) : "Get written estimates for a repair"}
+          {target ? (rebook ? `Book ${target.firstName} again` : `Request an estimate from ${target.firstName}`) : noSupply ? "Describe a repair" : "Get written estimates for a repair"}
         </h1>
         {target ? (
           <div className="mt-3 flex items-center gap-3">
@@ -69,6 +74,8 @@ export default async function RequestPage({
             customerId={s.customerId}
             target={target ? { id: target.id, firstName: target.firstName, displayName: target.displayName } : null}
             rebook={rebook}
+            noSupply={noSupply}
+            alertsOn={emailAlertsOn()}
           />
         </div>
       </div>

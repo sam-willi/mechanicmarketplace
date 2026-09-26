@@ -6,10 +6,22 @@ import { Ban, CalendarClock, CreditCard, LifeBuoy, ShieldCheck } from "lucide-re
  */
 export function Policies({ firstName, guarantee, compact = false }: { firstName: string; guarantee?: string; compact?: boolean }) {
   const rows = [
-    { icon: CreditCard, title: "Payment", body: `You pay ${firstName} directly after the work. Clutch records the amount but doesn't take or hold payment.` },
-    { icon: Ban, title: "Cancelling", body: "Free through Clutch before the appointment. If parts were already bought for you, sort that out with the mechanic." },
-    { icon: CalendarClock, title: "Rescheduling", body: `Ask ${firstName} from your repair page. The new time counts once they confirm it.` },
-    { icon: LifeBuoy, title: "If something goes wrong", body: "Report it from the repair page. Clutch's trust team reviews the estimate, notes and photos and follows up." },
+    {
+      icon: CreditCard,
+      title: "Payment",
+      body: `You pay ${firstName} directly after the work. Each of you can note the amount and whether it's paid; Clutch keeps what you enter but doesn't take, hold or refund money.`,
+    },
+    {
+      icon: Ban,
+      title: "Cancelling",
+      body: `Either of you can cancel in Clutch until work starts; Clutch charges no fee. After ${firstName} starts, talk to them, or report a problem. If parts were already bought for you, sort that out with ${firstName}.`,
+    },
+    { icon: CalendarClock, title: "Rescheduling", body: `Suggest a new time from your repair page. The booking only changes once ${firstName} accepts it (and ${firstName} can suggest one too).` },
+    {
+      icon: LifeBuoy,
+      title: "If something goes wrong",
+      body: "Report it from the repair page. Clutch staff see the estimate, the job's history and photos, and reply in the app. There's no set response time, and Clutch can't move money or rule on disputes.",
+    },
     {
       icon: ShieldCheck,
       title: "Workmanship",

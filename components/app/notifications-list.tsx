@@ -94,7 +94,7 @@ export function NotificationsList({ items, mode }: { items: AppNotification[]; m
             </Link>
           </li>
         ))}
-        {items.length === 0 && <li className="py-6 text-ink-3">Nothing yet.</li>}
+        {items.length === 0 && <li className="py-6 text-ink-3">Nothing yet. Updates on your requests and repairs appear here, in Clutch.</li>}
       </ul>
     </div>
   );

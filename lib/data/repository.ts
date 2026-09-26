@@ -1,5 +1,11 @@
 import type { PublicMechanicProfile, ProfileSources } from "@/lib/domain/public-profile";
 import type { IntakeDraft } from "@/lib/domain/intake-draft";
+import type { Scope } from "./scope";
+import type { Actor } from "@/lib/domain/transitions";
+import type { DeliveryEventType } from "@/lib/notify/events";
+import type { QueueCounts } from "@/lib/admin-queue";
+import type { BookingAcknowledgement } from "@/lib/domain/disclosure";
+import type { SearchPool } from "@/lib/domain/search";
 import type {
   AnalyticsEvent,
   DeclineReason,
@@ -22,7 +28,9 @@ import type {
   Quote,
   RepairCategory,
   RepairRequest,
+  RequestEdit,
   Review,
+  Slot,
   ScreeningKind,
   User,
   Vehicle,
@@ -41,6 +49,8 @@ import type {
  * never see private rows.
  */
 export interface RepositoryCore {
+  /** The data scope this repository reads and writes (lib/data/scope.ts). Fixed for its lifetime. */
+  readonly scope: Scope;
   // ---- Public reads ----
   listPublicProfiles(): PublicMechanicProfile[];
   getPublicProfile(slug: string): PublicMechanicProfile | null;
@@ -62,6 +72,8 @@ export interface RepositoryCore {
   getVehicle(id: ID): Vehicle | undefined;
   listRequestsForCustomer(customerId: ID): RepairRequest[];
   listRequestsForMechanic(mechanicId: ID): RepairRequest[];
+  /** Every request in this scope (staff demand view). */
+  listAllRequests(): RepairRequest[];
   getRequest(id: ID): RepairRequest | undefined;
   listQuotesForRequest(requestId: ID): Quote[];
   listQuotesForMechanic(mechanicId: ID): Quote[];
@@ -79,6 +91,30 @@ export interface RepositoryCore {
   }[];
   analyticsSummary(mechanicId: ID): Record<AnalyticsEventName | "profile_view_total", number>;
   listEvents(limit?: number): AnalyticsEvent[];
+
+  // ---- Candidate and aggregate reads (async on the app's Repository; SQL in targeted live mode) ----
+  /**
+   * Profiles that search and replacement suggestions rank. Targeted live mode returns only
+   * BOOKABLE mechanics (plus, with `unbookable`, a bounded sample of others); in memory, every profile.
+   */
+  searchPool(opts?: { unbookable?: number; repair?: RepairCategory; make?: VehicleMake; model?: string }): SearchPool;
+  /** Full public profiles for a few mechanics (e.g. the suggestions shown). */
+  publicProfiles(ids: ID[]): PublicMechanicProfile[];
+  /** Is at least one mechanic bookable right now? */
+  anyBookable(): boolean;
+  /** Staff: bookable mechanics and profiles in total. */
+  supplyCounts(): { profiles: number; bookable: number };
+  /** Staff review queue: items per tab, and approvals in the last week. */
+  verificationCounts(nowIso: string, weekAgo: string): QueueCounts;
+  openSupportCount(): number;
+  /** Staff: support cases per status. */
+  supportStatusCounts(): Record<string, number>;
+  /** A mechanic's own estimates, counted per status (the Estimates tabs). */
+  quoteStatusCounts(mechanicId: ID): Record<string, number>;
+  /** Saved requests this mechanic would be sent once matchable (a count; no request is read). */
+  waitingDemandCount(mechanic: MechanicProfile): number;
+  /** After a staff decision: the next pending item (this mechanic's first, else the oldest). */
+  nextPendingVerification(excludeId: ID, mechanicId: ID, nowIso: string): ID | undefined;
 
   // ---- Mechanic writes ----
   upsertMechanicProfile(input: MechanicProfileInput): MechanicProfile;
@@ -99,29 +135,56 @@ export interface RepositoryCore {
   markInterested(requestId: ID, mechanicId: ID, note?: string): void;
   /** Send (or, with draft, save privately) an estimate. Never exposes other mechanics' estimates. */
   submitQuote(input: Omit<Quote, "id" | "status" | "createdAt" | "customerQuestions">, opts?: { draft?: boolean }): Quote;
-  startJob(jobId: ID): void;
-  markJobDone(jobId: ID, finalAmountCents: number | undefined, notes?: string, confirm?: { engine?: string; transmission?: string; drivetrain?: string }): void;
+  // Lifecycle writes take the acting customer/mechanic id and check it against the record in the same
+  // transaction; out-of-order moves throw a LifecycleError (lib/domain/transitions.ts).
+  startJob(jobId: ID, mechanicId: ID): void;
+  markJobDone(
+    jobId: ID,
+    mechanicId: ID,
+    finalAmountCents: number | undefined,
+    notes?: string,
+    confirm?: { engine?: string; transmission?: string; drivetrain?: string },
+    payment?: { status: "paid" | "not_paid"; amountCents?: number },
+  ): void;
+  /** Customer: the repair isn't finished. Back to in progress, with their reason. */
+  reopenJob(jobId: ID, customerId: ID, note: string): void;
+  proposeReschedule(jobId: ID, who: Actor, when: string, slot?: Slot, note?: string): void;
+  respondReschedule(jobId: ID, who: Actor, accept: boolean): void;
+  /** Self-reported payment facts from either side. Clutch doesn't process money. */
+  reportPayment(jobId: ID, who: Actor, report: { status: "paid" | "not_paid"; amountCents?: number }): void;
+  /** Accepted estimate + approved extra work (labor and fees). */
+  approvedLaborAndFees(job: Job): number;
   /** Customer confirms completion → Platform Verified repair entry. */
-  completeJob(jobId: ID): void;
+  completeJob(jobId: ID, customerId: ID, payment?: { status: "paid" | "not_paid"; amountCents?: number }): void;
   /** A mechanic's cancellation reopens the request (and still-valid estimates) so the customer can pick again. */
-  cancelJob(jobId: ID, by: "customer" | "mechanic", reason?: DeclineReason): void;
-  confirmAppointment(jobId: ID): void;
-  recordDiagnosis(jobId: ID, note: string, matchesEstimate: boolean): void;
-  requestScopeChange(jobId: ID, description: string, extraCents: number): void;
-  respondScopeChange(jobId: ID, approve: boolean): void;
+  cancelJob(jobId: ID, who: Actor, reason?: DeclineReason): void;
+  confirmAppointment(jobId: ID, mechanicId: ID): void;
+  recordDiagnosis(jobId: ID, mechanicId: ID, note: string, matchesEstimate: boolean): void;
+  requestScopeChange(jobId: ID, mechanicId: ID, description: string, extraCents: number): void;
+  respondScopeChange(jobId: ID, customerId: ID, approve: boolean): void;
   addJobPhotos(jobId: ID, photos: RepairPhoto[]): void;
   addRepairPhotos(pastRepairId: ID, photos: RepairPhoto[]): void;
   /** Customer opened an estimate; the mechanic is told once. */
   markQuoteViewed(quoteId: ID): void;
-  declineQuote(quoteId: ID): void;
+  declineQuote(quoteId: ID, customerId: ID): void;
   findRepairWithPhoto(mediaId: ID): PastRepair | undefined;
   findJobWithPhoto(mediaId: ID): Job | undefined;
-  createSupportReport(input: Omit<SupportReport, "id" | "createdAt" | "status">): SupportReport;
+  createSupportReport(input: Omit<SupportReport, "id" | "createdAt" | "status" | "messages" | "history" | "updatedAt">): SupportReport;
   listSupportReports(filter?: { userId?: ID }): SupportReport[];
+  getSupportReport(id: ID): SupportReport | undefined;
+  /** The reporter adds a message to their own case (reopens a resolved one). */
+  addSupportMessage(reportId: ID, userId: ID, body: string): void;
+  /** Staff only: change status and/or reply. The reporter sees it in the app. */
+  updateSupportCase(reportId: ID, staffUserId: ID, change: { status?: SupportReport["status"]; reply?: string }): void;
   setJobNotes(jobId: ID, notes: string): void;
-  answerQuoteQuestion(quoteId: ID, index: number, answer: string): void;
+  answerQuoteQuestion(quoteId: ID, mechanicId: ID, index: number, answer: string): void;
   getCustomerNote(mechanicId: ID, customerId: ID): string;
   setCustomerNote(mechanicId: ID, customerId: ID, note: string): void;
+
+  /** Local browser testing only: a fictional test mechanic becomes bookable. Refused unless CLUTCH_TEST_LOGINS=on. */
+  addTestScreening(mechanicId: ID): void;
+  /** A real mechanic's screening check that no real provider ran (it can't be approved). */
+  unrunScreening(v: VerificationRecord): boolean;
 
   // ---- Admin writes ----
   decideVerification(id: ID, decision: "verified" | "rejected" | "needs_info", reviewerId: ID, notes: string, expiresAt?: string): void;
@@ -132,7 +195,7 @@ export interface RepositoryCore {
    * with `rebookOf` only to that returning mechanic; otherwise to a small set of qualified mechanics.
    */
   createRequest(
-    input: Omit<RepairRequest, "id" | "status" | "createdAt" | "matchedMechanicIds" | "declinedBy" | "questions" | "interested"> & {
+    input: Omit<RepairRequest, "id" | "status" | "createdAt" | "matchedMechanicIds" | "declinedBy" | "questions" | "interested" | "history"> & {
       vehicle?: Omit<Vehicle, "id" | "customerId">;
       directTo?: ID;
     },
@@ -140,17 +203,31 @@ export interface RepositoryCore {
   /** Customer replies to a mechanic's question, optionally with photos/video/audio. */
   /** Send an existing request to more mechanics, unchanged (after the customer's pick couldn't take it). */
   forwardRequest(requestId: ID, mechanicIds: ID[], kind: "replacement" | "broaden"): void;
+  /** Customer edits a request no mechanic has responded to yet. Re-runs matching if it was waiting. */
+  updateRequest(requestId: ID, edit: RequestEdit): RepairRequest;
+  /** Customer withdraws a request that isn't booked. Mechanics it was sent to stop seeing it as open. */
+  cancelRequest(requestId: ID): void;
+  /** Looks again for bookable mechanics for a request that was saved with none. Returns how many it was sent to. */
+  rematchRequest(requestId: ID): number;
   respondToQuestion(requestId: ID, questionIndex: number, response: string, attachments: RepairMedia[]): void;
   getDraft(customerId: ID): IntakeDraft | undefined;
   saveDraft(customerId: ID, draft: IntakeDraft): void;
   clearDraft(customerId: ID): void;
-  acceptQuote(quoteId: ID): Job;
-  submitReview(jobId: ID, input: Pick<Review, "overall" | "communication" | "timeliness" | "priceAccuracy" | "workmanship" | "comment">): void;
+  /** Atomic: one job, competing estimates closed, and only the version the customer saw (`expectedVersion`). Idempotent. */
+  /**
+   * Book the estimate. When Clutch hasn't verified every check of that mechanic, `ack` must carry
+   * the current disclosure version and the statuses the customer read (lib/domain/disclosure.ts);
+   * a missing, outdated or tampered acknowledgement is refused. The statuses, disclosure and who
+   * acknowledged are stored with the job and never change.
+   */
+  acceptQuote(quoteId: ID, customerId: ID, expectedVersion?: number, ack?: BookingAcknowledgement): Job;
+  submitReview(jobId: ID, customerId: ID, input: Pick<Review, "overall" | "communication" | "timeliness" | "priceAccuracy" | "workmanship" | "comment">): Review;
+  updateReview(jobId: ID, customerId: ID, input: Pick<Review, "overall" | "communication" | "timeliness" | "priceAccuracy" | "workmanship" | "comment">): Review;
   toggleSaved(customerId: ID, mechanicId: ID): boolean;
   listQuotesForCustomer(customerId: ID): Quote[];
   /** The request a media file is attached to (directly or via a question reply). */
   findRequestWithMedia(mediaId: ID): RepairRequest | undefined;
-  askAboutQuote(quoteId: ID, question: string): void;
+  askAboutQuote(quoteId: ID, customerId: ID, question: string): void;
   addVehicle(customerId: ID, v: Omit<Vehicle, "id" | "customerId">): Vehicle;
   updateVehicle(vehicleId: ID, patch: Partial<Omit<Vehicle, "id" | "customerId">>): void;
   listVehicleHistory(vehicleId: ID): PastRepair[];
@@ -159,13 +236,13 @@ export interface RepositoryCore {
   getUserByEmail(email: string): User | undefined;
   createUser(input: { id?: ID; name: string; email: string; phone?: string; role: "customer" | "mechanic"; avatarUrl?: string }): User;
   addCustomerProfile(userId: ID): CustomerProfile;
-  updateUser(userId: ID, patch: Partial<Pick<User, "name" | "email" | "phone" | "notificationPrefs" | "avatarUrl">>): void;
+  updateUser(userId: ID, patch: Partial<Pick<User, "name" | "email" | "phone" | "notificationPrefs" | "avatarUrl" | "emailVerifiedAt">>): void;
   getCustomerByUser(userId: ID): CustomerProfile | undefined;
   grantAdmin(userId: ID): void;
   getMechanicByUser(userId: ID): MechanicProfile | undefined;
 
   // ---- Notifications (role-aware) ----
-  notify(userId: ID, mode: AppMode, kind: NotificationKind, title: string, href: string, body?: string): void;
+  notify(userId: ID, mode: AppMode, kind: NotificationKind, title: string, href: string, body?: string, event?: DeliveryEventType | "none"): void;
   listNotifications(userId: ID, mode: AppMode): AppNotification[];
   markNotificationsRead(userId: ID, mode: AppMode): void;
 
@@ -191,6 +268,14 @@ export const MUTATIONS = [
   "markInterested",
   "submitQuote",
   "startJob",
+  "reopenJob",
+  "proposeReschedule",
+  "respondReschedule",
+  "reportPayment",
+  "updateReview",
+  "addSupportMessage",
+  "updateSupportCase",
+  "addTestScreening",
   "markJobDone",
   "completeJob",
   "cancelJob",
@@ -210,6 +295,9 @@ export const MUTATIONS = [
   "createRequest",
   "respondToQuestion",
   "forwardRequest",
+  "updateRequest",
+  "cancelRequest",
+  "rematchRequest",
   "saveDraft",
   "clearDraft",
   "acceptQuote",
@@ -227,10 +315,14 @@ export const MUTATIONS = [
 ] as const satisfies readonly (keyof RepositoryCore)[];
 export type Mutation = (typeof MUTATIONS)[number];
 
+/** Reads that are async on the app's Repository (SQL in targeted live mode). */
+export const QUERIES = ["analyticsSummary", "listEvents", "searchPool", "publicProfiles", "anyBookable", "supplyCounts", "verificationCounts", "openSupportCount", "supportStatusCounts", "quoteStatusCounts", "waitingDemandCount", "nextPendingVerification"] as const satisfies readonly (keyof RepositoryCore)[];
+export type Query = (typeof QUERIES)[number];
+
 type Async<F> = F extends (...a: infer A) => infer R ? (...a: A) => Promise<Awaited<R>> : never;
 
 export type Repository = {
-  [K in keyof RepositoryCore]: K extends Mutation | "analyticsSummary" | "listEvents" ? Async<RepositoryCore[K]> : RepositoryCore[K];
+  [K in keyof RepositoryCore]: K extends Mutation | Query ? Async<RepositoryCore[K]> : RepositoryCore[K];
 };
 
 export interface MechanicProfileInput {
@@ -244,7 +336,6 @@ export interface MechanicProfileInput {
   serviceRadiusMi: number;
   bio: string;
   workModel: WorkModel;
-  shopName?: string;
   declaredRepairCategories: RepairCategory[];
   declaredMakes: VehicleMake[];
   hourlyRateCents: number;

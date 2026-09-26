@@ -42,6 +42,9 @@ export default function HowItWorks() {
           Drivers find someone they can trust to fix their car. Mechanics build an independent business on proof of their work. Clutch never decides who is best: it
           shows the evidence and the customer chooses.
         </p>
+        <p className="mt-3 max-w-[60ch] text-[0.9375rem] text-ink-2">
+          Clutch is launching in Los Angeles and verifying its first mechanics now. Until they&apos;re verified, you can describe a repair and Clutch saves it for them.
+        </p>
         <div className="mt-14 grid gap-12 lg:grid-cols-2">
           <section>
             <h2 className="display text-[1.75rem]">If you need a mechanic</h2>
@@ -58,7 +61,7 @@ export default function HowItWorks() {
               <Steps items={MECHANIC} />
             </div>
             <Link href="/signup?role=mechanic" className="btn btn-line mt-6">
-              Join as a Mechanic <ArrowRight size={16} aria-hidden />
+              Create a mechanic account <ArrowRight size={16} aria-hidden />
             </Link>
           </section>
         </div>

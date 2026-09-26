@@ -38,8 +38,8 @@ export function milesBetween(a: { lat: number; lng: number }, b: { lat: number; 
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-/** Does this mechanic serve that point? Mobile/both use their radius; shop-only allows a 20 mi drive. */
+/** Does this mechanic serve that point? Every mechanic is mobile: within their travel radius (plus 2 mi for area centers). */
 export function serves(m: { lat: number; lng: number; serviceRadiusMi: number; workModel: string }, at: { lat: number; lng: number }) {
   const d = milesBetween(m, at);
-  return m.workModel === "shop" ? d <= 20 : d <= m.serviceRadiusMi + 2;
+  return d <= m.serviceRadiusMi + 2;
 }

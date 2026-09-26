@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeftRight } from "lucide-react";
 import type { AppMode, User } from "@/lib/domain/types";
 import { signOut, switchMode, updateAccount } from "@/app/actions/account";
+import { emailAlertsOn } from "@/lib/notify/config";
 
 /** Shared account details (one login). Role-specific settings live on each side. */
 export function AccountSettings({ user, mode, hasOther, back }: { user: User; mode: AppMode; hasOther: boolean; back: string }) {
@@ -27,21 +28,27 @@ export function AccountSettings({ user, mode, hasOther, back }: { user: User; mo
             <input name="phone" type="tel" defaultValue={user.phone} className="input mt-1" autoComplete="tel" />
           </label>
         </div>
-        <fieldset className="space-y-2">
-          <legend className="field-label">Notifications</legend>
-          {(
-            [
-              ["notifyEmail", "Email", user.notificationPrefs.email],
-              ["notifySms", "Text message", user.notificationPrefs.sms],
-              ["notifyPush", "Push", user.notificationPrefs.push],
-            ] as const
-          ).map(([name, label, on]) => (
-            <label key={name} className="flex items-center gap-2 text-[0.9375rem]">
-              <input type="checkbox" name={name} defaultChecked={on} className="size-4 accent-[var(--ink)]" />
-              {label}
+        {emailAlertsOn() ? (
+          <fieldset>
+            <legend className="field-label">Notifications</legend>
+            <input type="hidden" name="prefs" value="1" />
+            <label className="mt-1 flex items-center gap-2 text-[0.9375rem]">
+              <input type="checkbox" name="notifyEmail" defaultChecked={user.notificationPrefs.email} className="size-4 accent-[var(--ink)]" />
+              Email me short alerts about my requests and repairs
             </label>
-          ))}
-        </fieldset>
+            <p className="mt-1 text-[0.8125rem] text-ink-3">
+              Alerts only say something happened and link to Clutch; they never include repair details.{" "}
+              {user.emailVerifiedAt ? "Sent to your verified sign-in email." : "Sent only once your sign-in email is verified."} Everything is also in Notifications here.
+            </p>
+          </fieldset>
+        ) : (
+          <div>
+            <p className="field-label">Notifications</p>
+            <p className="mt-1 text-[0.9375rem] text-ink-2">
+              Updates show in Notifications, inside Clutch. Clutch doesn&apos;t send email, text or push alerts yet; sign-in and password emails still arrive as usual.
+            </p>
+          </div>
+        )}
         <button className="btn btn-ink">Save account</button>
       </form>
 

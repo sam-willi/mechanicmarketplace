@@ -117,7 +117,7 @@ Two systems, one shared record format.
 What the customer sees, in priority order. The profile follows this order top to bottom.
 
 1. **Identity** — is this person who they say they are? *Identity Verified* (vendor ID + selfie).
-2. **Safety** — are they safe to let near my car and home? *Background Check Passed*, *Driving Record Check Passed* (mobile), *Insurance Verified*. Shown as one compact "Screened" line, because it's the baseline, not the pitch.
+2. **Safety** — are they safe to let near my car and home? *Background Check Passed*, *Driving Record Check Passed*, *Insurance Verified*. Shown as one compact "Screened" line, because it's the baseline, not the pitch.
 3. **Relevant proof** — have they done my repair on my car? Count per repair category and per make, crossed when context is known ("18 brake jobs · 6 on BMW").
 4. **Credentials** — certifications and employment, each with its source.
 5. **Outcomes** — verified rating (only from verified-repair reviews), per-dimension scores, repeat customers.
@@ -194,7 +194,7 @@ Mobile first, as it's opened from a text message.
 
 ## 9. Data model
 
-Typed domain models in `lib/domain/types.ts` mirror the Postgres schema in `supabase/migrations/0001_init.sql` one to one.
+Typed domain models in `lib/domain/types.ts` follow the original relational design in `supabase/migrations/0001_init.sql` (reference only, never applied; the live normalized schema is `0004_live_normalized.sql`).
 
 ```
 users(id, role[customer|mechanic|admin], email, created_at)
@@ -310,11 +310,11 @@ components/
 
 - **Auth:** Supabase Auth. Email + password with email confirmation and password reset, and Google. `proxy.ts` refreshes sessions; `lib/session.ts` verifies claims and maps the auth user to the Clutch account (same id). The account is created on first sign-in from sign-up metadata (name, role, phone, optional car) or, for Google, after the person picks a role at `/welcome`. Staff get the reviewer role through `CLUTCH_ADMIN_EMAILS`. Seeded demo accounts remain as a separate, clearly labelled, passwordless path (`CLUTCH_DEMO_LOGINS`).
 - **Persistence:** `lib/data/store.ts` keeps every record in Postgres (`app_records`, jsonb) and runs the existing domain logic against a snapshot. Each write is one transaction guarded by `app_meta.version`; a concurrent commit from another instance triggers a reload and a retry, so writes never apply to stale data. Analytics go to `app_events`, uploads to `app_media`. Reads call `ready()` first, which reloads only when the version has moved.
-- **Next step as data grows:** move collections one at a time onto the normalized schema in `0001_init.sql` (with RLS), starting with the largest (past repairs, reviews), and move uploads to Supabase Storage.
+- **Next step as data grows:** the normalized live schema (`0004_live_normalized.sql`, with targeted reads) is built and behind a flag; see `docs/live-reads.md`. Move uploads to object storage.
 
 ### Product audit pass
 
-- **One eligibility rule** (`lib/domain/eligibility.ts`): required screening (ID, background, insurance, driving record when mobile) must be verified or expiring-soon to quote, be booked, be matched to new requests, or start booked work. Used by search, profiles, estimates, jobs, matching and the mechanic's standing.
+- **One eligibility rule** (`lib/domain/eligibility.ts`): since the 2026-09-26 policy (needs legal review before launch), a complete basic profile (service area, repairs, pricing, availability) is what lets a mechanic be matched, quote and be booked. The four verification checks (ID, background, driving record when mobile, insurance) are shown separately everywhere with exact statuses, rank fully verified mechanics higher at equal experience, and need a recorded customer acknowledgement before booking a mechanic who isn't fully verified (`lib/domain/disclosure.ts`).
 - **Recommendations** (`lib/domain/recommend.ts`): Best Fit and Soonest Strong Fit are separately defined; one mechanic winning both is labelled as such; the tradeoff between two different picks compares the same measure for both.
 - **Site feasibility** (`lib/domain/site.ts`): one normalized reading of where the car is, with each fact classified as fine, missing, unsure, a risk, or a blocker, and contradictions surfaced as "confirm before quoting".
 - **Quote readiness** (`lib/domain/readiness.ts`): the same "enough to quote?" rules for mechanics (opportunities) and customers (before sending a request).

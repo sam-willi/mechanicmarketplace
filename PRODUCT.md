@@ -26,7 +26,7 @@ Two-sided, both first-class:
 - **One login can hold both roles.** Sign-up asks "How do you want to use Clutch?". The account menu switches between Customer and Mechanic mode. Role-specific data lives on customer and mechanic profiles, never on the shared user.
 - **Public mechanic profiles** at `/mechanics/[slug]` sit outside both apps and never need a login.
 - **Jobs complete in two steps.** The mechanic marks the job complete, then the customer confirms. Only the confirmation creates the Platform Verified repair.
-- **Mechanics can sign up and explore first.** Identity, background and insurance (plus driving record for mobile work) are required before they can send estimates for real work.
+- **Mechanics can sign up and be booked after a basic profile.** Service area, repairs, pricing and availability are what's required (policy of 2026-09-26, pending legal review). Identity, background, driving record and insurance checks are shown separately with their status; they are not required, and customers acknowledge any that aren't verified before booking.
 
 ## Product Purpose
 
@@ -60,7 +60,7 @@ What sets it apart:
 ## Operating Context
 
 - Customers often open profiles on a phone from a text message, so the mobile profile experience is critical.
-- Mechanics may work mobile, at a shop, or both; this is set per mechanic.
+- Every Clutch mechanic is mobile: they go to the customer's car (since 2026-09-26). Customers aren't asked where the repair happens, only where the car is. Older records that say "shop" or "both" are treated as mobile.
 - For the MVP, verification is manual through an admin dashboard. Confirmation links to prior customers can be sent or simulated.
 - Estimates are approved in-app. There is no real payment processing in the MVP.
 
@@ -166,10 +166,11 @@ For the MVP, identity and background checks run behind a provider-agnostic adapt
 
 Tradeoff order, in this sequence: trust, mechanic ownership, portable reputation, evidence, customer conversion, then marketplace functionality. In the marketplace itself: trust over lowest price, relevant experience over generic rating, customer choice over platform assignment, mechanic pricing control over platform-set pricing. When one surface has to be weaker, the marketplace flow gives way before the mechanic profile.
 
-1. **Safety screening and skill verification are separate systems.** Identity, background, driving record and insurance are the baseline safety layer. Competence is proven separately through certifications, employment and repair evidence. A mechanic can pass screening without being proven competent, and the UI never blurs the two.
+1. **Verification checks and skill verification are separate systems.** Identity, background, driving record and insurance are verification checks, each shown with its own status. Competence is proven separately through certifications, employment and repair evidence. A mechanic can pass checks without being proven competent, and the UI never blurs the two.
+   *Policy of 2026-09-26 (needs legal review before public launch):* a mechanic with a complete basic profile can be matched, quote and be booked even if checks are missing, pending, failed to run or unverified. Unverified checks are never presented as verified; customers see exactly which checks Clutch hasn't verified and acknowledge that before booking, and the acknowledgement is kept with the booking. Fully verified mechanics rank higher at equal experience; nobody is hidden for missing checks unless the customer filters.
 2. **Repair-specific proof is the core differentiator.** "18 verified brake jobs, including 6 BMWs" matters more than a generic "4.9 stars". Surface experience relevant to this repair on this make first.
 3. **Every claim has provenance.** Each claim is Platform, Institution, Employer, Customer or Document Verified, or Self-Reported, and that is always visible. Self-reported claims are never presented as equal to verified ones.
-4. **Never expose sensitive screening information.** Public profiles show only outcome statuses: Identity Verified, Background Check Passed, Driving Record Check Passed, Insurance Verified. ID, criminal, driving and insurance documents never appear publicly.
+4. **Never expose sensitive screening information.** Public profiles show only each check's status (Verified, Pending, Not completed, Not verified, Expired, Could not be verified). ID, criminal, driving and insurance documents never appear publicly.
 5. **Expiration and re-verification are built in.** Credentials, insurance and screenings carry a verified date, an expiration date and a status (Pending, Verified, Expired, Reverification Required, and so on).
 6. **Mechanics own their reputation.** The profile stays useful outside the marketplace and is easy to share by text, on social media or through referrals.
 7. **Not a lowest-bid marketplace.** Mechanics set their prices, and customers compare price alongside relevant verified experience.

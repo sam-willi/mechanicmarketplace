@@ -2,8 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { ExternalLink } from "lucide-react";
-import { ready, repo } from "@/lib/data";
-import { getAccount, getAuthUser, getSession } from "@/lib/session";
+import { getRepo } from "@/lib/data";
+import { getAccount, getAuthUser, getSession, needs } from "@/lib/session";
 import { effectiveStatus } from "@/lib/verification/lifecycle";
 import { Logo } from "@/components/brand/wordmark";
 import { AccountMenu } from "@/components/app/account-menu";
@@ -16,7 +16,7 @@ import { BellLink, BottomNav, SideNav, type NavItem } from "@/components/app/nav
  * Operational, information-dense shell with its own navigation.
  */
 export default async function MechanicLayout({ children }: { children: React.ReactNode }) {
-  await ready();
+  const repo = await getRepo();
   const s = await getSession();
   const path = (await headers()).get("x-clutch-path") ?? "/mechanic";
   // A new mechanic account has no mechanic profile yet, so it resolves to "guest"; let it reach onboarding.
@@ -49,6 +49,7 @@ export default async function MechanicLayout({ children }: { children: React.Rea
   }
 
   const acct = (await getAccount())!;
+  await (await needs(s)).mechanicShell();
   const m = repo.getMechanic(s.mechanicId)!;
   const unread = repo.listNotifications(s.userId, "mechanic").filter((n) => !n.read).length;
   const quotes = repo.listQuotesForMechanic(s.mechanicId);

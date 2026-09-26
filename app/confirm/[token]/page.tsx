@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { ready, repo } from "@/lib/data";
+import { getRepo, needsFor } from "@/lib/data";
 import { monthYear } from "@/lib/format";
 import { Wordmark } from "@/components/brand/wordmark";
 import { Tick } from "@/components/trust/marks";
@@ -10,8 +10,10 @@ import { PhotoPrint } from "@/components/profile/photo";
 export const metadata: Metadata = { title: "Confirm a repair", robots: { index: false } };
 
 export default async function ConfirmPage({ params }: { params: Promise<{ token: string }> }) {
-  await ready();
+  const repo = await getRepo();
   const { token } = await params;
+  // Anyone holding the private link: that one confirmation, its repair and mechanic's public profile.
+  await (await needsFor({ staff: false })).confirmation(token);
   const found = repo.getConfirmationByToken(token);
   if (!found) notFound();
   const { confirmation: c, repair: r, mechanic: m } = found;
@@ -20,7 +22,8 @@ export default async function ConfirmPage({ params }: { params: Promise<{ token:
   async function respond(formData: FormData) {
     "use server";
     const answer = formData.get("answer") === "yes" ? "confirmed" : "denied";
-    await repo.respondToConfirmation(token, answer);
+    // Its own request: its own repository (the write reads what it needs by token).
+    await (await getRepo()).respondToConfirmation(token, answer);
     revalidatePath(`/confirm/${token}`);
   }
 
