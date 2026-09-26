@@ -19,7 +19,7 @@ jobs:
   verify:
     name: verify (Node ${{ matrix.node }}, Ubuntu)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -46,6 +46,8 @@ jobs:
       - run: npm run verify
         env:
           NEXT_TELEMETRY_DISABLED: "1"
+          # Shared runners are slower than a laptop: double the load test's latency budget (row budgets unchanged).
+          CLUTCH_LATENCY_FACTOR: "2"
 
   # Optional: only runs where the repository owner has added these secrets (never on forks,
   # which don't receive them). Builds against the configured public Supabase project; it

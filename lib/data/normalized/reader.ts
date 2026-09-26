@@ -25,6 +25,9 @@ const SPEC = Object.fromEntries(SPECS.map((s) => [s.collection, s])) as Record<k
  * or staff: screening vendor references and outcomes, policy numbers and documents,
  * reviewer notes and evidence descriptions. Public pages never need them.
  */
+/** Largest id list read in one query (see byIds). */
+const ID_BATCH = 200;
+
 export const PUBLIC_STRIP: Partial<Record<keyof DB, string[]>> = {
   screenings: ["provider", "providerRef", "result", "consentAt"],
   insurance: ["carrier", "policyLast4", "coverageCents", "documentName"],
@@ -103,7 +106,12 @@ export class Reader {
   async byIds(collection: keyof DB, ids: (string | undefined | null)[], level: Level = "full") {
     const need = this.uniq(ids).filter((id) => !this.slice.has(collection, id, level));
     if (!need.length) return [];
-    return this.load(collection, this.sql`id = any(${textArray(need)}::text[])`, level);
+    if (need.length <= ID_BATCH) return this.load(collection, this.sql`id = any(${textArray(need)}::text[])`, level);
+    // A long id list (e.g. the accounts of every candidate a write considers) is read in primary-key
+    // batches: one huge "= any(...)" makes the planner scan the whole table instead.
+    const out = [];
+    for (let i = 0; i < need.length; i += ID_BATCH) out.push(...(await this.load(collection, this.sql`id = any(${textArray(need.slice(i, i + ID_BATCH))}::text[])`, level)));
+    return out;
   }
 
   private any(col: string, ids: string[]) {

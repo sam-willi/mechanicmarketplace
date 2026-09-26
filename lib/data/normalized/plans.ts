@@ -67,9 +67,8 @@ export const PLANS: Record<Mutation, (r: Reader, a: A) => Promise<void>> = {
     const base = i.displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     // The slug check reads only names that could collide.
     await r.load("mechanics", r.sql`slug = ${base} or slug like ${`${base.replace(/[\\%_]/g, "\\$&")}-%`}`, "full", r.sql`limit 200`);
-    // TODO(normalized): a first publish should also load waiting requests (the in-memory store sends them);
-    // doing it here changed query plans in the DB suite, so it's deferred. See the todo test in tests-db/verification-policy.test.ts.
-    if (r.slice.db.mechanics.some((m) => m.id === i.id || m.userId === i.userId)) await matchWaiting(r);
+    // New or edited, the profile may now fit requests that are waiting (onboarding publishes it all at once).
+    await matchWaiting(r);
   },
   async updatePricing(r, [mid]) {
     await r.byIds("mechanics", [mid as string]);

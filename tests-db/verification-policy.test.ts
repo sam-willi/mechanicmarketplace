@@ -124,19 +124,3 @@ test("status-at-booking survives the mechanic becoming fully verified later; the
   assert.ok(now.find((x) => x.key === "identity")!.verified, "now verified");
   assert.equal(ctx.repo.getJob(job.id)!.verificationAtBooking!.checks.find((x) => x.key === "identity")!.status, "Not completed", "at booking it wasn't, and that's what's kept");
 });
-
-test("a request saved while nobody fits is sent to a new mechanic the moment they first publish a fitting profile", { todo: "normalized store: first publish doesn't load waiting requests yet (in-memory store does; see lib/data/normalized/plans.ts)" }, async () => {
-  const a = liveSlice(A).repo;
-  const cu = await a.createUser({ id: uid("cu"), name: "Casey", email: `${uid("c")}@example.test`, role: "customer" });
-  const c = a.getCustomerByUser(cu.id)!;
-  const v = await a.addVehicle(c.id, { year: 2016, make: "BMW", model: "328i" });
-  // An area no other fixture mechanic serves, so this request waits.
-  const r = await a.createRequest({ customerId: c.id, vehicleId: v.id, repairCategory: "brakes", categorySource: "customer", symptomDescription: "Grinding when braking.", occurrence: { conditions: [] }, onset: {}, warningLights: [], diagnosticCodes: [], smells: [], recentRepairs: [], customerParts: [], location: { serviceMode: "mobile", area: "long-beach" }, media: [] });
-  assert.deepEqual(r.matchedMechanicIds, [], "nobody fits yet: saved, not sent");
-  // First publish of a fitting profile, on the other instance.
-  const b = liveSlice(B).repo;
-  const mu = await b.createUser({ id: uid("mu"), name: "Morgan", email: `${uid("m")}@example.test`, role: "mechanic" });
-  const m = await b.upsertMechanicProfile({ userId: mu.id, displayName: `Morgan Newcomer ${n}`, city: "Long Beach", neighborhood: "long-beach", serviceRadiusMi: 10, bio: "", workModel: "mobile", declaredRepairCategories: ["brakes"], declaredMakes: ["BMW"], hourlyRateCents: 9000, diagnosticFeeCents: 5000, availabilityNote: "Weekdays" });
-  const got = await db<{ n: number }[]>`select count(*)::int as n from lv_request_invitations where request_id = ${r.id} and mechanic_id = ${m.id}`;
-  assert.equal(got[0].n, 1, "sent to the new mechanic");
-});

@@ -159,6 +159,9 @@ test("mixed page reads and writes on two instances: bounded, fast, and the marke
   for (const [kind, v] of Object.entries(k)) {
     const rowBudget = kind === "search" ? 12_000 : kind.startsWith("staff") ? 4_000 : 1_500;
     assert.ok(v.maxRows <= rowBudget, `${kind}: ${v.maxRows} rows > ${rowBudget}`);
-    assert.ok(v.p95ms < 2_000, `${kind}: p95 ${v.p95ms} ms`);
+    // CI's shared 2-core runners are ~3x slower than a laptop at this concurrency; they set
+    // CLUTCH_LATENCY_FACTOR (see .github/workflows/ci.yml). The row budgets above don't change.
+    const latencyBudget = 2_000 * (Number(process.env.CLUTCH_LATENCY_FACTOR) || 1);
+    assert.ok(v.p95ms < latencyBudget, `${kind}: p95 ${v.p95ms} ms (budget ${latencyBudget} ms)`);
   }
 });

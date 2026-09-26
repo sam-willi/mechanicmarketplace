@@ -39,6 +39,8 @@ create index if not exists lv_confirmations_mechanic on lv_confirmations ((data-
 create index if not exists lv_requests_customer on lv_requests (customer_id, (data->>'createdAt') collate "C" desc, id collate "C" desc);
 create index if not exists lv_requests_active on lv_requests ((data->>'createdAt') collate "C", id collate "C") where status in ('open', 'quoted');
 create index if not exists lv_requests_vehicle on lv_requests (vehicle_id);
+-- Open requests by repair (waiting-demand counts on the mechanic home, and matching of waiting requests).
+create index if not exists lv_requests_open_category on lv_requests ((data->>'repairCategory')) where status = 'open';
 create index if not exists lv_invitations_mechanic on lv_request_invitations (mechanic_id, request_id);
 create index if not exists lv_quotes_mechanic on lv_quotes (mechanic_id, (data->>'createdAt') collate "C" desc, id collate "C" desc);
 create index if not exists lv_quote_questions_open on lv_quote_questions (quote_id) where answer is null;

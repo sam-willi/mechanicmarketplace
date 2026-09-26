@@ -95,7 +95,8 @@ export async function runDeliveryOnce(o: WorkerOptions): Promise<RunSummary> {
     )
     update delivery_outbox d
     set state = 'processing', lease_owner = ${o.workerId}, lease_until = now() + (${leaseMs}::int * interval '1 millisecond'), updated_at = now()
-    from due where d.id = due.id
+    -- By id (primary key) rather than a join, so a large outbox is never scanned to update one batch.
+    where d.id = any(array(select id from due))
     returning d.id::text, d.event_key, d.event_type, d.channel, d.user_id, d.link_path, d.send_attempts, d.max_attempts, d.uncertain, d.provider_message_id`;
   summary.claimed = claimed.length;
 
