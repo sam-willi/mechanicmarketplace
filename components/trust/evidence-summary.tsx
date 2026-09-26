@@ -1,4 +1,5 @@
-import { Star } from "lucide-react";
+
+import { StarRating } from "@/components/visual/stars";
 import type { PublicMechanicProfile } from "@/lib/domain/public-profile";
 import { repairNoun } from "@/lib/domain/provenance";
 import type { RepairCategory, VehicleMake } from "@/lib/domain/types";
@@ -72,7 +73,7 @@ export function EvidenceSummary({
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.875rem] text-ink-2">
         {r.rating ? (
           <span className="inline-flex items-center gap-1">
-            <Star size={13} fill="currentColor" strokeWidth={0} className="text-ink" aria-hidden />
+            <StarRating value={r.rating.average} size={13} />
             <span className="tnum font-semibold text-ink">{rating(r.rating.average)}</span> from {plural(r.rating.count, "verified review")}
           </span>
         ) : (

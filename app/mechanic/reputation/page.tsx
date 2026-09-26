@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { StarRating } from "@/components/visual/stars";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { ready, repo } from "@/lib/data";
@@ -55,6 +56,7 @@ export default async function Reputation() {
             <div key={k} className="border-r border-b border-rule-soft p-4 sm:border-b-0 sm:last:border-r-0">
               <dt className="field-label">{k}</dt>
               <dd className="num mt-2 text-[2rem]">{v}</dd>
+              {k === "Verified rating" && r.rating ? <StarRating value={r.rating.average} size={16} className="mt-1" /> : null}
               {note ? <p className="mt-1 text-[0.75rem] text-ink-3">{note}</p> : null}
             </div>
           ))}

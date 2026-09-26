@@ -11,6 +11,6 @@ export async function finishSignIn(origin: string, auth: { id: string; email: st
     new URL(user ? (user.roles.length === 1 && user.roles[0] === "mechanic" && role === "mechanic" ? "/mechanic/onboarding" : homeFor(user, next)) : `/welcome${next ? `?next=${encodeURIComponent(next)}` : ""}`, origin),
   );
   res.cookies.delete(USER_COOKIE);
-  if (user && !user.roles.includes("admin")) res.cookies.set(MODE_COOKIE, user.roles.includes("customer") && role !== "mechanic" ? "customer" : "mechanic", { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
+  if (user && (user.roles.includes("customer") || user.roles.includes("mechanic"))) res.cookies.set(MODE_COOKIE, user.roles.includes("customer") && role !== "mechanic" ? "customer" : "mechanic", { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
   return res;
 }

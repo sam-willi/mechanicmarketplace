@@ -9,6 +9,7 @@ import { getAccount, getSession, MODE_COOKIE, PERSONA_COOKIE } from "@/lib/sessi
 import { toPublicProfile } from "@/lib/domain/public-profile";
 import { eligibility } from "@/lib/domain/eligibility";
 import { DECLINE_REASONS } from "@/lib/domain/decline";
+import { slotLabel } from "@/lib/domain/schedule";
 import {
   REPAIR_CATEGORIES,
   VEHICLE_MAKES,
@@ -229,6 +230,8 @@ export async function markInterested(requestId: string, formData: FormData) {
   if (!r || !r.matchedMechanicIds.includes(id)) return;
   await repo.markInterested(requestId, id, str(formData, "note"));
   refresh();
+  // Straight into the estimate: interest and estimate are one step.
+  redirect(`/mechanic/requests/${requestId}#estimate`);
 }
 
 export async function submitQuote(requestId: string, formData: FormData) {
@@ -264,6 +267,9 @@ export interface EstimateInput {
   partsIncluded: boolean;
   durationHours: number;
   availableOn: string;
+  /** The appointment you're offering, for both calendars: "YYYY-MM-DD" and "HH:MM". */
+  availableDate: string;
+  availableTime: string;
   serviceMode: "mobile" | "shop";
   scope: string;
   notes: string;
@@ -286,6 +292,8 @@ export async function saveEstimate(requestId: string, input: EstimateInput, inte
   const existing = repo.listQuotesForRequest(requestId).find((q) => q.mechanicId === id);
   if (existing && existing.status !== "draft" && intent === "draft") return { ok: false, error: "This estimate was already sent." };
   if (r.declinedBy.includes(id)) return { ok: false, error: "You declined this request." };
+  const slot =
+    /^\d{4}-\d{2}-\d{2}$/.test(text(input.availableDate)) && /^\d{2}:\d{2}$/.test(text(input.availableTime)) ? { date: text(input.availableDate), time: text(input.availableTime) } : undefined;
   const lines = (Array.isArray(input.lines) ? input.lines : []).slice(0, 30).map((l, i) => ({
     id: text(l.id, 40) || `l${i}`,
     kind: l.kind === "part" ? ("part" as const) : ("labor" as const),
@@ -299,7 +307,7 @@ export async function saveEstimate(requestId: string, input: EstimateInput, inte
     if (!eligibility(toPublicProfile(repo.getMechanicSources(id))).eligible) return { ok: false, error: "Your screening isn't current, so you can't send estimates yet. Your draft is saved." };
     if (!laborCents) return { ok: false, error: "Add at least one labor line with a price." };
     if (!scope) return { ok: false, error: "Describe the scope of work." };
-    if (!text(input.availableOn)) return { ok: false, error: "Say when you're available." };
+    if (!slot) return { ok: false, error: "Pick the date and time you can do it." };
   }
   const expires = /^\d{4}-\d{2}-\d{2}$/.test(text(input.expiresOn)) ? text(input.expiresOn) : undefined;
   await repo.submitQuote(
@@ -312,7 +320,8 @@ export async function saveEstimate(requestId: string, input: EstimateInput, inte
       partsIncluded: Boolean(input.partsIncluded),
       partsEstimateCents: partsCents,
       durationHours: Math.max(0.25, Math.min(100, Number(input.durationHours) || 1)),
-      availableOn: text(input.availableOn, 120),
+      availableOn: slot ? slotLabel(slot) : text(input.availableOn, 120),
+      availableAt: slot,
       serviceMode: input.serviceMode === "shop" ? "shop" : "mobile",
       scope,
       notes: text(input.notes) || undefined,

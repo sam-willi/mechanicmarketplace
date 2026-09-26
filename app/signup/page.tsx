@@ -20,14 +20,15 @@ const SIGNUP_ERRORS: Record<string, string> = {
 
 export default async function SignupPage({ searchParams }: { searchParams: Promise<{ role?: string; next?: string; error?: string; email?: string; name?: string }> }) {
   const sp = await searchParams;
-  const role = sp.role === "mechanic" ? "mechanic" : sp.role === "customer" ? "customer" : null;
+  // Coming from the customer app (e.g. a car search), they're here as a customer.
+  const role = sp.role === "mechanic" ? "mechanic" : sp.role === "customer" || sp.next?.startsWith("/customer") ? "customer" : null;
 
   return (
     <div className="min-h-dvh">
       <header className="border-b border-rule">
         <div className="mx-auto flex h-14 max-w-[640px] items-center justify-between px-4">
           <Wordmark />
-          <Link href="/login" className="text-[0.9375rem] font-semibold hover:underline">
+          <Link href={`/login${sp.next ? `?next=${encodeURIComponent(sp.next)}` : ""}`} className="text-[0.9375rem] font-semibold hover:underline">
             Log in
           </Link>
         </div>

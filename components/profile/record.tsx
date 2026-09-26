@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { MapPin, Star } from "lucide-react";
+import { StarRating } from "@/components/visual/stars";
+import { MapPin } from "lucide-react";
 import type { PublicMechanicProfile } from "@/lib/domain/public-profile";
 import { safetyEvidence } from "@/lib/domain/evidence";
 import { REPAIR_LABEL, repairNoun } from "@/lib/domain/provenance";
@@ -164,7 +165,7 @@ export function CountsStrip({ p }: { p: PublicMechanicProfile }) {
           <>
             <span className="flex items-baseline gap-1">
               <span className="num text-[2.25rem] text-ink sm:text-[2.75rem]">{rating(r.rating.average)}</span>
-              <Star size={15} fill="currentColor" strokeWidth={0} className="-translate-y-0.5 text-ink" aria-hidden />
+              <StarRating value={r.rating.average} size={15} className="-translate-y-0.5" />
             </span>
             <span className="mt-1.5 block text-[0.8125rem] leading-tight text-ink-2 group-hover:text-ink">
               from {plural(r.rating.count, "verified review")}

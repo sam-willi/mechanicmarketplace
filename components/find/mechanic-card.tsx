@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { CalendarClock, ChevronDown, ShieldAlert, ShieldCheck, Star } from "lucide-react";
+import { StarRating } from "@/components/visual/stars";
+import { CalendarClock, ChevronDown, ShieldAlert, ShieldCheck } from "lucide-react";
 import type { PublicMechanicProfile } from "@/lib/domain/public-profile";
 import type { RepairCategory, VehicleMake } from "@/lib/domain/types";
 import { eligibility, notBookableStatus, screeningSummary } from "@/lib/domain/eligibility";
@@ -30,7 +31,7 @@ function Facts({ p, extra }: { p: PublicMechanicProfile; extra?: React.ReactNode
   return (
     <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-[0.875rem]">
       <li className="inline-flex items-center gap-1.5">
-        <Star size={14} className="text-ink" fill="currentColor" strokeWidth={0} aria-hidden />
+        {r ? <StarRating value={r.average} size={14} /> : null}
         {r ? (
           <span>
             <span className="font-semibold">{r.average.toFixed(1)}</span> <span className="text-ink-2">({r.count})</span>
@@ -179,32 +180,5 @@ export function UnbookableCard({ fit, ctx, profileHref, status }: Omit<Common, "
         Profile
       </Link>
     </li>
-  );
-}
-
-/** A single example on marketing pages: the same facts a search result shows. */
-export function ExampleCard({ fit, ctx, profileHref }: Omit<Common, "quoteHref">) {
-  const p = fit.p;
-  return (
-    <div className="border-2 border-brand-deep bg-sheet shadow-[0_24px_48px_-28px_rgba(15,28,48,0.5)]">
-      <p className="border-b-4 border-brass bg-brand-deep px-5 py-2 text-[0.9375rem] font-extrabold text-brass-wash">Best Fit for a BMW brake job</p>
-      <div className="space-y-4 p-5">
-        <div className="flex items-center gap-4">
-          <PhotoPrint photoUrl={p.photoUrl} initials={p.initials} name={p.displayName} size={72} />
-          <div>
-            <p className="heading text-[1.3125rem]">{p.displayName}</p>
-            <p className="text-[0.875rem] text-ink-2">{WORK_MODEL_LABEL[p.workModel]}</p>
-          </div>
-        </div>
-        <Reason fit={fit} ctx={ctx} big />
-        <Facts p={p} />
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-t border-rule-soft pt-4">
-          <Price p={p} repair={ctx.repair} big />
-          <Link href={profileHref} className="btn btn-line min-h-11">
-            View profile
-          </Link>
-        </div>
-      </div>
-    </div>
   );
 }

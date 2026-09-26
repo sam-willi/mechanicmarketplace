@@ -6,6 +6,7 @@ import { getAccount, getAuthUser, getSession } from "@/lib/session";
 import { addCustomerRole } from "@/app/actions/account";
 import { Wordmark } from "@/components/brand/wordmark";
 import { AccountMenu } from "@/components/app/account-menu";
+import { StaffOnlyNotice } from "@/components/app/staff-only";
 import { ModeSwitch, SwitchedToast } from "@/components/app/mode-switch";
 import { BellLink, BottomNav, TopNav, type NavItem } from "@/components/app/nav";
 import { needsNewMechanic } from "@/lib/domain/status";
@@ -23,7 +24,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
     if (await getAuthUser()) redirect(`/welcome?next=${encodeURIComponent(path)}`);
     redirect(`/login?next=${encodeURIComponent(path)}`);
   }
-  if (s.role === "admin") redirect("/admin");
+  if (s.role === "admin") return <StaffOnlyNotice name={s.name} area="customer" />;
   const acct = (await getAccount())!;
 
   if (s.role !== "customer") {
@@ -78,7 +79,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
           <div className="flex items-center gap-1">
             {acct.mechanic ? <ModeSwitch to="mechanic" /> : null}
             <BellLink href="/customer/notifications" unread={unread} />
-            <AccountMenu name={s.name} mode="customer" hasCustomer hasMechanic={Boolean(acct.mechanic)} />
+            <AccountMenu staff={s.roles.includes("admin")} name={s.name} mode="customer" hasCustomer hasMechanic={Boolean(acct.mechanic)} />
           </div>
         </div>
       </header>

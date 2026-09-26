@@ -27,7 +27,8 @@ export async function proxy(request: NextRequest) {
   const area = path.startsWith("/customer") ? "customer" : path.startsWith("/mechanic/") || path === "/mechanic" ? "mechanic" : "";
   const headers = new Headers(request.headers);
   headers.set("x-clutch-area", area);
-  headers.set("x-clutch-path", path);
+  // Where to return after logging in, with the query (e.g. a search's car, repair and area).
+  headers.set("x-clutch-path", path + request.nextUrl.search);
   headers.set("x-clutch-switched", request.nextUrl.searchParams.get("switched") ?? "");
   const res = NextResponse.next({ request: { headers } });
   refreshed.forEach(({ name, value, options }) => res.cookies.set(name, value, options));

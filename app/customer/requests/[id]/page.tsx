@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
+import { StarRating } from "@/components/visual/stars";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, ArrowLeft, Check, ShieldAlert, ShieldCheck, Star } from "lucide-react";
+import { ArrowRight, ArrowLeft, Check, ShieldAlert, ShieldCheck } from "lucide-react";
 import { ready, repo } from "@/lib/data";
 import { getSession } from "@/lib/session";
 import { repairNoun } from "@/lib/domain/provenance";
@@ -226,7 +227,13 @@ export default async function CompareQuotes({ params }: { params: Promise<{ id: 
                       <td className="py-2.5 pr-4 text-[0.875rem]">{q.availableOn}</td>
                       <td className="tnum py-2.5 pr-4 font-semibold">{exact} verified</td>
                       <td className="tnum py-2.5 pr-4 text-[0.875rem]">
-                        {p.reputation.rating ? `${p.reputation.rating.average.toFixed(1)} (${p.reputation.rating.count})` : "–"}
+                        {p.reputation.rating ? (
+                          <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                            <StarRating value={p.reputation.rating.average} size={13} /> {p.reputation.rating.average.toFixed(1)} ({p.reputation.rating.count})
+                          </span>
+                        ) : (
+                          "–"
+                        )}
                       </td>
                       <td className="py-1.5 text-right">
                         {q.status === "accepted" ? (
@@ -285,7 +292,7 @@ export default async function CompareQuotes({ params }: { params: Promise<{ id: 
                     </p>
                     <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[0.875rem]">
                       <li className="inline-flex items-center gap-1.5">
-                        <Star size={14} fill="currentColor" strokeWidth={0} aria-hidden />
+                        {rating ? <StarRating value={rating.average} size={14} /> : null}
                         {rating ? `${rating.average.toFixed(1)} (${rating.count})` : "No reviews yet"}
                       </li>
                       <li className={`inline-flex items-center gap-1.5 ${e.eligible ? "" : "font-semibold text-alert"}`}>

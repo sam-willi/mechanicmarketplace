@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeftRight, Bell, Car, ChevronDown, Heart, LifeBuoy, LogOut, Settings } from "lucide-react";
+import { ArrowLeftRight, Bell, Car, ChevronDown, Heart, LifeBuoy, LogOut, Settings, ShieldCheck } from "lucide-react";
 import { signOut, switchMode } from "@/app/actions/account";
 import type { AppMode } from "@/lib/domain/types";
 
@@ -12,12 +12,15 @@ export function AccountMenu({
   mode,
   hasCustomer,
   hasMechanic,
+  staff = false,
   tone = "light",
 }: {
   name: string;
   mode: AppMode;
   hasCustomer: boolean;
   hasMechanic: boolean;
+  /** Clutch staff also see the verification review queue. */
+  staff?: boolean;
   tone?: "light" | "dark";
 }) {
   const [open, setOpen] = useState(false);
@@ -83,6 +86,11 @@ export function AccountMenu({
             <Settings size={16} aria-hidden />
             Settings
           </Link>
+          {staff ? (
+            <Link role="menuitem" href="/admin" className="flex items-center gap-2.5 px-4 py-3 text-[0.9375rem] hover:bg-paper" onClick={() => setOpen(false)}>
+              <ShieldCheck size={16} aria-hidden /> Review queue
+            </Link>
+          ) : null}
           <Link role="menuitem" href={mode === "customer" ? "/customer/help" : "/mechanic/help"} className="flex items-center gap-2.5 px-4 py-3 text-[0.9375rem] hover:bg-paper" onClick={() => setOpen(false)}>
             <LifeBuoy size={16} aria-hidden /> Help &amp; safety
           </Link>

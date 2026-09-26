@@ -5,6 +5,9 @@ import type { RecordedSpec, VehicleSpec } from "@/lib/vehicles/types";
 export type ID = string;
 export type ISODate = string; // YYYY-MM-DD or full ISO timestamp
 
+/** A booked or offered time: a calendar date and a 24-hour "HH:MM" time (Los Angeles). */
+export type Slot = { date: ISODate; time: string };
+
 export type Role = "customer" | "mechanic" | "admin";
 
 export const REPAIR_CATEGORIES = [
@@ -557,6 +560,8 @@ export interface Quote {
   partsEstimateCents: number;
   durationHours: number;
   availableOn: string;
+  /** The same time, structured, for calendars. Older estimates only have the text. */
+  availableAt?: Slot;
   serviceMode: "mobile" | "shop";
   scope: string;
   notes?: string;
@@ -611,6 +616,8 @@ export interface Job {
   title: string;
   status: JobStatus;
   scheduledFor: string;
+  /** The booked slot, for the mechanic's calendar. */
+  appointment?: Slot;
   /** Mechanic confirmed the appointment time. */
   confirmedAt?: ISODate;
   startedAt?: ISODate;

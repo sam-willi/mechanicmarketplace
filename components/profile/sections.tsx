@@ -1,4 +1,5 @@
-import { Star } from "lucide-react";
+
+import { StarRating } from "@/components/visual/stars";
 import type { PublicMechanicProfile, PublicRepair, PublicReview } from "@/lib/domain/public-profile";
 import { credentialEvidence, employmentEvidence, repairEvidence, sourceEvidence } from "@/lib/domain/evidence";
 import { REPAIR_LABEL, repairNoun } from "@/lib/domain/provenance";
@@ -253,11 +254,7 @@ export function Credentials({ p }: { p: PublicMechanicProfile }) {
 
 function Stars({ n }: { n: number }) {
   return (
-    <span className="inline-flex gap-px" aria-label={`${n} out of 5`}>
-      {[1, 2, 3, 4, 5].map((i) => (
-        <Star key={i} size={13} strokeWidth={1.5} fill={i <= n ? "var(--ink)" : "none"} className={i <= n ? "text-ink" : "text-rule"} aria-hidden />
-      ))}
-    </span>
+    <StarRating value={n} size={14} labelled />
   );
 }
 
@@ -312,6 +309,7 @@ export function Reviews({ p, prefer }: { p: PublicMechanicProfile; prefer?: { re
         <div className="grid gap-y-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-end sm:gap-x-10">
           <div>
             <p className="num text-[3.5rem] text-ink">{rating(r.average)}</p>
+            <StarRating value={r.average} size={22} className="mt-1" />
             <p className="mt-2 text-[0.8125rem] text-ink-2">from {plural(r.count, "completed Clutch repair")}</p>
           </div>
           <dl className="grid grid-cols-2 gap-x-4 border-t border-rule">

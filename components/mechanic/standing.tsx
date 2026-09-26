@@ -11,7 +11,9 @@ import { SCREENING_STYLE } from "@/components/trust/screening-style";
  * and checks expire.
  */
 export function Standing({ p, steps }: { p: PublicMechanicProfile; steps: ProfileStep[] }) {
-  const basics = steps.filter((s) => !s.requiredForWork && ["Basic information and bio", "Profile photo", "Service area", "Services you offer", "Pricing"].includes(s.label));
+  const basics = steps.filter(
+    (s) => !s.requiredForWork && ["Basic information and bio", "Profile photo", "Service area", "Services you offer", "Pricing"].includes(s.label),
+  );
   const basicsDone = basics.filter((s) => s.done).length;
   const nextBasic = basics.find((s) => !s.done);
   const e = eligibility(p);
@@ -49,7 +51,19 @@ export function Standing({ p, steps }: { p: PublicMechanicProfile; steps: Profil
             const S = SCREENING_STYLE[i.state];
             return (
               <li key={i.key} className="flex items-center gap-1.5">
-                <S.icon size={14} aria-hidden className={i.state === "verified" ? "text-carbon" : i.state === "expiring" ? "text-amber" : i.state === "expired" || i.state === "rejected" ? "text-alert" : "text-ink-3"} />
+                <S.icon
+                  size={14}
+                  aria-hidden
+                  className={
+                    i.state === "verified"
+                      ? "text-carbon"
+                      : i.state === "expiring"
+                        ? "text-amber"
+                        : i.state === "expired" || i.state === "rejected"
+                          ? "text-alert"
+                          : "text-ink-3"
+                  }
+                />
                 {i.privateLabel}
               </li>
             );
@@ -68,7 +82,8 @@ export function Standing({ p, steps }: { p: PublicMechanicProfile; steps: Profil
           <span className="text-ink-2"> verified repairs</span>
         </p>
         <p className="text-[0.8125rem] text-ink-2">
-          {verifiedCreds} verified {verifiedCreds === 1 ? "credential" : "credentials"} · {selfCount} self-reported {selfCount === 1 ? "claim" : "claims"} still unproven
+          {verifiedCreds} verified {verifiedCreds === 1 ? "credential" : "credentials"} · {selfCount} self-reported {selfCount === 1 ? "claim" : "claims"} still
+          unproven
         </p>
         <Link href="/mechanic/repairs" className="mt-2 inline-block text-[0.875rem] font-semibold underline decoration-rule underline-offset-2">
           Add proof of past work

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import { StarRating } from "@/components/visual/stars";
 import Link from "next/link";
-import { ArrowLeft, CalendarClock, Check, MessageCircleQuestion, Minus, Star } from "lucide-react";
+import { ArrowLeft, CalendarClock, Check, MessageCircleQuestion, Minus } from "lucide-react";
 import { notFound } from "next/navigation";
 import { ready, repo } from "@/lib/data";
 import { getSession } from "@/lib/session";
@@ -110,7 +111,7 @@ export default async function EstimatePage({ params }: { params: Promise<{ id: s
               <li className="flex items-center gap-1.5">
                 {p.reputation.rating ? (
                   <>
-                    <Star size={14} fill="currentColor" strokeWidth={0} aria-hidden />
+                    <StarRating value={p.reputation.rating.average} size={14} />
                     <span className="font-semibold">{rating(p.reputation.rating.average)}</span>
                     <span className="text-ink-2">from {plural(p.reputation.rating.count, "verified review")}</span>
                   </>

@@ -68,8 +68,6 @@ export async function getSession(): Promise<Session> {
   const userId = await signedInUserId();
   const user = userId ? repo.getUser(userId) : undefined;
   if (!user) return { role: "guest" };
-  if (user.roles.includes("admin")) return { role: "admin", userId: user.id, name: user.name, roles: user.roles };
-
   const area = (await headers()).get(AREA_HEADER) as AppMode | "" | null;
   const cookieMode = jar.get(MODE_COOKIE)?.value as AppMode | undefined;
   const order: AppMode[] = [area || cookieMode || (user.roles[0] as AppMode), "customer", "mechanic"].filter(Boolean) as AppMode[];
@@ -84,7 +82,17 @@ export async function getSession(): Promise<Session> {
       if (m) return { role: "mechanic", userId: user.id, mechanicId: m.id, slug: m.slug, name: user.name, roles: user.roles };
     }
   }
+  // Staff-only accounts (no customer or mechanic profile) get the reviewer session.
+  if (user.roles.includes("admin")) return { role: "admin", userId: user.id, name: user.name, roles: user.roles };
   return { role: "guest" };
+}
+
+/**
+ * Clutch staff. Admin is a permission on top of an account's customer or
+ * mechanic mode, not a replacement for it; the review pages check this.
+ */
+export function isStaff(s: Session): s is Exclude<Session, { role: "guest" }> {
+  return s.role !== "guest" && s.roles.includes("admin");
 }
 
 /** Which roles the signed-in account holds, regardless of the current area. */

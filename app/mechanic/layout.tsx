@@ -7,6 +7,7 @@ import { getAccount, getAuthUser, getSession } from "@/lib/session";
 import { effectiveStatus } from "@/lib/verification/lifecycle";
 import { Logo } from "@/components/brand/wordmark";
 import { AccountMenu } from "@/components/app/account-menu";
+import { StaffOnlyNotice } from "@/components/app/staff-only";
 import { ModeSwitch, SwitchedToast } from "@/components/app/mode-switch";
 import { BellLink, BottomNav, SideNav, type NavItem } from "@/components/app/nav";
 
@@ -25,7 +26,7 @@ export default async function MechanicLayout({ children }: { children: React.Rea
     if (path.startsWith("/mechanic/onboarding")) redirect("/signup?role=mechanic");
     redirect(`/login?next=${encodeURIComponent(path)}`);
   }
-  if (s.role === "admin") redirect("/admin");
+  if (s.role === "admin") return <StaffOnlyNotice name={s.name} area="mechanic" />;
 
   // Onboarding is open to signed-in accounts that don't have the mechanic role yet.
   if (s.role !== "mechanic") {
@@ -128,10 +129,10 @@ export default async function MechanicLayout({ children }: { children: React.Rea
                 <BellLink href="/mechanic/notifications" unread={unread} />
               </span>
               <span className="lg:hidden">
-                <AccountMenu name={s.name} mode="mechanic" hasCustomer={Boolean(acct.customer)} hasMechanic tone="dark" />
+                <AccountMenu staff={s.roles.includes("admin")} name={s.name} mode="mechanic" hasCustomer={Boolean(acct.customer)} hasMechanic tone="dark" />
               </span>
               <span className="hidden lg:block">
-                <AccountMenu name={s.name} mode="mechanic" hasCustomer={Boolean(acct.customer)} hasMechanic />
+                <AccountMenu staff={s.roles.includes("admin")} name={s.name} mode="mechanic" hasCustomer={Boolean(acct.customer)} hasMechanic />
               </span>
             </div>
           </div>

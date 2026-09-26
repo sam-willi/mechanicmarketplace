@@ -15,7 +15,6 @@ import { usd } from "@/lib/format";
 import {
   attachJobPhotos,
   cancelJobAsMechanic,
-  confirmAppointment,
   markJobDone,
   recordDiagnosis,
   requestScopeChange,
@@ -26,6 +25,7 @@ import { RepairPhotoUploader } from "@/components/mechanic/photo-uploader";
 import { StatusChip } from "@/components/app/status-chip";
 import { ConfirmButton } from "@/components/app/confirm-button";
 import { DeclineForm } from "@/components/mechanic/decline-form";
+import { ConfirmDecide } from "@/components/mechanic/confirm-decide";
 import { LifecycleRail, NowPanel } from "@/components/app/job-lifecycle";
 import { EligibilityNotice } from "@/components/trust/eligibility-notice";
 import { RequestSummary } from "@/components/request/request-summary";
@@ -76,11 +76,7 @@ export default async function MechanicJob({ params }: { params: Promise<{ id: st
     switch (current?.key) {
       case "confirmed":
         return (
-          <form action={confirmAppointment.bind(null, j.id)}>
-            <ConfirmButton message={`Confirm ${j.scheduledFor} with ${first}? They'll be told you're coming.`} className="btn btn-ink min-h-11">
-              Confirm {j.scheduledFor}
-            </ConfirmButton>
-          </form>
+          <ConfirmDecide jobId={j.id} when="" first={first} />
         );
       case "checked_in":
         return (
@@ -296,7 +292,7 @@ export default async function MechanicJob({ params }: { params: Promise<{ id: st
             </div>
           </details>
 
-          {open && (
+          {open && current?.key !== "confirmed" && (
             <div className="border-t border-rule pt-4">
               <DeclineForm
                 danger

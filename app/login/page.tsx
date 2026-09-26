@@ -28,13 +28,14 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <header className="border-b border-rule">
         <div className="mx-auto flex h-14 max-w-[560px] items-center justify-between px-4">
           <Wordmark />
-          <Link href="/signup" className="text-[0.9375rem] font-semibold hover:underline">
+          <Link href={`/signup${sp.next ? `?next=${encodeURIComponent(sp.next)}` : ""}`} className="text-[0.9375rem] font-semibold hover:underline">
             Sign up
           </Link>
         </div>
       </header>
       <main className="mx-auto max-w-[560px] px-4 pt-10 pb-20">
         <h1 className="display text-[2.25rem]">Log in</h1>
+        {sp.next?.startsWith("/customer/mechanics") ? <p className="mt-2 text-ink-2">Log in or create an account to see mechanics for your car.</p> : null}
         {sp.exists ? <p className="mt-3 border border-ink bg-sheet px-3 py-2 text-[0.9375rem]">You already have an account with that email. Log in below.</p> : null}
         {sp.reset ? <p className="mt-3 border border-ink bg-sheet px-3 py-2 text-[0.9375rem]">Password updated. Log in with your new password.</p> : null}
         {sp.error ? <p className="mt-3 border border-alert bg-alert-wash px-3 py-2 text-[0.9375rem]" role="alert">{ERRORS[sp.error] ?? ERRORS.unknown}</p> : null}
@@ -100,6 +101,8 @@ function DemoAccounts({ next }: { next?: string }) {
       <div className="mt-2 border-t border-rule">
         {demo
           .filter((d) => (d.id === "user-derek-hall" ? derek : d.id === "user-maya" ? maya : true))
+          // The reviewer can't open customer or mechanic pages, so don't offer it on the way to one.
+          .filter((d) => d.mode !== "admin" || !(next?.startsWith("/customer") || next?.startsWith("/mechanic")))
           .map((d) => (
             <form key={d.id} action={demoSignIn}>
               <input type="hidden" name="userId" value={d.id} />

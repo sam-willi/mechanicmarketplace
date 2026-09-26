@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { StarRating } from "@/components/visual/stars";
 import Link from "next/link";
 import { ArrowLeft, CalendarClock, LifeBuoy, MapPin, Phone } from "lucide-react";
 import { notFound } from "next/navigation";
@@ -111,7 +112,12 @@ export default async function JobPage({ params, searchParams }: { params: Promis
                 <p className="heading text-[1.1875rem]">{m.displayName}</p>
                 <p className="text-[0.875rem] text-ink-2">
                   {m.reputation.verifiedRepairs} verified repairs
-                  {m.reputation.rating ? ` · ${m.reputation.rating.average.toFixed(1)} from ${m.reputation.rating.count} verified reviews` : ""}
+                  {m.reputation.rating ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <span aria-hidden> ·</span> <StarRating value={m.reputation.rating.average} size={13} /> {m.reputation.rating.average.toFixed(1)} from{" "}
+                      {m.reputation.rating.count} verified reviews
+                    </span>
+                  ) : null}
                 </p>
                 <div className="mt-2">
                   <ScreeningList p={m} compact />
@@ -290,7 +296,10 @@ export default async function JobPage({ params, searchParams }: { params: Promis
             <p className="flex items-center gap-2 font-semibold text-carbon">
               <Tick size={16} /> Verified review posted
             </p>
-            <p className="tnum text-[1.25rem] font-semibold">{review.overall}/5</p>
+            <p className="flex items-center gap-2">
+              <StarRating value={review.overall} size={20} labelled />
+              <span className="tnum text-[1.125rem] font-semibold">{review.overall}/5</span>
+            </p>
             {review.comment ? <p className="text-ink-2">{review.comment}</p> : null}
           </div>
         ) : (

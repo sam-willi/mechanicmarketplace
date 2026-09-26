@@ -172,7 +172,7 @@ export async function demoSignIn(formData: FormData) {
   jar.set(USER_COOKIE, sign(user.id), { path: "/", sameSite: "lax", maxAge: YEAR, httpOnly: true, secure: process.env.NODE_ENV === "production" });
   jar.delete(PERSONA_COOKIE);
   if (mode && mode !== "admin") jar.set(MODE_COOKIE, mode, { path: "/", sameSite: "lax", maxAge: YEAR });
-  const home = user.roles.includes("admin") ? "/admin" : mode === "mechanic" ? "/mechanic" : "/customer";
+  const home = mode === "admin" || !(user.roles.includes("customer") || user.roles.includes("mechanic")) ? "/admin" : mode === "mechanic" ? "/mechanic" : "/customer";
   redirect(safeNext(next, home));
 }
 

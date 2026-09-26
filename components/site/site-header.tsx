@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { signOut } from "@/app/actions/account";
 import { getSession } from "@/lib/session";
 import { Wordmark } from "@/components/brand/wordmark";
 
 const NAV = [
-  { href: "/mechanics", label: "Find a Mechanic" },
+  { href: "/customer/mechanics", label: "Find a Mechanic" },
   { href: "/for-mechanics", label: "For Mechanics" },
   { href: "/how-it-works", label: "How It Works" },
 ];
@@ -35,6 +36,14 @@ export async function SiteHeader() {
           </nav>
         </div>
         <div className="flex items-center gap-3">
+          {s.role === "admin" ? (
+            <>
+              <span className="hidden text-[0.875rem] text-ink-2 sm:inline">Signed in as {s.name}</span>
+              <form action={signOut}>
+                <button className="text-[0.9375rem] font-semibold text-ink hover:underline">Log out</button>
+              </form>
+            </>
+          ) : null}
           {app ? (
             <Link href={app.href} className="btn btn-ink min-h-11 px-3 text-sm">
               {app.label}
@@ -72,7 +81,7 @@ export function SiteFooter() {
           <p className="text-ink-3">Demo build: every mechanic, shop, customer and review on this site is fictional.</p>
         </div>
         <nav aria-label="Footer" className="grid grid-cols-2 gap-x-8 gap-y-2">
-          <Link href="/mechanics" className="hover:text-ink">Find a Mechanic</Link>
+          <Link href="/customer/mechanics" className="hover:text-ink">Find a Mechanic</Link>
           <Link href="/for-mechanics" className="hover:text-ink">For Mechanics</Link>
           <Link href="/how-it-works" className="hover:text-ink">How It Works</Link>
           <Link href="/verification" className="hover:text-ink">Verification</Link>

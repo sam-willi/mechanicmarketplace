@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Check, Loader2, Plus, Trash2 } from "lucide-react";
 import { saveEstimate, type EstimateInput } from "@/app/actions/mechanic";
+import { slotLabel, type Slot } from "@/lib/domain/schedule";
 import { inclusions, quoteTotals } from "@/lib/domain/quote";
 import { usd } from "@/lib/format";
 
@@ -27,6 +28,7 @@ export function EstimateBuilder({
   blockedReason,
   mobileAllowed,
   shopAllowed,
+  openings = [],
 }: {
   requestId: string;
   customerFirst: string;
@@ -36,6 +38,8 @@ export function EstimateBuilder({
   blockedReason?: string;
   mobileAllowed: boolean;
   shopAllowed: boolean;
+  /** The mechanic's posted openings, offered as one-tap times. */
+  openings?: Slot[];
 }) {
   const [v, setV] = useState<EstimateInput>(initial);
   const [dirty, setDirty] = useState(false);
@@ -49,8 +53,16 @@ export function EstimateBuilder({
     setV((p) => ({ ...p, [k]: val }));
     setDirty(true);
   };
-  const setLine = (id: string, patch: Partial<Line>) => set("lines", v.lines.map((l) => (l.id === id ? { ...l, ...patch } : l)));
-  const setAlt = (i: number, patch: Partial<Alt>) => set("alternates", v.alternates.map((a, j) => (j === i ? { ...a, ...patch } : a)));
+  const setLine = (id: string, patch: Partial<Line>) =>
+    set(
+      "lines",
+      v.lines.map((l) => (l.id === id ? { ...l, ...patch } : l)),
+    );
+  const setAlt = (i: number, patch: Partial<Alt>) =>
+    set(
+      "alternates",
+      v.alternates.map((a, j) => (j === i ? { ...a, ...patch } : a)),
+    );
 
   // Autosave: a quiet draft save a moment after typing stops.
   useEffect(() => {
@@ -69,9 +81,23 @@ export function EstimateBuilder({
 
   const labor = v.lines.filter((l) => l.kind === "labor").reduce((n, l) => n + l.cents, 0);
   const parts = v.lines.filter((l) => l.kind === "part").reduce((n, l) => n + l.cents, 0);
-  const totals = quoteTotals({ laborCents: labor, diagnosticFeeCents: v.diagnosticFeeCents, travelFeeCents: v.serviceMode === "mobile" ? v.travelFeeCents : 0, partsIncluded: v.partsIncluded, partsEstimateCents: parts });
+  const totals = quoteTotals({
+    laborCents: labor,
+    diagnosticFeeCents: v.diagnosticFeeCents,
+    travelFeeCents: v.serviceMode === "mobile" ? v.travelFeeCents : 0,
+    partsIncluded: v.partsIncluded,
+    partsEstimateCents: parts,
+  });
   const inc = useMemo(
-    () => inclusions({ diagnosticFeeCents: v.diagnosticFeeCents, travelFeeCents: v.travelFeeCents, partsIncluded: v.partsIncluded, partsEstimateCents: parts, serviceMode: v.serviceMode, exclusions: v.exclusions }),
+    () =>
+      inclusions({
+        diagnosticFeeCents: v.diagnosticFeeCents,
+        travelFeeCents: v.travelFeeCents,
+        partsIncluded: v.partsIncluded,
+        partsEstimateCents: parts,
+        serviceMode: v.serviceMode,
+        exclusions: v.exclusions,
+      }),
     [v.diagnosticFeeCents, v.travelFeeCents, v.partsIncluded, parts, v.serviceMode, v.exclusions],
   );
 
@@ -96,28 +122,70 @@ export function EstimateBuilder({
           <ul className="space-y-2">
             {v.lines.map((l) => (
               <li key={l.id} className="grid grid-cols-[6.5rem_minmax(0,1fr)_7rem_2.75rem] items-center gap-2">
-                <select aria-label="Line type" value={l.kind} onChange={(e) => setLine(l.id, { kind: e.target.value as Line["kind"] })} className="input min-h-11 px-2 text-[0.875rem]">
+                <select
+                  aria-label="Line type"
+                  value={l.kind}
+                  onChange={(e) => setLine(l.id, { kind: e.target.value as Line["kind"] })}
+                  className="input min-h-11 px-2 text-[0.875rem]"
+                >
                   <option value="labor">Labor</option>
                   <option value="part">Part</option>
                 </select>
-                <input aria-label="Description" value={l.label} onChange={(e) => setLine(l.id, { label: e.target.value })} className="input min-h-11" placeholder={l.kind === "labor" ? "e.g. Replace front pads and rotors" : "e.g. Front rotors (pair), OEM"} />
-                <input aria-label="Amount in dollars" inputMode="decimal" value={dollars(l.cents)} onChange={(e) => setLine(l.id, { cents: cents(e.target.value) })} className={`${money} min-h-11`} placeholder="$0" />
-                <button type="button" onClick={() => set("lines", v.lines.filter((x) => x.id !== l.id))} className="grid size-11 place-items-center text-ink-3 hover:text-alert" aria-label={`Remove ${l.label || "line"}`}>
+                <input
+                  aria-label="Description"
+                  value={l.label}
+                  onChange={(e) => setLine(l.id, { label: e.target.value })}
+                  className="input min-h-11"
+                  placeholder={l.kind === "labor" ? "e.g. Replace front pads and rotors" : "e.g. Front rotors (pair), OEM"}
+                />
+                <input
+                  aria-label="Amount in dollars"
+                  inputMode="decimal"
+                  value={dollars(l.cents)}
+                  onChange={(e) => setLine(l.id, { cents: cents(e.target.value) })}
+                  className={`${money} min-h-11`}
+                  placeholder="$0"
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    set(
+                      "lines",
+                      v.lines.filter((x) => x.id !== l.id),
+                    )
+                  }
+                  className="grid size-11 place-items-center text-ink-3 hover:text-alert"
+                  aria-label={`Remove ${l.label || "line"}`}
+                >
                   <Trash2 size={16} aria-hidden />
                 </button>
               </li>
             ))}
           </ul>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => set("lines", [...v.lines, { id: lineId(), kind: "labor", label: "", cents: 0 }])} className="btn btn-quiet min-h-11 text-sm">
+            <button
+              type="button"
+              onClick={() => set("lines", [...v.lines, { id: lineId(), kind: "labor", label: "", cents: 0 }])}
+              className="btn btn-quiet min-h-11 text-sm"
+            >
               <Plus size={15} aria-hidden /> Labor line
             </button>
-            <button type="button" onClick={() => set("lines", [...v.lines, { id: lineId(), kind: "part", label: "", cents: 0 }])} className="btn btn-quiet min-h-11 text-sm">
+            <button
+              type="button"
+              onClick={() => set("lines", [...v.lines, { id: lineId(), kind: "part", label: "", cents: 0 }])}
+              className="btn btn-quiet min-h-11 text-sm"
+            >
               <Plus size={15} aria-hidden /> Part
             </button>
             <label className="ml-auto flex items-center gap-2 text-[0.875rem]">
               Hours
-              <input inputMode="decimal" value={v.durationHours || ""} onChange={(e) => set("durationHours", Number(e.target.value) || 0)} className="input tnum min-h-11 w-20" aria-label="Estimated hours" />
+              <input
+                inputMode="decimal"
+                value={v.durationHours || ""}
+                onChange={(e) => set("durationHours", Number(e.target.value) || 0)}
+                className="input tnum min-h-11 w-20"
+                aria-label="Estimated hours"
+              />
             </label>
             <button
               type="button"
@@ -144,8 +212,17 @@ export function EstimateBuilder({
                 [false, "Billed at cost with receipts", "Parts lines are an estimate; the customer pays what they cost."],
               ] as const
             ).map(([val, title, body]) => (
-              <label key={title} className="flex min-h-11 cursor-pointer gap-2.5 border border-rule bg-sheet p-3 has-[:checked]:border-brand has-[:checked]:ring-1 has-[:checked]:ring-ink">
-                <input type="radio" name="partsIncluded" checked={v.partsIncluded === val} onChange={() => set("partsIncluded", val)} className="mt-1 accent-[var(--ink)]" />
+              <label
+                key={title}
+                className="flex min-h-11 cursor-pointer gap-2.5 border border-rule bg-sheet p-3 has-[:checked]:border-brand has-[:checked]:ring-1 has-[:checked]:ring-ink"
+              >
+                <input
+                  type="radio"
+                  name="partsIncluded"
+                  checked={v.partsIncluded === val}
+                  onChange={() => set("partsIncluded", val)}
+                  className="mt-1 accent-[var(--ink)]"
+                />
                 <span>
                   <span className="block font-semibold">{title}</span>
                   <span className="block text-[0.8125rem] text-ink-2">{body}</span>
@@ -159,7 +236,13 @@ export function EstimateBuilder({
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block">
             <span className="field-label">Diagnostic fee ($)</span>
-            <input inputMode="decimal" value={dollars(v.diagnosticFeeCents)} onChange={(e) => set("diagnosticFeeCents", cents(e.target.value))} className={`${money} mt-1`} placeholder="0" />
+            <input
+              inputMode="decimal"
+              value={dollars(v.diagnosticFeeCents)}
+              onChange={(e) => set("diagnosticFeeCents", cents(e.target.value))}
+              className={`${money} mt-1`}
+              placeholder="0"
+            />
           </label>
           <label className="block">
             <span className="field-label">Where</span>
@@ -171,13 +254,50 @@ export function EstimateBuilder({
           {v.serviceMode === "mobile" && (
             <label className="block">
               <span className="field-label">Travel fee ($)</span>
-              <input inputMode="decimal" value={dollars(v.travelFeeCents)} onChange={(e) => set("travelFeeCents", cents(e.target.value))} className={`${money} mt-1`} placeholder="0" />
+              <input
+                inputMode="decimal"
+                value={dollars(v.travelFeeCents)}
+                onChange={(e) => set("travelFeeCents", cents(e.target.value))}
+                className={`${money} mt-1`}
+                placeholder="0"
+              />
             </label>
           )}
-          <label className="block">
-            <span className="field-label">When you can do it</span>
-            <input value={v.availableOn} onChange={(e) => set("availableOn", e.target.value)} className="input mt-1" placeholder="e.g. Sat, Sep 27 · 9am" />
-          </label>
+          <fieldset className="block sm:col-span-2">
+            <legend className="field-label">When you can do it</legend>
+            {openings.length ? (
+              <div className="mt-1 flex flex-wrap gap-2">
+                {openings.map((o) => {
+                  const on = v.availableDate === o.date && v.availableTime === o.time;
+                  return (
+                    <button
+                      key={o.date + o.time}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => {
+                        set("availableDate", o.date);
+                        set("availableTime", o.time);
+                      }}
+                      className={`min-h-11 border px-3 text-[0.875rem] ${on ? "border-brand bg-brand font-semibold text-on-brand" : "border-rule bg-sheet hover:border-ink-3"}`}
+                    >
+                      {slotLabel(o)}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <input type="date" value={v.availableDate} onChange={(e) => set("availableDate", e.target.value)} className="input" aria-label="Date" />
+              <input
+                type="time"
+                step={900}
+                value={v.availableTime}
+                onChange={(e) => set("availableTime", e.target.value)}
+                className="input"
+                aria-label="Time"
+              />
+            </div>
+          </fieldset>
           <label className="block">
             <span className="field-label">Estimate valid until</span>
             <input type="date" value={v.expiresOn} onChange={(e) => set("expiresOn", e.target.value)} className="input mt-1" />
@@ -186,35 +306,89 @@ export function EstimateBuilder({
 
         <label className="block">
           <span className="field-label">Scope of work</span>
-          <textarea value={v.scope} onChange={(e) => set("scope", e.target.value)} rows={3} className="input mt-1" placeholder="What you'll do and what you'll check first." />
+          <textarea
+            value={v.scope}
+            onChange={(e) => set("scope", e.target.value)}
+            rows={3}
+            className="input mt-1"
+            placeholder="What you'll do and what you'll check first."
+          />
         </label>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block">
             <span className="field-label">This price assumes</span>
-            <textarea value={v.assumptions} onChange={(e) => set("assumptions", e.target.value)} rows={3} className="input mt-1" placeholder="e.g. Rotors are above minimum thickness. Calipers aren't seized." />
+            <textarea
+              value={v.assumptions}
+              onChange={(e) => set("assumptions", e.target.value)}
+              rows={3}
+              className="input mt-1"
+              placeholder="e.g. Rotors are above minimum thickness. Calipers aren't seized."
+            />
           </label>
           <label className="block">
             <span className="field-label">Not included</span>
-            <textarea value={v.exclusions} onChange={(e) => set("exclusions", e.target.value)} rows={3} className="input mt-1" placeholder="One per line, e.g. Rear brakes; Brake fluid flush" />
+            <textarea
+              value={v.exclusions}
+              onChange={(e) => set("exclusions", e.target.value)}
+              rows={3}
+              className="input mt-1"
+              placeholder="One per line, e.g. Rear brakes; Brake fluid flush"
+            />
           </label>
         </div>
 
         {/* Alternate scopes */}
         <fieldset className="space-y-2">
           <legend className="heading text-[1.0625rem]">Not sure until you diagnose it?</legend>
-          <p className="text-[0.8125rem] text-ink-3">Add up to two other outcomes with their own prices, so {customerFirst} knows the range before you arrive.</p>
+          <p className="text-[0.8125rem] text-ink-3">
+            Add up to two other outcomes with their own prices, so {customerFirst} knows the range before you arrive.
+          </p>
           {v.alternates.map((a, i) => (
             <div key={i} className="grid gap-2 border border-rule-soft bg-paper/60 p-3 sm:grid-cols-[minmax(0,1fr)_7rem_7rem_2.75rem]">
-              <input aria-label="Alternate outcome" value={a.label} onChange={(e) => setAlt(i, { label: e.target.value })} className="input min-h-11" placeholder="If it's the starter solenoid, not the motor" />
-              <input aria-label="Alternate labor ($)" inputMode="decimal" value={dollars(a.laborCents)} onChange={(e) => setAlt(i, { laborCents: cents(e.target.value) })} className={`${money} min-h-11`} placeholder="Labor $" />
-              <input aria-label="Alternate parts ($)" inputMode="decimal" value={dollars(a.partsCents)} onChange={(e) => setAlt(i, { partsCents: cents(e.target.value) })} className={`${money} min-h-11`} placeholder="Parts $" />
-              <button type="button" onClick={() => set("alternates", v.alternates.filter((_, j) => j !== i))} className="grid size-11 place-items-center text-ink-3 hover:text-alert" aria-label="Remove this outcome">
+              <input
+                aria-label="Alternate outcome"
+                value={a.label}
+                onChange={(e) => setAlt(i, { label: e.target.value })}
+                className="input min-h-11"
+                placeholder="If it's the starter solenoid, not the motor"
+              />
+              <input
+                aria-label="Alternate labor ($)"
+                inputMode="decimal"
+                value={dollars(a.laborCents)}
+                onChange={(e) => setAlt(i, { laborCents: cents(e.target.value) })}
+                className={`${money} min-h-11`}
+                placeholder="Labor $"
+              />
+              <input
+                aria-label="Alternate parts ($)"
+                inputMode="decimal"
+                value={dollars(a.partsCents)}
+                onChange={(e) => setAlt(i, { partsCents: cents(e.target.value) })}
+                className={`${money} min-h-11`}
+                placeholder="Parts $"
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  set(
+                    "alternates",
+                    v.alternates.filter((_, j) => j !== i),
+                  )
+                }
+                className="grid size-11 place-items-center text-ink-3 hover:text-alert"
+                aria-label="Remove this outcome"
+              >
                 <Trash2 size={16} aria-hidden />
               </button>
             </div>
           ))}
           {v.alternates.length < 2 && (
-            <button type="button" onClick={() => set("alternates", [...v.alternates, { label: "", laborCents: 0, partsCents: 0 }])} className="btn btn-quiet min-h-11 text-sm">
+            <button
+              type="button"
+              onClick={() => set("alternates", [...v.alternates, { label: "", laborCents: 0, partsCents: 0 }])}
+              className="btn btn-quiet min-h-11 text-sm"
+            >
               <Plus size={15} aria-hidden /> Add another outcome
             </button>
           )}
@@ -222,7 +396,13 @@ export function EstimateBuilder({
 
         <label className="block">
           <span className="field-label">Note to {customerFirst}</span>
-          <textarea value={v.notes} onChange={(e) => set("notes", e.target.value)} rows={3} className="input mt-1" placeholder="What you'd check first and why you're a good fit for this job." />
+          <textarea
+            value={v.notes}
+            onChange={(e) => set("notes", e.target.value)}
+            rows={3}
+            className="input mt-1"
+            placeholder="What you'd check first and why you're a good fit for this job."
+          />
         </label>
       </div>
 
@@ -254,7 +434,9 @@ export function EstimateBuilder({
               </div>
             ) : null}
           </dl>
-          <p className={`mt-3 border px-2 py-1.5 text-[0.8125rem] font-semibold ${v.partsIncluded ? "border-ink" : "border-amber bg-amber-wash text-amber"}`}>{totals.partsLine}</p>
+          <p className={`mt-3 border px-2 py-1.5 text-[0.8125rem] font-semibold ${v.partsIncluded ? "border-ink" : "border-amber bg-amber-wash text-amber"}`}>
+            {totals.partsLine}
+          </p>
           {inc.notIncluded.length ? (
             <p className="mt-2 text-[0.8125rem] text-ink-2">
               <span className="font-semibold text-ink">Not included:</span> {inc.notIncluded.slice(0, -1).join("; ") || "nothing listed"}
@@ -266,12 +448,15 @@ export function EstimateBuilder({
                 .filter((a) => a.label)
                 .map((a, i) => (
                   <li key={i}>
-                    <span className="font-semibold">Or:</span> {a.label} · {usd(a.laborCents + a.partsCents + v.diagnosticFeeCents + (v.serviceMode === "mobile" ? v.travelFeeCents : 0))}
+                    <span className="font-semibold">Or:</span> {a.label} ·{" "}
+                    {usd(a.laborCents + a.partsCents + v.diagnosticFeeCents + (v.serviceMode === "mobile" ? v.travelFeeCents : 0))}
                   </li>
                 ))}
             </ul>
           ) : null}
-          <p className="mt-2 text-[0.75rem] text-ink-3">Valid until {v.expiresOn || "no date set"}. Final scope may change after diagnosis, with {customerFirst}&apos;s approval.</p>
+          <p className="mt-2 text-[0.75rem] text-ink-3">
+            Valid until {v.expiresOn || "no date set"}. Final scope may change after diagnosis, with {customerFirst}&apos;s approval.
+          </p>
         </div>
 
         {error ? (
@@ -290,7 +475,8 @@ export function EstimateBuilder({
             </>
           ) : savedAt ? (
             <>
-              <Check size={13} aria-hidden /> Draft saved {new Date(savedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}. Only you can see it.
+              <Check size={13} aria-hidden /> Draft saved {new Date(savedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}. Only you can see
+              it.
             </>
           ) : (
             "Drafts save automatically as you type. Only you can see them."

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ready, repo } from "@/lib/data";
-import { getSession } from "@/lib/session";
+import { getSession, isStaff } from "@/lib/session";
 import { dayMonth } from "@/lib/format";
 import { SiteHeader } from "@/components/site/site-header";
 import { NeedsPersona, PageTitle } from "@/components/workspace/ui";
@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Support reports" };
 export default async function AdminSupport() {
   await ready();
   const s = await getSession();
-  if (s.role !== "admin")
+  if (!isStaff(s))
     return (
       <>
         <SiteHeader />

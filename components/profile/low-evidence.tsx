@@ -1,4 +1,5 @@
-import { Star } from "lucide-react";
+
+import { StarRating } from "@/components/visual/stars";
 import type { PublicMechanicProfile } from "@/lib/domain/public-profile";
 import { REPAIR_LABEL } from "@/lib/domain/provenance";
 import type { EvidenceVariant } from "@/lib/domain/types";
@@ -19,7 +20,7 @@ export function LowEvidenceProfile({ p, quoteHref, variant }: { p: PublicMechani
       <RecordHeader p={p} />
       {avg !== null && (
         <p className="flex items-center gap-2 text-[1rem] text-ink">
-          <Star size={16} fill="currentColor" strokeWidth={0} aria-hidden />
+          <StarRating value={avg} size={16} />
           <span className="font-semibold">{rating(avg)}</span>
           <span className="text-ink-2">({all.length} reviews)</span>
         </p>

@@ -1,13 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ready, repo } from "@/lib/data";
-import { getSession } from "@/lib/session";
+import { getSession, isStaff } from "@/lib/session";
 import { CATEGORY_LABEL, METHOD_LABEL } from "@/lib/domain/provenance";
 import type { VerificationCategory, VerificationStatus } from "@/lib/domain/types";
 import { effectiveStatus } from "@/lib/verification/lifecycle";
-import { dayMonth } from "@/lib/format";
+import { dayMonth, plural, WORK_MODEL_LABEL } from "@/lib/format";
+import { ArrowRight, Check, Clock, Hourglass, MessageCircleQuestion, X } from "lucide-react";
+import { screeningItems } from "@/lib/domain/eligibility";
+import { today } from "@/lib/verification/lifecycle";
+import { PhotoPrint } from "@/components/profile/photo";
+import { SafetyChips, VerdictChip } from "@/components/admin/verdict";
 import { SiteHeader } from "@/components/site/site-header";
-import { NeedsPersona, PageTitle, StatusPill } from "@/components/workspace/ui";
+import { NeedsPersona, PageTitle } from "@/components/workspace/ui";
 
 export const metadata: Metadata = { title: "Verification review" };
 
@@ -18,10 +23,10 @@ const FILTERS: { key: string; label: string; statuses: VerificationStatus[] }[] 
   { key: "done", label: "Decided", statuses: ["verified", "rejected"] },
 ];
 
-export default async function AdminQueue({ searchParams }: { searchParams: Promise<{ f?: string; cat?: string }> }) {
+export default async function AdminQueue({ searchParams }: { searchParams: Promise<{ f?: string; cat?: string; done?: string }> }) {
   await ready();
   const s = await getSession();
-  if (s.role !== "admin")
+  if (!isStaff(s))
     return (
       <>
         <SiteHeader />
@@ -55,76 +60,135 @@ export default async function AdminQueue({ searchParams }: { searchParams: Promi
     ]),
   );
   const cats: VerificationCategory[] = ["identity", "background", "driving_record", "insurance", "credential", "employment", "past_repair"];
+  const now = today();
+  const waited = (d?: string) => (d ? Math.max(0, Math.round((new Date(now).getTime() - new Date(d.slice(0, 10)).getTime()) / 86_400_000)) : 0);
+  const weekAgo = new Date(new Date(now).getTime() - 7 * 86_400_000).toISOString().slice(0, 10);
+  const approvedThisWeek = repo.listVerifications().filter((v) => v.status === "verified" && (v.verifiedAt ?? "") >= weekAgo && v.method !== "platform_job").length;
+
+  // One card per mechanic, longest-waiting first.
+  const groups = [...new Set(rows.map((r) => r.v.mechanicId))]
+    .map((mid) => {
+      const items = rows.filter((r) => r.v.mechanicId === mid).sort((a, b) => (a.v.submittedAt ?? "").localeCompare(b.v.submittedAt ?? ""));
+      const m = repo.getMechanic(mid);
+      const pub = m ? repo.getPublicProfile(m.slug) : null;
+      return { mid, m, pub, items, oldest: items[0]?.v.submittedAt ?? "" };
+    })
+    .sort((a, b) => a.oldest.localeCompare(b.oldest));
+
+  const tiles = [
+    { key: "queue", n: counts.queue, label: "to review", cls: counts.queue ? "border-amber bg-amber-wash text-amber" : "border-rule bg-sheet text-ink-3", icon: Hourglass },
+    { key: "waiting", n: counts.waiting, label: "waiting on mechanic", cls: "border-brand-tint bg-brand-wash text-brand-deep", icon: MessageCircleQuestion },
+    { key: "expiring", n: counts.expiring, label: "expiring or expired", cls: counts.expiring ? "border-alert bg-alert-wash text-alert" : "border-rule bg-sheet text-ink-3", icon: Clock },
+    { key: "done", n: approvedThisWeek, label: "approved this week", cls: "border-go bg-go-wash text-go", icon: Check },
+  ];
 
   return (
     <>
       <SiteHeader />
       <main className="mx-auto max-w-[1200px] space-y-6 px-4 pt-8 pb-24 sm:px-6">
-        <PageTitle title="Verification review" note="Every decision is logged with method, reviewer, time and expiry." />
-        <p className="text-[0.9375rem]">
-          <Link href="/admin/support" className="link">Support reports ({repo.listSupportReports().filter((r) => r.status !== "resolved").length} open)</Link>
-        </p>
-        <nav aria-label="Queues" className="flex flex-wrap gap-1 border-b border-rule">
-          {FILTERS.map((f) => (
+        <PageTitle
+          title="Verification review"
+          action={
+            <Link href="/admin/support" className="btn btn-quiet min-h-11">
+              Support reports ({repo.listSupportReports().filter((r) => r.status !== "resolved").length} open)
+            </Link>
+          }
+        />
+
+        {sp.done ? (
+          <p role="status" className={`flex items-center gap-2 border-2 px-4 py-3 font-bold ${sp.done === "rejected" ? "border-alert bg-alert-wash text-alert" : sp.done === "verified" ? "border-go bg-go-wash text-go" : "border-brand-tint bg-brand-wash text-brand-deep"}`}>
+            {sp.done === "rejected" ? <X size={20} strokeWidth={3} aria-hidden /> : <Check size={20} strokeWidth={3} aria-hidden />}
+            {sp.done === "rejected" ? "Rejected." : sp.done === "verified" ? "Approved." : "Sent back to the mechanic."} That was the last item waiting.
+          </p>
+        ) : null}
+        {/* The queue at a glance; each tile opens its list. */}
+        <nav aria-label="Queues" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {tiles.map((t) => (
             <Link
-              key={f.key}
-              href={`/admin?f=${f.key}`}
-              aria-current={filter.key === f.key ? "page" : undefined}
-              className={`-mb-px border-b-2 px-3 py-2 text-[0.9375rem] ${filter.key === f.key ? "border-ink font-semibold text-ink" : "border-transparent text-ink-2 hover:text-ink"}`}
+              key={t.key}
+              href={`/admin?f=${t.key}`}
+              aria-current={filter.key === t.key ? "page" : undefined}
+              className={`flex items-center gap-3 border-2 p-4 transition-shadow ${t.cls} ${filter.key === t.key ? "shadow-[inset_0_0_0_2px_currentColor]" : "hover:brightness-95"}`}
             >
-              {f.label} <span className="tnum text-ink-3">{counts[f.key]}</span>
+              <t.icon size={26} strokeWidth={2.25} aria-hidden />
+              <span>
+                <span className="num block text-[2rem] leading-none">{t.n}</span>
+                <span className="text-[0.875rem] font-semibold">{t.label}</span>
+              </span>
             </Link>
           ))}
         </nav>
-        <div className="flex flex-wrap gap-2 text-[0.8125rem]">
-          <Link href={`/admin?f=${filter.key}`} className={`border px-2 py-1 ${!sp.cat ? "border-ink text-ink" : "border-rule text-ink-2"}`}>
+
+        <div className="flex flex-wrap items-center gap-2 text-[0.8125rem]">
+          <span className="font-semibold text-ink-2">Show:</span>
+          <Link href={`/admin?f=${filter.key}`} className={`min-h-9 content-center border px-2.5 ${!sp.cat ? "border-brand bg-brand text-on-brand" : "border-rule bg-sheet text-ink-2 hover:border-ink-3"}`}>
             All
           </Link>
           {cats.map((c) => (
-            <Link key={c} href={`/admin?f=${filter.key}&cat=${c}`} className={`border px-2 py-1 ${sp.cat === c ? "border-ink text-ink" : "border-rule text-ink-2"}`}>
+            <Link key={c} href={`/admin?f=${filter.key}&cat=${c}`} className={`min-h-9 content-center border px-2.5 ${sp.cat === c ? "border-brand bg-brand text-on-brand" : "border-rule bg-sheet text-ink-2 hover:border-ink-3"}`}>
               {CATEGORY_LABEL[c]}
             </Link>
           ))}
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] border-collapse text-left text-[0.9375rem]">
-            <thead>
-              <tr className="border-b border-ink">
-                {["Mechanic", "Category", "Evidence", "Method", "Submitted", "Status"].map((h) => (
-                  <th key={h} className="field-label py-2 pr-4 font-semibold">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(({ v, status }) => {
-                const m = repo.getMechanic(v.mechanicId);
-                return (
-                  <tr key={v.id} className="border-b border-rule-soft hover:bg-sheet">
-                    <td className="py-3 pr-4 font-semibold">
-                      <Link href={`/admin/reviews/${v.id}`} className="hover:underline">
-                        {m?.displayName}
-                      </Link>
-                    </td>
-                    <td className="py-3 pr-4 text-ink-2">{CATEGORY_LABEL[v.category]}</td>
-                    <td className="max-w-[22rem] py-3 pr-4 text-ink-2">
-                      <Link href={`/admin/reviews/${v.id}`} className="line-clamp-2 hover:text-ink">
-                        {v.evidenceSummary ?? "—"}
-                      </Link>
-                    </td>
-                    <td className="py-3 pr-4 text-ink-2">{METHOD_LABEL[v.method]}</td>
-                    <td className="tnum py-3 pr-4 text-ink-2">{dayMonth(v.submittedAt)}</td>
-                    <td className="py-3">
-                      <StatusPill status={status} />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {rows.length === 0 && <p className="py-8 text-ink-3">Nothing here. The queue is clear.</p>}
-        </div>
+
+        <h2 className="heading text-[1.25rem]">
+          {filter.label} · {plural(rows.length, "item")} from {plural(groups.length, "mechanic")}
+        </h2>
+
+        {groups.length ? (
+          <ul className="space-y-5">
+            {groups.map(({ mid, m, pub, items }) => (
+              <li key={mid} className="border-2 border-rule bg-sheet">
+                {/* The person */}
+                <div className="flex flex-wrap items-center gap-4 border-b border-rule bg-paper px-4 py-3 sm:px-5">
+                  {pub ? <PhotoPrint photoUrl={pub.photoUrl} initials={pub.initials} name={pub.displayName} size={52} /> : null}
+                  <div className="min-w-0 flex-1">
+                    <p className="heading text-[1.25rem]">{m?.displayName ?? "Unknown mechanic"}</p>
+                    <p className="text-[0.8125rem] text-ink-2">
+                      {pub ? `${pub.neighborhood ?? pub.city} · ${WORK_MODEL_LABEL[pub.workModel]} · ` : ""}
+                      {plural(items.length, "item")} here
+                    </p>
+                  </div>
+                  {pub ? (
+                    <div className="w-full sm:w-auto">
+                      <SafetyChips items={screeningItems(pub)} />
+                    </div>
+                  ) : null}
+                </div>
+                {/* Their items */}
+                <ul className="divide-y divide-rule-soft">
+                  {items.map(({ v, status }) => {
+                    const days = waited(v.submittedAt);
+                    const late = status === "pending" && days > 3;
+                    return (
+                      <li key={v.id} className={`grid gap-3 px-4 py-3.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-5 ${late ? "border-l-4 border-l-alert" : ""}`}>
+                        <div className="min-w-0">
+                          <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span className="font-bold">{CATEGORY_LABEL[v.category]}</span>
+                            <VerdictChip status={status} />
+                            {late ? <span className="text-[0.8125rem] font-bold text-alert">Waiting {days} days</span> : null}
+                          </p>
+                          <p className="mt-0.5 line-clamp-2 text-[0.9375rem] text-ink-2">{v.evidenceSummary ?? "No summary"}</p>
+                          <p className="mt-0.5 text-[0.8125rem] text-ink-3">
+                            {METHOD_LABEL[v.method]} · submitted {dayMonth(v.submittedAt)}
+                            {!late && status === "pending" ? ` · ${days === 0 ? "today" : `${plural(days, "day")} ago`}` : ""}
+                          </p>
+                        </div>
+                        <Link href={`/admin/reviews/${v.id}`} className={`btn min-h-11 ${status === "pending" ? "btn-ink" : "btn-line"}`}>
+                          {status === "pending" ? "Review" : "Open"} <ArrowRight size={15} aria-hidden />
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="flex items-center gap-2 border-2 border-go bg-go-wash px-4 py-5 font-semibold text-go">
+            <Check size={20} strokeWidth={3} aria-hidden /> Nothing here. The queue is clear.
+          </p>
+        )}
       </main>
     </>
   );

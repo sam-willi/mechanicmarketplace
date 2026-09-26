@@ -8,20 +8,37 @@ import { findArea } from "@/lib/domain/areas";
 import { dayMonth, usd } from "@/lib/format";
 import { PageTitle } from "@/components/workspace/ui";
 import { StatusChip } from "@/components/app/status-chip";
+import { calendarStatus, JobCalendar, type CalendarItem } from "@/components/mechanic/job-calendar";
+import { jobSlot, parseTime } from "@/lib/domain/schedule";
+import { today } from "@/lib/verification/lifecycle";
 
-export const metadata: Metadata = { title: "My Jobs" };
+export const metadata: Metadata = { title: "Jobs" };
 
 const GROUPS: MechanicJobStatus[] = ["In Progress", "Upcoming", "Awaiting Customer", "Completed", "Cancelled"];
 
-export default async function MyJobs() {
+export default async function MyJobs({ searchParams }: { searchParams: Promise<{ view?: string; d?: string }> }) {
   await ready();
   const s = await getSession();
   if (s.role !== "mechanic") return null;
+  const sp = await searchParams;
   const jobs = repo.listJobsForMechanic(s.mechanicId);
+  const now = today();
+  const view = sp.view === "month" ? "month" : "week";
+  const anchor = /^\d{4}-\d{2}-\d{2}$/.test(sp.d ?? "") ? sp.d! : now;
+  const items: CalendarItem[] = jobs.flatMap((j) => {
+    const status = calendarStatus(j);
+    const slot = jobSlot(j, repo.getQuote(j.quoteId), now);
+    if (!status || !slot) return [];
+    const v = repo.getVehicle(j.vehicleId)!;
+    return [{ id: j.id, href: `/mechanic/jobs/${j.id}`, slot, title: `${v.year} ${v.make} ${v.model}`, sub: `${j.title} · ${repo.getCustomer(j.customerId)?.displayName ?? ""}`, status }];
+  });
+  const openings = (repo.getPublicProfile(s.slug)?.openings ?? []).map((o) => ({ date: o.on, time: parseTime(o.time) ?? "09:00" }));
 
   return (
     <div className="space-y-8">
-      <PageTitle title="My Jobs" note="When you finish, mark the job complete. Once the customer confirms, it's added to your verified record automatically." />
+      <PageTitle title="Jobs" />
+      <JobCalendar items={items} openings={openings} view={view} anchor={anchor} today={now} basePath="/mechanic/jobs" />
+      <h2 className="heading border-t-2 border-ink pt-3 text-[1.375rem]">All jobs</h2>
       {GROUPS.map((g) => {
         const list = jobs.filter((j) => mechanicJobStatus(j) === g);
         if (!list.length && (g === "Cancelled" || g === "Awaiting Customer" || g === "In Progress")) return null;

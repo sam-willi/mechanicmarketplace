@@ -1,4 +1,5 @@
-import { CalendarClock, ChevronDown, MapPin, ShieldAlert, ShieldCheck, Star } from "lucide-react";
+import { CalendarClock, ChevronDown, MapPin, ShieldAlert, ShieldCheck } from "lucide-react";
+import { StarRating } from "@/components/visual/stars";
 import type { PublicMechanicProfile } from "@/lib/domain/public-profile";
 import type { FitInput } from "@/lib/domain/recommend";
 import { dominantReason, isStrongFit } from "@/lib/domain/recommend";
@@ -78,7 +79,7 @@ export function TrustOverview({ p, fit, ctx }: { p: PublicMechanicProfile; fit: 
                 <span className="text-[1.0625rem] font-bold">{dom.text}</span>
               </li>
               <li className="flex items-center gap-2 text-[0.9375rem]">
-                <Star size={15} fill="currentColor" strokeWidth={0} aria-hidden /> {rating}
+                {r.rating ? <StarRating value={r.rating.average} size={16} /> : null} {rating}
               </li>
               <li className="flex items-center gap-2 text-[0.9375rem]">
                 <CalendarClock size={15} className="text-ink-3" aria-hidden /> {o ? openingLabel(o, { prefix: true }) : `Next opening ${p.nextAvailable}`}
@@ -95,6 +96,7 @@ export function TrustOverview({ p, fit, ctx }: { p: PublicMechanicProfile; fit: 
         {stats.map(([n, label]) => (
           <div key={label} className="flex items-baseline gap-2">
             <dd className="num text-[1.75rem]">{n}</dd>
+            {label.startsWith("from") && r.rating ? <StarRating value={r.rating.average} size={16} className="self-center" /> : null}
             <dt className="text-[0.875rem] text-ink-2">{label}</dt>
           </div>
         ))}

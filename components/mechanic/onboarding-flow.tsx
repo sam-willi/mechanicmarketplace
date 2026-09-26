@@ -12,7 +12,17 @@ const KEY = "clutch-onboarding-draft";
  * (so one submit saves everything), only the current step is visible. Answers
  * are kept on this device as you go, and restored if you come back.
  */
-export function OnboardingFlow({ steps, children, submitLabel, persist }: { steps: StepMeta[]; children: React.ReactNode; submitLabel: string; persist: boolean }) {
+export function OnboardingFlow({
+  steps,
+  children,
+  submitLabel,
+  persist,
+}: {
+  steps: StepMeta[];
+  children: React.ReactNode;
+  submitLabel: string;
+  persist: boolean;
+}) {
   const panels = Children.toArray(children);
   const [step, setStep] = useState(0);
   const [reached, setReached] = useState(0);
@@ -105,9 +115,17 @@ export function OnboardingFlow({ steps, children, submitLabel, persist }: { step
       <ol className="mt-2 grid gap-1" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }} aria-label="Steps">
         {steps.map((s, i) => (
           <li key={s.title} className="min-w-0">
-            <button type="button" onClick={() => i <= reached && go(i)} disabled={i > reached || i === step} aria-current={i === step ? "step" : undefined} className="group block w-full text-left disabled:cursor-default">
+            <button
+              type="button"
+              onClick={() => i <= reached && go(i)}
+              disabled={i > reached || i === step}
+              aria-current={i === step ? "step" : undefined}
+              className="group block w-full text-left disabled:cursor-default"
+            >
               <span className={`block h-1.5 ${i === step ? "bg-brand" : i < reached || i < step ? "bg-ink-2" : "bg-rule-soft"}`} />
-              <span className={`mt-1.5 hidden truncate text-[0.6875rem] sm:block ${i === step ? "font-bold text-ink" : i <= reached ? "text-ink-2 underline decoration-rule underline-offset-2" : "text-ink-3"}`}>
+              <span
+                className={`mt-1.5 hidden truncate text-[0.6875rem] sm:block ${i === step ? "font-bold text-ink" : i <= reached ? "text-ink-2 underline decoration-rule underline-offset-2" : "text-ink-3"}`}
+              >
                 {s.title}
               </span>
             </button>

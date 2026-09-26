@@ -26,6 +26,7 @@ import type {
 import { getProviderByKey, getScreeningProvider } from "@/lib/verification/providers/registry";
 import { today } from "@/lib/verification/lifecycle";
 import { findArea, serves } from "@/lib/domain/areas";
+import { parseSlotText } from "@/lib/domain/schedule";
 
 /** How many qualified mechanics a posted request reaches. Small on purpose: no auction. */
 const MATCH_LIMIT = 4;
@@ -926,6 +927,7 @@ export class MockRepository implements RepositoryCore {
       title,
       status: "scheduled",
       scheduledFor: q.availableOn,
+      appointment: q.availableAt ?? parseSlotText(q.availableOn, today()) ?? undefined,
       vehicleSpec: req.vehicleSpec ?? this.getVehicle(req.vehicleId)?.spec,
     };
     d.jobs.push(job);

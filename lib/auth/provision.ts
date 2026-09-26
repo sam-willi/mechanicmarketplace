@@ -53,6 +53,8 @@ function isStaff(email: string) {
 /** Where a freshly signed-in user should land. */
 export function homeFor(user: User, next?: string | null) {
   if (next && next.startsWith("/") && !next.startsWith("//")) return next;
-  if (user.roles.includes("admin")) return "/admin";
-  return user.roles.includes("customer") ? "/customer" : "/mechanic";
+  // Staff land in their own app like anyone else; the review queue is in the account menu.
+  if (user.roles.includes("customer")) return "/customer";
+  if (user.roles.includes("mechanic")) return "/mechanic";
+  return user.roles.includes("admin") ? "/admin" : "/customer";
 }

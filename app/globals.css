@@ -23,6 +23,11 @@
   --on-brand-2: #bfcadc;
   --brass: #c9973a;
   --brass-wash: #f4e7c8;
+  /* Rating stars: brass deepened to hold 3:1 on cream pages. */
+  --star: #a8741a;
+  /* Yes / confirmed: the green of a big check mark. Always paired with an icon and words. */
+  --go: #18703f;
+  --go-wash: #dcefe3;
   --carbon: #3d3fc4;
   --carbon-deep: #2c2e9c;
   --carbon-wash: #e8e9fb;
@@ -48,6 +53,9 @@
   --color-on-brand-2: var(--on-brand-2);
   --color-brass: var(--brass);
   --color-brass-wash: var(--brass-wash);
+  --color-star: var(--star);
+  --color-go: var(--go);
+  --color-go-wash: var(--go-wash);
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
   --color-rule: var(--rule);

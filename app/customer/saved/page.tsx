@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { StarRating } from "@/components/visual/stars";
 import Link from "next/link";
 import { ready, repo } from "@/lib/data";
 import { getSession } from "@/lib/session";
@@ -49,7 +50,12 @@ export default async function SavedMechanics() {
                     {usd(p.pricing.hourlyRateCents)}/hr · available {p.nextAvailable}
                   </p>
                   <p className="text-[0.8125rem] text-ink-3">
-                    {p.reputation.verifiedRepairs} verified repairs{p.reputation.rating ? ` · ${p.reputation.rating.average.toFixed(1)} verified rating` : ""}
+                    {p.reputation.verifiedRepairs} verified repairs
+                    {p.reputation.rating ? (
+                      <span className="inline-flex items-center gap-1">
+                        <span aria-hidden> ·</span> <StarRating value={p.reputation.rating.average} size={12} /> {p.reputation.rating.average.toFixed(1)}
+                      </span>
+                    ) : null}
                   </p>
                 </div>
               </div>

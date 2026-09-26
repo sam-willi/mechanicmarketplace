@@ -48,7 +48,7 @@ export default function HowItWorks() {
             <div className="mt-5">
               <Steps items={DRIVER} />
             </div>
-            <Link href="/mechanics" className="btn btn-ink mt-6">
+            <Link href="/customer/mechanics" className="btn btn-ink mt-6">
               Find a Mechanic <ArrowRight size={16} aria-hidden />
             </Link>
           </section>

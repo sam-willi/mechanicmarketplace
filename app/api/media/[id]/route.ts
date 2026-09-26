@@ -20,7 +20,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const job = repo.findJobWithPhoto(id);
   const allowed =
     publicRepairPhoto ||
-    s.role === "admin" ||
+    (s.role !== "guest" && s.roles.includes("admin")) ||
     (s.role !== "guest" && m.ownerId === s.userId) ||
     (req && s.role === "customer" && req.customerId === s.customerId) ||
     (job && s.role === "customer" && job.customerId === s.customerId) ||
