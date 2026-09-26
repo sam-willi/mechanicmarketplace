@@ -43,3 +43,6 @@ next-env.d.ts
 
 # impeccable review captures
 /.impeccable/review/
+
+# impeccable design-hook session cache (local paths, changes every edit)
+/.impeccable/hook.cache.json
