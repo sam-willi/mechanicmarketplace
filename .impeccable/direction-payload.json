@@ -1,0 +1,230 @@
+{
+  "title": "Choose Clutch's visual world",
+  "question": "The roll assigned the Repair Order. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "The Repair Order",
+      "kicker": "THE ROLL",
+      "lineage": "numbered shop repair orders and multi-part carbon work forms",
+      "thesis": "Every verified repair is a numbered work order, and each copy \u2014 Clutch, customer, employer \u2014 is a named source of proof.",
+      "palette": [
+        "#F4F5F1",
+        "#16181D",
+        "#3D3FC4",
+        "#F2DA5C",
+        "#B9BDC4"
+      ],
+      "materials": [
+        "ruled form fields",
+        "carbon-copy blue ink",
+        "numbered ticket stubs",
+        "one canary highlighter"
+      ],
+      "viewport": "Phone-first: the mechanic's record header as a filled form \u2014 photo attached, Identity and Screening as checked boxes, then a ruled ledger where 'Brakes 18 \u00b7 BMW 6' is the loudest type, highlighted when the link carries your car.",
+      "risk": "Rendered timidly it reads like paperwork; it only works if the rules, numerals and ink are executed with Stripe-level precision.",
+      "raised": [
+        {
+          "from": "challenger-seven-segment",
+          "raise": "Unproven fields stay visible as designed blanks, never hidden \u2014 absence is drawn as carefully as proof."
+        },
+        {
+          "from": "challenger-zine",
+          "raise": "One highlighter: only the lines matching the customer's car and repair get a single canary stroke."
+        },
+        {
+          "from": "challenger-forge",
+          "raise": "Numerals carry the force: repair counts are the heaviest type on the page, tabular and ruled."
+        },
+        {
+          "from": "challenger-single-hue",
+          "raise": "One owned ink: carbon blue belongs to verification alone and is never decorative."
+        },
+        {
+          "from": "challenger-versailles",
+          "raise": "One axis: the profile reads down a single form column; the eye path never branches."
+        },
+        {
+          "from": "challenger-tropicalia",
+          "raise": "The mechanic's photo is attached to the record like a real print, not cropped into a stock avatar circle."
+        }
+      ]
+    },
+    {
+      "id": "model-pick",
+      "label": "The Vehicle History Report",
+      "kicker": "IMPECCABLE\u2019S PICK",
+      "lineage": "vehicle history reports and inspection certificates",
+      "thesis": "A mechanic's profile read like a history report: a summary verdict up top, then a dated event log with a source on every line.",
+      "palette": [
+        "#FFFFFF",
+        "#0F2A44",
+        "#1E8E5A",
+        "#E9EEF3"
+      ],
+      "materials": [
+        "report summary panel",
+        "dated event rows",
+        "source columns"
+      ],
+      "viewport": "Summary box of checks and counts, then a chronological log of verified repairs with source per row.",
+      "risk": "Closest to Carfax itself \u2014 familiar and effective, and where most runs in this category would land."
+    },
+    {
+      "id": "challenger-seven-segment",
+      "label": "Seven-Segment Display",
+      "verdict": "declined",
+      "lineage": "LED clocks, price totems, scoreboards",
+      "thesis": "Counts as lit segments on a dark panel.",
+      "palette": [
+        "#111111",
+        "#E0301E",
+        "#2A2A2A"
+      ],
+      "materials": [
+        "LED segments",
+        "ghost cells"
+      ],
+      "viewport": "Repair counts as big lit digits.",
+      "case": "Loses both axes: reads as gas-station signage, not trust.",
+      "risk": "Cheap-signage associations the brief rules out.",
+      "kept": "Absence designed as deliberately as light.",
+      "hero": "https://impeccable.style/worlds/cards/signals-instruments-seven-segment-alarm-clock-hero.webp"
+    },
+    {
+      "id": "challenger-zine",
+      "label": "Hand-drawn Zine",
+      "verdict": "declined",
+      "lineage": "napkin-sketch explainer zines",
+      "thesis": "Trust explained like a friend's doodle.",
+      "palette": [
+        "#F6F0E0",
+        "#111111",
+        "#F7E14B",
+        "#F28AB2"
+      ],
+      "materials": [
+        "marker ink",
+        "highlighter"
+      ],
+      "viewport": "Marker headline and doodled arrows to badges.",
+      "case": "Loses both axes: too casual for a serious hiring decision.",
+      "risk": "Undermines 'serious' and 'premium'.",
+      "kept": "One highlighter marking the line that matters.",
+      "hero": "https://impeccable.style/worlds/cards/hand-drawn-zine-explainer-hero.webp"
+    },
+    {
+      "id": "challenger-forge",
+      "label": "Forge & Scale",
+      "verdict": "declined",
+      "lineage": "blacksmith forging under a power hammer",
+      "thesis": "Reputation forged blow by blow.",
+      "palette": [
+        "#141414",
+        "#6B6E73",
+        "#E2562B",
+        "#F6E7C1"
+      ],
+      "materials": [
+        "forge dark",
+        "stencil caps"
+      ],
+      "viewport": "Dark forge ground, glowing counts.",
+      "case": "Loses both axes: drifts toward the enthusiast/garage-grunge look the brief bans.",
+      "risk": "Reads as a racing or tool brand.",
+      "kept": "Tabular numerals that carry weight.",
+      "hero": "https://impeccable.style/worlds/cards/metal-forging-patina-blacksmith-scale-shower-hero.webp"
+    },
+    {
+      "id": "challenger-single-hue",
+      "label": "Single-Hue Program",
+      "verdict": "declined",
+      "lineage": "one-licensed-colour toy brand identity",
+      "thesis": "One owned colour floods everything.",
+      "palette": [
+        "#E4007C",
+        "#FFFFFF"
+      ],
+      "materials": [
+        "gloss",
+        "script logotype"
+      ],
+      "viewport": "Full-bleed brand colour with a swept logotype.",
+      "case": "Loses both axes: a flooded hue would drown the provenance distinctions.",
+      "risk": "Toy-brand energy on a hiring decision.",
+      "kept": "Total commitment to one owned colour.",
+      "hero": "https://impeccable.style/worlds/cards/brand-identity-canon-single-hue-doll-program-hero.webp"
+    },
+    {
+      "id": "challenger-versailles",
+      "label": "Versailles Vistas",
+      "verdict": "declined",
+      "lineage": "axial French formal gardens",
+      "thesis": "The profile as an axial garden walk.",
+      "palette": [
+        "#3E5B3A",
+        "#D8CBA8",
+        "#B8914A"
+      ],
+      "materials": [
+        "engraved plans",
+        "gilt"
+      ],
+      "viewport": "Symmetric parterre of evidence.",
+      "case": "Loses both axes: no link to the audience's world.",
+      "risk": "Ornamental, off-subject.",
+      "kept": "A single axis the eye never leaves.",
+      "hero": "https://impeccable.style/worlds/cards/architecture-inhabitable-space-versailles-bosquet-vistas-hero.webp"
+    },
+    {
+      "id": "challenger-tropicalia",
+      "label": "Tropic\u00e1lia Sleeve",
+      "verdict": "declined",
+      "lineage": "Brazilian collage album sleeves",
+      "thesis": "Mechanics pasted into a crowded tableau.",
+      "palette": [
+        "#1F8A3B",
+        "#F4A21B",
+        "#D6452A"
+      ],
+      "materials": [
+        "cut-out photos",
+        "scattered lettering"
+      ],
+      "viewport": "Collage of mechanic portraits.",
+      "case": "Loses both axes: chaos where calm legibility is the job.",
+      "risk": "Unserious and hard to scan.",
+      "kept": "Photography treated as real, physical material.",
+      "hero": "https://impeccable.style/worlds/cards/posters-covers-sleeves-tropicalia-sleeve-collage-hero.webp"
+    }
+  ],
+  "reroll": {
+    "registers": [
+      "safer",
+      "bolder"
+    ]
+  },
+  "buildPath": {
+    "value": "code",
+    "toggle": false
+  },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "A clean marketplace profile \u2014 big photo, badges, stars, price and a blue button \u2014 executed impeccably.",
+    "palette": [
+      "#FFFFFF",
+      "#111827",
+      "#2563EB",
+      "#F3F4F6"
+    ],
+    "materials": [
+      "clean grid",
+      "rounded cards",
+      "product photography"
+    ],
+    "viewport": "Photo, name, star rating and badge row, with a booking card on the right.",
+    "risk": "Indistinguishable from Thumbtack or Airbnb by design."
+  },
+  "steer": true
+}

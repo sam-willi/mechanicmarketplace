@@ -1,0 +1,663 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-26T07:58:27+00:00",
+  "title": "Design System: Clutch",
+  "extensions": {
+    "colorMeta": {
+      "paper": {
+        "role": "neutral",
+        "displayName": "Logbook Cream",
+        "canonical": "#f4f1e8",
+        "tonalRamp": [
+          "#292414",
+          "#453c21",
+          "#685a31",
+          "#917e45",
+          "#b6a367",
+          "#cec097",
+          "#e5ddc8",
+          "#f7f4ee"
+        ]
+      },
+      "sheet": {
+        "role": "neutral",
+        "displayName": "Page",
+        "canonical": "#fdfbf6",
+        "tonalRamp": [
+          "#32270b",
+          "#534113",
+          "#7d611c",
+          "#af8827",
+          "#d6ad47",
+          "#e3c782",
+          "#f0e1bc",
+          "#faf6ea"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#141a26",
+        "tonalRamp": [
+          "#151b28",
+          "#232e43",
+          "#354564",
+          "#4a608c",
+          "#6c83b2",
+          "#9babca",
+          "#cad2e3",
+          "#eef1f6"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Ink 2",
+        "canonical": "#414857",
+        "tonalRamp": [
+          "#1a1d23",
+          "#2c303a",
+          "#414858",
+          "#5c657b",
+          "#7f899f",
+          "#a7aebe",
+          "#d0d4dc",
+          "#f0f2f4"
+        ]
+      },
+      "ink-3": {
+        "role": "neutral",
+        "displayName": "Ink 3",
+        "canonical": "#5a6171",
+        "tonalRamp": [
+          "#1b1d22",
+          "#2d3139",
+          "#444955",
+          "#5f6677",
+          "#828a9c",
+          "#aaafbb",
+          "#d2d4db",
+          "#f1f2f4"
+        ]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Rule",
+        "canonical": "#bcc2cc",
+        "tonalRamp": [
+          "#1a1e23",
+          "#2c313a",
+          "#424a57",
+          "#5d677a",
+          "#808b9e",
+          "#a8b0bd",
+          "#d1d5dc",
+          "#f1f2f4"
+        ]
+      },
+      "rule-soft": {
+        "role": "neutral",
+        "displayName": "Rule Soft",
+        "canonical": "#dee1e7",
+        "tonalRamp": [
+          "#1a1d23",
+          "#2b303b",
+          "#404859",
+          "#5a657c",
+          "#7d89a1",
+          "#a6aebf",
+          "#d0d4dd",
+          "#f0f2f4"
+        ]
+      },
+      "brand": {
+        "role": "primary",
+        "displayName": "Navy",
+        "canonical": "#1f3a5f",
+        "tonalRamp": [
+          "#0f1c2e",
+          "#192f4d",
+          "#264673",
+          "#3563a2",
+          "#5686c8",
+          "#8cacd9",
+          "#c1d3eb",
+          "#ecf1f9"
+        ]
+      },
+      "brand-deep": {
+        "role": "primary",
+        "displayName": "Deep Navy",
+        "canonical": "#172c4a",
+        "tonalRamp": [
+          "#0f1c2f",
+          "#182e4e",
+          "#244575",
+          "#3361a3",
+          "#5484ca",
+          "#8aabdb",
+          "#c1d2ec",
+          "#ecf1f9"
+        ]
+      },
+      "brand-night": {
+        "role": "primary",
+        "displayName": "Night Navy",
+        "canonical": "#0f1c30",
+        "tonalRamp": [
+          "#0f1b2f",
+          "#182d4e",
+          "#244475",
+          "#335fa3",
+          "#5482ca",
+          "#8aaadb",
+          "#c1d2ec",
+          "#ecf1f9"
+        ]
+      },
+      "brand-wash": {
+        "role": "primary",
+        "displayName": "Navy Wash",
+        "canonical": "#e4e9f1",
+        "tonalRamp": [
+          "#151c28",
+          "#232f43",
+          "#344765",
+          "#49638d",
+          "#6b87b2",
+          "#9aadcb",
+          "#c9d3e3",
+          "#eef1f6"
+        ]
+      },
+      "brand-tint": {
+        "role": "primary",
+        "displayName": "Navy Tint",
+        "canonical": "#c9d3e2",
+        "tonalRamp": [
+          "#151d28",
+          "#243042",
+          "#354864",
+          "#4b658b",
+          "#6d88b1",
+          "#9baeca",
+          "#cad4e2",
+          "#eef1f6"
+        ]
+      },
+      "on-brand": {
+        "role": "primary",
+        "displayName": "On Navy",
+        "canonical": "#fdfbf6",
+        "tonalRamp": [
+          "#32270b",
+          "#534113",
+          "#7d611c",
+          "#af8827",
+          "#d6ad47",
+          "#e3c782",
+          "#f0e1bc",
+          "#faf6ea"
+        ]
+      },
+      "on-brand-2": {
+        "role": "primary",
+        "displayName": "On Navy Muted",
+        "canonical": "#bfcadc",
+        "tonalRamp": [
+          "#161c28",
+          "#242f42",
+          "#364763",
+          "#4c648a",
+          "#6e87b0",
+          "#9cadc9",
+          "#cad3e2",
+          "#eff1f6"
+        ]
+      },
+      "brass": {
+        "role": "secondary",
+        "displayName": "Brass",
+        "canonical": "#c9973a",
+        "tonalRamp": [
+          "#30240d",
+          "#503c16",
+          "#785a21",
+          "#a87d2e",
+          "#cfa24f",
+          "#dec087",
+          "#edddbf",
+          "#faf4eb"
+        ]
+      },
+      "brass-wash": {
+        "role": "secondary",
+        "displayName": "Brass Wash",
+        "canonical": "#f4e7c8",
+        "tonalRamp": [
+          "#33270a",
+          "#554111",
+          "#806119",
+          "#b38824",
+          "#daad44",
+          "#e6c77f",
+          "#f1e1bb",
+          "#fbf6ea"
+        ]
+      },
+      "carbon": {
+        "role": "tertiary",
+        "displayName": "Carbon Copy Blue",
+        "canonical": "#3d3fc4",
+        "tonalRamp": [
+          "#0e0f2f",
+          "#18194e",
+          "#242575",
+          "#3234a4",
+          "#5355cb",
+          "#8a8bdb",
+          "#c0c1ec",
+          "#ebecf9"
+        ]
+      },
+      "carbon-deep": {
+        "role": "tertiary",
+        "displayName": "Carbon Deep",
+        "canonical": "#2c2e9c",
+        "tonalRamp": [
+          "#0d0e30",
+          "#161750",
+          "#222377",
+          "#2f31a7",
+          "#5052ce",
+          "#8889dd",
+          "#bfc0ed",
+          "#ebebf9"
+        ]
+      },
+      "carbon-wash": {
+        "role": "tertiary",
+        "displayName": "Carbon Wash",
+        "canonical": "#e8e9fb",
+        "tonalRamp": [
+          "#090b34",
+          "#0f1357",
+          "#171c82",
+          "#2028b6",
+          "#4048de",
+          "#7d82e8",
+          "#b9bdf3",
+          "#e9eafb"
+        ]
+      },
+      "canary": {
+        "role": "tertiary",
+        "displayName": "Canary Highlighter",
+        "canonical": "#f2da5c",
+        "tonalRamp": [
+          "#362e08",
+          "#594d0d",
+          "#867413",
+          "#bba21b",
+          "#e3c83b",
+          "#ecda79",
+          "#f5ebb8",
+          "#fcf9e9"
+        ]
+      },
+      "canary-wash": {
+        "role": "tertiary",
+        "displayName": "Canary Wash",
+        "canonical": "#fbf1b8",
+        "tonalRamp": [
+          "#362f08",
+          "#594e0d",
+          "#867513",
+          "#bba31b",
+          "#e3ca3b",
+          "#ecdb79",
+          "#f5ecb8",
+          "#fcf9e9"
+        ]
+      },
+      "pencil": {
+        "role": "tertiary",
+        "displayName": "Pencil",
+        "canonical": "#5e6470",
+        "tonalRamp": [
+          "#1c1e21",
+          "#2f3237",
+          "#464a53",
+          "#626874",
+          "#858c99",
+          "#acb0b9",
+          "#d3d5da",
+          "#f1f2f3"
+        ]
+      },
+      "alert": {
+        "role": "tertiary",
+        "displayName": "Signal Red",
+        "canonical": "#b3261e",
+        "tonalRamp": [
+          "#340b09",
+          "#57130f",
+          "#831c16",
+          "#b7271f",
+          "#df473f",
+          "#e9827c",
+          "#f3bcb9",
+          "#fbeae9"
+        ]
+      },
+      "alert-wash": {
+        "role": "tertiary",
+        "displayName": "Red Wash",
+        "canonical": "#f8e2df",
+        "tonalRamp": [
+          "#32100b",
+          "#541a12",
+          "#7e271b",
+          "#b03726",
+          "#d75847",
+          "#e48d81",
+          "#f0c2bc",
+          "#faecea"
+        ]
+      },
+      "amber": {
+        "role": "tertiary",
+        "displayName": "Shop Amber",
+        "canonical": "#7d5200",
+        "tonalRamp": [
+          "#362608",
+          "#593f0d",
+          "#865e13",
+          "#bb841b",
+          "#e3a93b",
+          "#ecc479",
+          "#f5e0b8",
+          "#fcf5e9"
+        ]
+      },
+      "amber-wash": {
+        "role": "tertiary",
+        "displayName": "Amber Wash",
+        "canonical": "#fbecc9",
+        "tonalRamp": [
+          "#362808",
+          "#59420d",
+          "#866313",
+          "#bb8b1b",
+          "#e3b03b",
+          "#ecc979",
+          "#f5e2b8",
+          "#fcf6e9"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Page titles and the mechanic's name; 2rem to 3rem, 4.25rem on the home hero only."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section heads under a 2px ink rule."
+      },
+      "numeral": {
+        "displayName": "Numeral",
+        "purpose": "Counts, ratings, prices and dashboard stats: heavy, tabular; base stated beneath."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Reading prose, capped at 62 to 65ch."
+      },
+      "body-sm": {
+        "displayName": "Body Small",
+        "purpose": "Most supporting copy and ledger rows."
+      },
+      "meta": {
+        "displayName": "Meta",
+        "purpose": "Captions, count bases, provenance labels, footnotes."
+      },
+      "label": {
+        "displayName": "Field Label",
+        "purpose": "Semi-condensed caps naming a cell of the form; never a kicker above a headline."
+      }
+    },
+    "shadows": [
+      {
+        "name": "pressed-button",
+        "value": "0 1px 0 rgba(15,28,48,0.25), 0 6px 14px -8px rgba(15,28,48,0.55)",
+        "purpose": "Primary button; drop removed on :active."
+      },
+      {
+        "name": "recommendation",
+        "value": "0 10px 30px -18px rgba(15,28,48,0.55)",
+        "purpose": "Best Fit / Soonest Strong Fit cards."
+      },
+      {
+        "name": "print",
+        "value": "0 1px 2px rgba(22,24,29,0.12), 0 6px 16px -8px rgba(22,24,29,0.35)",
+        "purpose": "The mechanic's photo print."
+      },
+      {
+        "name": "sheet-up-phone",
+        "value": "0 -12px 40px -12px rgba(22,24,29,0.25)",
+        "purpose": "Evidence sheet rising from the bottom on phones."
+      },
+      {
+        "name": "sheet-up-desktop",
+        "value": "0 24px 60px -20px rgba(22,24,29,0.35)",
+        "purpose": "Evidence sheet as a centred dialog."
+      },
+      {
+        "name": "focus-ring",
+        "value": "outline: 2px solid #1f3a5f; outline-offset: 2px",
+        "purpose": "Global :focus-visible."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-paper",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Highlighter draw and sheet rise."
+      },
+      {
+        "name": "highlight-draw",
+        "value": "720ms ease-paper 240ms delay, background-size 0% to 100%",
+        "purpose": "The canary stroke drawing once across a matching line."
+      },
+      {
+        "name": "sheet-up",
+        "value": "320ms ease-paper, translateY(24px) to 0 with fade",
+        "purpose": "Evidence sheet entrance."
+      },
+      {
+        "name": "state",
+        "value": "160ms ease-out (140ms on inputs)",
+        "purpose": "Button and input colour/border transitions."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "animations and transitions collapse to 0.01ms; highlight shows drawn",
+        "purpose": "prefers-reduced-motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px",
+        "purpose": "Mechanic sidebar appears."
+      },
+      {
+        "name": "xl",
+        "value": "1280px",
+        "purpose": "Customer top navigation replaces bottom tabs."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The primary action (.btn-ink): navy block, cream text, pressed shadow.",
+      "html": "<button class=\"ds-btn ds-btn-primary\">Request a quote</button>",
+      "css": ".ds-btn { font-family: var(--font-montserrat), Montserrat, ui-sans-serif, system-ui, sans-serif; display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:0 18px; border-radius:2px; border:1px solid transparent; font-weight:700; font-size:14px; cursor:pointer; transition:background-color 160ms ease-out, border-color 160ms ease-out, box-shadow 160ms ease-out; } .ds-btn:focus-visible { outline:2px solid #1f3a5f; outline-offset:2px; } .ds-btn:disabled { opacity:0.45; cursor:not-allowed; } .ds-btn-primary { background:#1f3a5f; color:#fdfbf6; box-shadow:0 1px 0 rgba(15,28,48,0.25), 0 6px 14px -8px rgba(15,28,48,0.55); } .ds-btn-primary:hover { background:#172c4a; } .ds-btn-primary:active { box-shadow:0 1px 0 rgba(15,28,48,0.25); }"
+    },
+    {
+      "name": "Line Button",
+      "kind": "button",
+      "refersTo": "button-line",
+      "description": "Secondary action: page background, navy border, deep-navy text.",
+      "html": "<button class=\"ds-btn ds-btn-line\">Save mechanic</button>",
+      "css": ".ds-btn { font-family: var(--font-montserrat), Montserrat, ui-sans-serif, system-ui, sans-serif; display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:0 18px; border-radius:2px; border:1px solid transparent; font-weight:700; font-size:14px; cursor:pointer; transition:background-color 160ms ease-out, border-color 160ms ease-out, box-shadow 160ms ease-out; } .ds-btn:focus-visible { outline:2px solid #1f3a5f; outline-offset:2px; } .ds-btn:disabled { opacity:0.45; cursor:not-allowed; } .ds-btn-line { background:#fdfbf6; color:#172c4a; border-color:#1f3a5f; } .ds-btn-line:hover { background:#e4e9f1; }"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Tertiary action; rule-bordered and transparent.",
+      "html": "<button class=\"ds-btn ds-btn-quiet\">Discard</button>",
+      "css": ".ds-btn { font-family: var(--font-montserrat), Montserrat, ui-sans-serif, system-ui, sans-serif; display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:0 18px; border-radius:2px; border:1px solid transparent; font-weight:700; font-size:14px; cursor:pointer; transition:background-color 160ms ease-out, border-color 160ms ease-out, box-shadow 160ms ease-out; } .ds-btn:focus-visible { outline:2px solid #1f3a5f; outline-offset:2px; } .ds-btn:disabled { opacity:0.45; cursor:not-allowed; } .ds-btn-quiet { background:transparent; color:#141a26; border-color:#bcc2cc; } .ds-btn-quiet:hover { border-color:#5a6171; }"
+    },
+    {
+      "name": "Field Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "A filled-in line: field label above, ink-3 bottom edge, navy on focus.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-label\">Your car</span><input class=\"ds-input\" placeholder=\"2017 BMW 330i\"></label>",
+      "css": ".ds-field { font-family: var(--font-montserrat), Montserrat, ui-sans-serif, system-ui, sans-serif; display:block; max-width:320px; } .ds-label { display:block; margin-bottom:6px; font-size:10.5px; line-height:16px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#5a6171; } .ds-input { font-family: var(--font-montserrat), Montserrat, ui-sans-serif, system-ui, sans-serif; box-sizing:border-box; width:100%; min-height:44px; padding:8px 12px; background:#fdfbf6; border:1px solid #bcc2cc; border-bottom-color:#5a6171; border-radius:2px; font-size:16px; color:#141a26; caret-color:#1f3a5f; transition:border-color 140ms ease-out, box-shadow 140ms ease-out; } .ds-input::placeholder { color:#5a6171; } .ds-input:focus { outline:none; border-color:#1f3a5f; box-shadow:0 0 0 1px #1f3a5f; }"
+    },
+    {
+      "name": "Cover Panel",
+      "kind": "card",
+      "refersTo": "cover-panel",
+      "description": "Deep-navy panel for the mechanic side, with brass ticks and a cream button.",
+      "html": "<div class=\"ds-cover\"><h3 class=\"ds-cover-h\">I'm a mechanic</h3><p class=\"ds-cover-p\">Set your price. Prove your experience.</p><ul class=\"ds-cover-l\"><li><span class=\"ds-brass-tick\"></span>Your own profile link</li><li><span class=\"ds-brass-tick\"></span>Past jobs verified</li></ul><button class=\"ds-cover-btn\">Join as a Mechanic</button></div>",
+      "css": ".ds-cover { font-family: var(--font-montserrat), Montserrat, ui-sans-serif, system-ui, sans-serif; background:#172c4a; color:#fdfbf6; padding:28px; border-radius:2px; max-width:420px; } .ds-cover-h { margin:0; font-size:28px; font-weight:800; letter-spacing:-0.03em; } .ds-cover-p { margin:8px 0 16px; color:#bfcadc; font-size:15px; line-height:1.5; } .ds-cover-l { list-style:none; margin:0 0 20px; padding:16px 0 0; border-top:1px solid #1f3a5f; font-size:14px; } .ds-cover-l li { display:flex; align-items:center; gap:10px; margin-bottom:8px; } .ds-brass-tick { width:14px; height:14px; border-radius:2px; background:#c9973a; display:inline-block; } .ds-cover-btn { font-family: var(--font-montserrat), Montserrat, ui-sans-serif, system-ui, sans-serif; min-height:44px; padding:0 18px; border:0; border-radius:2px; background:#fdfbf6; color:#141a26; font-weight:700; font-size:14px; cursor:pointer; }"
+    },
+    {
+      "name": "Recommendation Card",
+      "kind": "card",
+      "description": "Deep-navy band with brass-wash title and a 4px brass rule, over a page with the verified count.",
+      "html": "<div class=\"ds-rec\"><div class=\"ds-rec-band\"><p class=\"ds-rec-t\">Best Fit</p><p class=\"ds-rec-d\">Most verified experience with Toyota brakes.</p></div><div class=\"ds-rec-body\"><p class=\"ds-rec-name\">Rosa Delgado</p><p class=\"ds-rec-count\"><span class=\"ds-num\">6</span> verified Toyota brake jobs</p></div></div>",
+      "css": ".ds-rec { font-family: var(--font-montserrat), Montserrat, ui-sans-serif, system-ui, sans-serif; max-width:420px; border:2px solid #172c4a; background:#fdfbf6; box-shadow:0 10px 30px -18px rgba(15,28,48,0.55); } .ds-rec-band { background:#172c4a; border-bottom:4px solid #c9973a; padding:12px 20px; } .ds-rec-t { margin:0; color:#f4e7c8; font-weight:700; font-size:15px; } .ds-rec-d { margin:2px 0 0; color:#bfcadc; font-size:13px; } .ds-rec-body { padding:20px; color:#141a26; } .ds-rec-name { margin:0 0 12px; font-size:22px; font-weight:700; letter-spacing:-0.02em; } .ds-rec-count { margin:0; font-weight:700; font-size:16px; } .ds-num { font-size:36px; font-weight:800; letter-spacing:-0.035em; font-feature-settings:'tnum' 1, 'lnum' 1; }"
+    },
+    {
+      "name": "Provenance Marks (tick states)",
+      "kind": "badge",
+      "refersTo": "tick-box",
+      "description": "Verified (carbon), self-reported (dashed pencil), lapsed (red).",
+      "html": "<div class=\"ds-marks\"><span class=\"ds-mark ds-v\"><i></i>Confirmed with the issuer</span><span class=\"ds-mark ds-s\"><i></i>Mechanic-provided, not verified</span><span class=\"ds-mark ds-x\"><i></i>Lapsed</span></div>",
+      "css": ".ds-marks { font-family: var(--font-montserrat), Montserrat, ui-sans-serif, system-ui, sans-serif; display:flex; flex-direction:column; gap:10px; font-size:13px; font-weight:600; } .ds-mark { display:inline-flex; align-items:center; gap:8px; } .ds-mark i { width:14px; height:14px; border-radius:2px; box-sizing:border-box; display:inline-block; } .ds-v { color:#3d3fc4; } .ds-v i { background:#3d3fc4; } .ds-s { color:#5e6470; } .ds-s i { border:1px dashed #5e6470; } .ds-x { color:#b3261e; } .ds-x i { background:#f8e2df; border:1px solid #b3261e; }"
+    },
+    {
+      "name": "Count Badge on Nav",
+      "kind": "navigation",
+      "refersTo": "count-badge",
+      "description": "Night-navy sidebar link with a brass count badge.",
+      "html": "<nav class=\"ds-side\"><a class=\"ds-side-a ds-on\">Home</a><a class=\"ds-side-a\">Job Opportunities <b class=\"ds-badge\">3</b></a></nav>",
+      "css": ".ds-side { font-family: var(--font-montserrat), Montserrat, ui-sans-serif, system-ui, sans-serif; background:#0f1c30; padding:8px; width:232px; } .ds-side-a { display:flex; justify-content:space-between; align-items:center; padding:10px 12px; color:#bfcadc; font-size:15px; text-decoration:none; } .ds-on { background:#172c4a; color:#fdfbf6; font-weight:700; } .ds-badge { background:#c9973a; color:#0f1c30; font-size:11px; font-weight:800; padding:1px 6px; border-radius:2px; }"
+    },
+    {
+      "name": "Counts Strip with Match Highlight",
+      "kind": "card",
+      "description": "Heavy tabular counts over their base; canary stroke on the match.",
+      "html": "<div class=\"ds-counts\"><div><span class=\"ds-n ds-hl\">18</span><p>verified brake jobs</p></div><div><span class=\"ds-n\">4.9</span><p>from 24 verified reviews</p></div></div>",
+      "css": ".ds-counts { font-family: var(--font-montserrat), Montserrat, ui-sans-serif, system-ui, sans-serif; display:flex; border-top:1px solid #bcc2cc; border-bottom:1px solid #bcc2cc; max-width:420px; color:#141a26; } .ds-counts > div { flex:1; padding:12px 14px; } .ds-counts > div + div { border-left:1px solid #dee1e7; } .ds-counts p { margin:4px 0 0; font-size:13px; color:#414857; } .ds-n { font-size:40px; font-weight:800; letter-spacing:-0.035em; line-height:0.95; font-feature-settings:'tnum' 1, 'lnum' 1; } .ds-hl { background-image:linear-gradient(#f2da5c,#f2da5c); background-repeat:no-repeat; background-size:100% 62%; background-position:left 78%; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Logbook",
+    "overview": "Clutch is kept like a car's service logbook: a navy cloth cover with brass stamping, cream pages inside, and every entry dated, numbered and signed by whoever vouches for it. A mechanic's profile is their logbook. Claims sit in ruled fields, proven entries are ticked in carbon blue, and fields nobody has proven stay visible as blank lines waiting to be filled. The record carries a number (Record CL-4180), each job carries a ticket (No.012), and the primary action lives on a perforated tear-off stub.\n\nThe cover is navy. It carries the brand and every primary action: the main button, the mechanic app's sidebar, the \"I'm a mechanic\" door, the band above a recommended mechanic. Brass is the stamping on that cover: a 4px rule under a recommendation band, the count badges in navigation, the tick boxes on the mechanic pitch. Inside, the pages are cream stock with ink type and 1px hairline rules, dense like a working form: one reading column, tight ruled cells, small caps field labels, and heavy tabular numerals that carry the force of the page.\n\nColour inside the pages still means something specific. Carbon means verified and nothing else. One canary highlighter stroke marks what matches the visitor's car and repair. Self-reported material is written in pencil: grey text, dashed rules, dashed tick boxes, visibly weaker than anything proven.\n\nThe world refuses the category default of hero photo, star row, badge strip and rounded booking card. The mechanic's photo is clipped into the record like a real print.",
+    "keyCharacteristics": [
+      "Navy cover (brand) for identity and every primary action; brass stamping as its only ornament.",
+      "Cream logbook pages (paper, sheet), ink type, 1px rule hairlines.",
+      "Carbon blue reserved for verification; canary reserved for the visitor's match.",
+      "Pencil grey plus dashed rules for anything self-reported.",
+      "Square corners (2px), ruled sheets, field labels, numbered records and jobs.",
+      "One family (Montserrat), matched to the logo lettering, doing everything through weight: 800 display and numerals, 700 heads, labels and buttons, 450 body."
+    ],
+    "rules": [
+      {
+        "name": "The Cover Rule",
+        "body": "Navy is the cover: identity and the primary action. Every page has at most one filled navy button per decision, and navy is never used to mean \"verified\".",
+        "section": "colors"
+      },
+      {
+        "name": "The Brass Stamp Rule",
+        "body": "Brass is stamping on navy. It appears as a rule, a badge, a tick or a title on or beside a navy surface, never as a page fill, button, or body text on cream.",
+        "section": "colors"
+      },
+      {
+        "name": "The Carbon Copy Rule",
+        "body": "Carbon marks verification and nothing else. If a claim is not proven by a named copy (Clutch, customer, employer, issuer), it is not carbon. No carbon for links, generic success, navigation or decoration.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Highlighter Rule",
+        "body": "Canary is a single highlighter stroke for what matches the visitor's car and repair. It is drawn once, never used as a fill, badge or button, and never appears when the page carries no car-and-repair context.",
+        "section": "colors"
+      },
+      {
+        "name": "The Pencil Rule",
+        "body": "Self-reported means pencil grey and dashed. It is never filled, never carbon, never navy, and never set equal to a verified claim.",
+        "section": "colors"
+      },
+      {
+        "name": "The Numerals Carry the Force Rule",
+        "body": "Counts, ratings and prices are set heavy and tabular, and every count states its base underneath in meta type (\"from 27 verified reviews\").",
+        "section": "typography"
+      },
+      {
+        "name": "The Field Label Rule",
+        "body": "Small caps labels name a field in a ruled cell (Your car, Screened, Estimate request). They are never decorative kickers above headlines.",
+        "section": "typography"
+      },
+      {
+        "name": "The Paper Only Rule",
+        "body": "Only physical objects cast a shadow: the pressed button, a lifted recommendation, a photo print, the evidence sheet. Boxes, strips and panels stay flat. The sticky header's 95% cream with a slight blur is the only translucency.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Answer First Rule",
+        "body": "Every screen shows the answer, two or three supporting facts and one primary action; detail sits behind \"See details\", \"Why this match?\" or \"More about \u2026\". Page titles stay around six words, intros are one sentence, card descriptions two lines, marketplace cards five visible facts. A fact appears once per viewport, and healthy states take one line (\"Screening current\", \"You're ready to receive jobs\").",
+        "section": "colors"
+      }
+    ],
+    "dos": [
+      "**Do** use navy (#1F3A5F) for the primary action and brand surfaces, one filled navy button per decision.",
+      "**Do** keep brass (#C9973A) on or beside navy: rules, badges, ticks, band titles.",
+      "**Do** keep carbon (#3D3FC4) for verified ticks, provenance marks and verified status only.",
+      "**Do** mark the visitor's matching car and repair with one canary (#F2DA5C) highlighter stroke, drawn once.",
+      "**Do** set self-reported material in pencil with dashed rules and dashed tick boxes.",
+      "**Do** keep every corner at 2px and every border a 1px hairline; open sections with a 2px ink rule.",
+      "**Do** set counts, ratings and prices as heavy tabular numerals with their base stated beneath.",
+      "**Do** number records and jobs, and show unproven fields as designed blanks.",
+      "**Do** summarize, then disclose: \"Safety screening: 4 of 4 current\" opens to the four checks; methodology lives on the verification page."
+    ],
+    "donts": [
+      "**Don't** use navy or brass to signal \"verified\"; that is carbon's only job.",
+      "**Don't** use brass as a page fill, a button, or text on cream.",
+      "**Don't** use carbon for links, generic success, navigation or confirming the visitor's own actions.",
+      "**Don't** use canary as a fill, badge, button or background block.",
+      "**Don't** fill, colour or visually equate a self-reported claim with a verified one.",
+      "**Don't** use pure black or pure white; ink and page are navy-tinted and cream.",
+      "**Don't** round boxes past 2px, and don't use pills for status.",
+      "**Don't** add decorative gradients, glass or glow; the only gradients are the highlighter band and the perforation.",
+      "**Don't** show a trust score or rank by price.",
+      "**Don't** put caps labels above headlines as kickers.",
+      "**Don't** list every screening badge, credential, fee and caveat on a card, or repeat a fact the same screen already shows."
+    ]
+  }
+}

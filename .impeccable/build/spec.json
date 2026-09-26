@@ -1,0 +1,245 @@
+{
+  "tool": "comp-spec",
+  "version": 1,
+  "createdAt": "2026-09-26T01:39:34.664Z",
+  "comp": "/private/tmp/claude-501/-Users-samwilliamson-mechanicmarketplace/a49ee4f7-2814-4c37-98d0-32d8726e175c/scratchpad/logo.png",
+  "warnings": [
+    "region wordmark: \"container\": true set in the regions file (the region-size refusal is overridden: one undivided element)"
+  ],
+  "uncoveredInkCells": [
+    "C7",
+    "D7",
+    "E7",
+    "F7",
+    "G7",
+    "H7",
+    "I7"
+  ],
+  "compSize": {
+    "width": 2000,
+    "height": 689
+  },
+  "aspect": 2.9028,
+  "orientation": "landscape",
+  "palette": [
+    {
+      "hex": "#f8f8f8",
+      "coverage": 0.8208
+    },
+    {
+      "hex": "#161818",
+      "coverage": 0.1757
+    },
+    {
+      "hex": "#888888",
+      "coverage": 0.0018
+    },
+    {
+      "hex": "#303030",
+      "coverage": 0.0012
+    },
+    {
+      "hex": "#c8c8c8",
+      "coverage": 0.0005
+    }
+  ],
+  "bands": [
+    {
+      "y": 0.2727,
+      "strength": 0.2574
+    },
+    {
+      "y": 0.2955,
+      "strength": 0.2203
+    },
+    {
+      "y": 0.3864,
+      "strength": 0.5091
+    },
+    {
+      "y": 0.4091,
+      "strength": 0.3817
+    },
+    {
+      "y": 0.4318,
+      "strength": 0.2256
+    },
+    {
+      "y": 0.4773,
+      "strength": 0.2815
+    },
+    {
+      "y": 0.5,
+      "strength": 0.2211
+    },
+    {
+      "y": 0.5682,
+      "strength": 0.2094
+    },
+    {
+      "y": 0.6136,
+      "strength": 0.2187
+    },
+    {
+      "y": 0.6364,
+      "strength": 0.2013
+    },
+    {
+      "y": 0.7045,
+      "strength": 0.6213
+    },
+    {
+      "y": 0.7273,
+      "strength": 0.8211
+    }
+  ],
+  "regions": [
+    {
+      "id": "wordmark",
+      "kind": "text",
+      "note": "lowercase wordmark 'lutch' in a heavy geometric sans",
+      "grid": null,
+      "container": true,
+      "box": {
+        "x": 0.3625,
+        "y": 0.2322,
+        "w": 0.54,
+        "h": 0.508
+      },
+      "px": {
+        "x": 725,
+        "y": 160,
+        "w": 1080,
+        "h": 350
+      },
+      "aspect": 3.0857,
+      "palette": [
+        {
+          "hex": "#f8f8f8",
+          "coverage": 0.5303
+        },
+        {
+          "hex": "#151818",
+          "coverage": 0.4653
+        },
+        {
+          "hex": "#494949",
+          "coverage": 0.0022
+        },
+        {
+          "hex": "#c2c2c2",
+          "coverage": 0.0016
+        },
+        {
+          "hex": "#888888",
+          "coverage": 0.0005
+        }
+      ],
+      "detail": {
+        "energy": 33.4365
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 5,
+          "capHeightPx": 303.1,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.7985,
+          "advTall": 0.4982,
+          "advX": 0.8282,
+          "gap": 0.0577,
+          "xRatio": 0.766,
+          "stemW": 0.2578,
+          "contrast": 1.1733,
+          "serif": null,
+          "densTall": 0.656,
+          "densX": 0.629,
+          "weight": 0.656
+        },
+        "widthClass": "wide",
+        "weightClass": "bold",
+        "chosen": {
+          "family": "Poppins",
+          "weight": 700,
+          "fontSizePx": 414,
+          "source": "index",
+          "fp": {
+            "lines": 1,
+            "glyphs": 5,
+            "capHeightPx": 303.5,
+            "inkIsDark": true,
+            "allCaps": false,
+            "advance": 0.7445,
+            "advTall": 0.4777,
+            "advX": 0.7511,
+            "gap": 0.1202,
+            "xRatio": 0.7429,
+            "stemW": 0.2332,
+            "contrast": 1.1702,
+            "serif": 1,
+            "densTall": 0.6352,
+            "densX": 0.6327,
+            "weight": 0.6352
+          },
+          "stamp": "99829284da3a"
+        }
+      }
+    },
+    {
+      "id": "wrench",
+      "kind": "plate",
+      "note": "wrench glyph forming the letter C",
+      "grid": null,
+      "box": {
+        "x": 0.0825,
+        "y": 0.2467,
+        "w": 0.28,
+        "h": 0.4935
+      },
+      "px": {
+        "x": 165,
+        "y": 170,
+        "w": 560,
+        "h": 340
+      },
+      "aspect": 1.6471,
+      "palette": [
+        {
+          "hex": "#f8f8f8",
+          "coverage": 0.6189
+        },
+        {
+          "hex": "#181818",
+          "coverage": 0.3732
+        },
+        {
+          "hex": "#818181",
+          "coverage": 0.0032
+        },
+        {
+          "hex": "#474747",
+          "coverage": 0.0025
+        },
+        {
+          "hex": "#b8b8b8",
+          "coverage": 0.0023
+        }
+      ],
+      "detail": {
+        "energy": 13.0812
+      },
+      "medium": "raster",
+      "plate": "assets/plates/wrench.png",
+      "text": null
+    }
+  ],
+  "compSha256": "52283cd736825aa11e3841d4ee986a667461fdac05b6dfdb09ab9354cf17bfb8",
+  "regionsSource": {
+    "path": "/private/tmp/claude-501/-Users-samwilliamson-mechanicmarketplace/a49ee4f7-2814-4c37-98d0-32d8726e175c/scratchpad/logo-regions.json",
+    "sha256": "fb1bae4fe01170ce729ab2895195e51ff68e7e747f4779b8de4a430bc80c0386"
+  }
+}

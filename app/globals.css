@@ -1,0 +1,312 @@
+@import "tailwindcss";
+
+/*
+ * Clutch — the Logbook: a car's service book in navy cloth, brass stamping
+ * and cream pages. Navy is the brand and every primary action; brass is the
+ * stamped ornament on navy. Carbon blue still belongs to verification alone, canary
+ * to "matches your car and repair", amber to warnings, alert red to errors.
+ */
+:root {
+  --paper: #f4f1e8;
+  --sheet: #fdfbf6;
+  --ink: #141a26;
+  --ink-2: #414857;
+  --ink-3: #5a6171;
+  --rule: #bcc2cc;
+  --rule-soft: #dee1e7;
+  --brand: #1f3a5f;
+  --brand-deep: #172c4a;
+  --brand-night: #0f1c30;
+  --brand-wash: #e4e9f1;
+  --brand-tint: #c9d3e2;
+  --on-brand: #fdfbf6;
+  --on-brand-2: #bfcadc;
+  --brass: #c9973a;
+  --brass-wash: #f4e7c8;
+  --carbon: #3d3fc4;
+  --carbon-deep: #2c2e9c;
+  --carbon-wash: #e8e9fb;
+  --canary: #f2da5c;
+  --canary-wash: #fbf1b8;
+  --pencil: #5e6470;
+  --alert: #b3261e;
+  --alert-wash: #f8e2df;
+  --amber: #7d5200;
+  --amber-wash: #fbecc9;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-sheet: var(--sheet);
+  --color-ink: var(--ink);
+  --color-brand: var(--brand);
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-night: var(--brand-night);
+  --color-brand-wash: var(--brand-wash);
+  --color-brand-tint: var(--brand-tint);
+  --color-on-brand: var(--on-brand);
+  --color-on-brand-2: var(--on-brand-2);
+  --color-brass: var(--brass);
+  --color-brass-wash: var(--brass-wash);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-rule: var(--rule);
+  --color-rule-soft: var(--rule-soft);
+  --color-carbon: var(--carbon);
+  --color-carbon-deep: var(--carbon-deep);
+  --color-carbon-wash: var(--carbon-wash);
+  --color-canary: var(--canary);
+  --color-canary-wash: var(--canary-wash);
+  --color-pencil: var(--pencil);
+  --color-alert: var(--alert);
+  --color-alert-wash: var(--alert-wash);
+  --color-amber: var(--amber);
+  --color-amber-wash: var(--amber-wash);
+  --font-sans: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+  --radius-form: 2px;
+}
+
+html {
+  background: var(--paper);
+  color: var(--ink);
+  -webkit-text-size-adjust: 100%;
+  scrollbar-color: var(--brand-tint) var(--paper);
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-weight: 450;
+  font-feature-settings: "tnum" 0;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--canary);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* Visually hidden inputs (file pickers, radio chips) show focus on their visible label. */
+label:has(> input.sr-only:focus-visible),
+label:has(input[type="radio"].sr-only:focus-visible),
+label:has(input[type="file"].sr-only:focus-visible) {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* Search-form controls have no box; their cell shows focus instead. */
+.search-control:focus-visible {
+  outline: none;
+}
+
+a {
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+input,
+textarea,
+select {
+  caret-color: var(--brand);
+}
+
+@layer components {
+  /* Form field label: semi-condensed caps, the voice of a printed form. */
+  .field-label {
+    font-size: 0.65625rem;
+    line-height: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  /* Numerals carry the force: condensed, heavy, tabular. */
+  .num {
+    font-weight: 800;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+    letter-spacing: -0.035em;
+    line-height: 0.95;
+  }
+
+  .tnum {
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
+
+  .display {
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.02;
+    text-wrap: balance;
+  }
+
+  .heading {
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+
+  /* A ruled sheet: the paper the record is printed on. */
+  .sheet {
+    background: var(--sheet);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-form);
+  }
+
+  /* Perforated edge for the tear-off stub. */
+  .perf-top {
+    background-image: radial-gradient(circle at 5px 0, var(--paper) 3px, transparent 3.5px);
+    background-size: 10px 6px;
+    background-repeat: repeat-x;
+    background-position: top left;
+  }
+  .perf-left {
+    background-image: radial-gradient(circle at 0 5px, var(--paper) 3px, transparent 3.5px);
+    background-size: 6px 10px;
+    background-repeat: repeat-y;
+    background-position: top left;
+  }
+
+  /* The one highlighter stroke, drawn once. */
+  /* A highlighter pass: a canary band across the lower two-thirds of the line. */
+  .highlight {
+    background-image: linear-gradient(var(--canary), var(--canary));
+    background-repeat: no-repeat;
+    background-size: 100% 62%;
+    background-position: left 78%;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+  .highlight-draw {
+    animation: highlight-draw 720ms cubic-bezier(0.16, 1, 0.3, 1) 240ms both;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0 1.125rem;
+    border-radius: var(--radius-form);
+    font-weight: 700;
+    font-size: 0.875rem;
+    letter-spacing: 0;
+    transition:
+      background-color 160ms ease-out,
+      color 160ms ease-out,
+      border-color 160ms ease-out,
+      box-shadow 160ms ease-out;
+    white-space: nowrap;
+  }
+  .btn-ink {
+    background: var(--brand);
+    color: var(--on-brand);
+    box-shadow: 0 1px 0 rgba(15, 28, 48, 0.25), 0 6px 14px -8px rgba(15, 28, 48, 0.55);
+  }
+  .btn-ink:hover {
+    background: var(--brand-deep);
+  }
+  .btn-ink:active {
+    box-shadow: 0 1px 0 rgba(15, 28, 48, 0.25);
+  }
+  .btn-line {
+    background: var(--sheet);
+    color: var(--brand-deep);
+    border: 1px solid var(--brand);
+  }
+  .btn-line:hover {
+    background: var(--brand-wash);
+  }
+  .btn-quiet {
+    color: var(--ink);
+    border: 1px solid var(--rule);
+    background: transparent;
+  }
+  .btn-quiet:hover {
+    border-color: var(--ink-3);
+  }
+  .btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .input {
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--sheet);
+    border: 1px solid var(--rule);
+    border-bottom-color: var(--ink-3);
+    border-radius: var(--radius-form);
+    font-size: 1rem;
+    color: var(--ink);
+    transition: border-color 140ms ease-out, box-shadow 140ms ease-out;
+  }
+  .input::placeholder {
+    color: var(--ink-3);
+  }
+  .input:focus {
+    outline: none;
+    border-color: var(--brand);
+    box-shadow: 0 0 0 1px var(--brand);
+  }
+
+  .link {
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-color: var(--rule);
+  }
+  .link:hover {
+    text-decoration-color: var(--ink);
+  }
+}
+
+@keyframes highlight-draw {
+  from {
+    background-size: 0% 62%;
+  }
+  to {
+    background-size: 100% 62%;
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .highlight-draw {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
