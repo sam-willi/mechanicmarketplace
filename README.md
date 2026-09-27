@@ -269,6 +269,8 @@ Clutch intentionally does not fake unavailable providers.
 - Payment records are self-reported. Clutch does not hold, process, refund or guarantee funds.
 - Secrets must remain in server-side environment variables.
 - Test accounts and placeholder addresses are blocked from outbound delivery.
+- **Uploads** (`lib/media/policy.ts`) are accepted from what their bytes are, never the browser's type or the file name: photos (JPEG, PNG, WebP, up to 20 MB), video (MP4, MOV, WebM, 3GP) and audio (M4A, MP3, WAV, WebM, Ogg, AAC) up to 40 MB, and PDFs (customers' request attachments only, up to 20 MB). The declared type and extension must match the bytes. SVG, HTML/XML, scripts, archives, programs, GIFs and double extensions are refused. HEIC/HEIF is refused with instructions, because most browsers can't display it. Portraits and car photos must be photos; mechanics upload photos and video only.
+- **Serving uploads** (`/api/media/[id]`) keeps the same authorization and demo/live isolation, and re-derives the type from the stored bytes. Photos, video and audio are sent inline; PDFs and anything unrecognised (including files stored before this check) are downloads. Every response has `X-Content-Type-Options: nosniff`, a sandboxing `Content-Security-Policy`, `Cross-Origin-Resource-Policy: same-origin` and a generated file name (`clutch-photo-1a2b3c4d.jpg`), never the uploader's. Byte ranges are supported for video.
 
 To report a vulnerability, see [SECURITY.md](SECURITY.md). Don't file it publicly.
 

@@ -200,7 +200,7 @@ test("counts and analytics are per marketplace", async () => {
 });
 
 test("uploads are only readable from the marketplace they were uploaded in", async () => {
-  const file = { name: "brake.jpg", type: "image/jpeg", bytes: new Uint8Array([0xff, 0xd8, 0xff]) };
+  const file = { displayName: "brake.jpg", contentType: "image/jpeg", kind: "photo" as const, bytes: new Uint8Array([0xff, 0xd8, 0xff]) };
   const m = await putMedia("demo", "user-maya", file, "damage");
   assert.ok(await getMedia("demo", m.id));
   assert.equal(await getMedia("live", m.id), undefined);

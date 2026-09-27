@@ -6,7 +6,7 @@
 // Run with: npm run test:browser (scripts/test-browser.mjs sets up everything).
 import puppeteer from "puppeteer-core";
 import postgres from "postgres";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 
 export async function run({ base, auth, db, chrome, out, restart, store = "snapshot" }) {
   /** Where live records are: the snapshot store's app_records, or the normalized lv_* tables. */
@@ -16,6 +16,28 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
   const OUT = out.endsWith("/") ? out : `${out}/`;
   mkdirSync(OUT, { recursive: true });
   const sql = postgres(db, { prepare: false, max: 2, onnotice: () => undefined });
+  // Upload fixtures: a real PNG, and files that must be refused (HTML named .jpg, an SVG with script).
+  const FILES = {
+    png: `${OUT}photo.png`,
+    fakeJpg: `${OUT}brakes.jpg`,
+    svg: `${OUT}face.svg`,
+    pdf: `${OUT}shop-estimate.pdf`,
+  };
+  writeFileSync(FILES.png, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAHklEQVR42mO8wMDAQApgHNUwqmFUw6iGUQ2jGgYAAJoYAhGGlGzLAAAAAElFTkSuQmCC", "base64"));
+  writeFileSync(FILES.fakeJpg, "<!doctype html><script>fetch('/api/account')</script>");
+  writeFileSync(FILES.svg, '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+  writeFileSync(FILES.pdf, "%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n");
+  /** Upload through a file input, then wait for the page to settle. */
+  const chooseFile = async (p, selector, file) => {
+    const input = await p.$(selector);
+    if (!input) throw new Error(`no ${selector} on ${p.url()}`);
+    await input.uploadFile(file);
+    await p.waitForNetworkIdle({ idleTime: 800 }).catch(() => {});
+    await new Promise((r) => setTimeout(r, 400));
+  };
+  const alertText = (p) => p.evaluate(() => [...document.querySelectorAll('[role="alert"]')].map((x) => x.innerText).join(" | "));
+  /** Status and headers of a file as this browser session sees it. */
+  const fetchAs = (p, url, headers = {}) => p.evaluate(async (url, headers) => { const r = await fetch(url, { headers }); return { status: r.status, h: Object.fromEntries(r.headers.entries()) }; }, url, headers);
   /** First column of the first row, as text ("" when none), like psql -tA. */
   const psql = async (q) => {
     const [row] = await sql.unsafe(q);
@@ -102,6 +124,12 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
   ok(`confirmed → onboarding (${path(M.p)})`, path(M.p).startsWith("/mechanic/onboarding"), await main(M.p));
   ok("live account created, not demo", await psql(`select count(*) from ${T('users')} data->>'email'='${MECH.email}'`) === "1" && await psql(`select count(*) from app_records where scope='demo' and data->>'email'='${MECH.email}'`) === "0");
   await phone(M.p, "onboarding", "02-onboarding");
+  // Portrait: an SVG with script is refused with a clear reason; a real photo is accepted.
+  await chooseFile(M.p, 'input[type="file"][accept="image/*"]', FILES.svg);
+  ok("portrait: SVG refused with the reason", /doesn't accept web pages, SVG images or scripts/.test(await alertText(M.p)), await alertText(M.p));
+  await chooseFile(M.p, 'input[type="file"][accept="image/*"]', FILES.png);
+  const portraitUrl = await M.p.evaluate(() => document.querySelector('img[alt="Your portrait"]')?.getAttribute("src") ?? "");
+  ok(`portrait: photo accepted (${portraitUrl})`, /^\/api\/media\/[0-9a-f-]+$/.test(portraitUrl) && !(await alertText(M.p)), await alertText(M.p));
   await M.p.evaluate((name) => {
     const f = document.querySelector('input[name="displayName"]').form;
     const s = (n, v) => { const el = f.querySelector(`[name="${n}"]`); const proto = el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : el.tagName === "SELECT" ? HTMLSelectElement.prototype : HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(proto, "value").set.call(el, v); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); };
@@ -157,6 +185,20 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
   await C.p.type("textarea", "Grinding from the front brakes, worse in the morning.");
   await click(C.p, /^Starts normally/, "label"); await sleep(200);
   await click(C.p, /^Continue/, "button"); await stepTo(3);
+  // Diagnostic media: HTML disguised as a JPEG is refused; a photo and a PDF estimate are accepted.
+  const anyFile = 'input[type="file"][accept="image/*,video/*,audio/*,application/pdf"]';
+  await chooseFile(C.p, anyFile, FILES.fakeJpg);
+  ok("diagnostic upload: HTML named .jpg refused with the reason", /doesn't accept web pages, SVG images or scripts/.test(await alertText(C.p)), await alertText(C.p));
+  await C.p.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+  ok("upload refusal @390 fits", (await C.p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) <= 0);
+  await C.p.screenshot({ path: `${OUT}07a-upload-refused-390.png`, fullPage: true });
+  await C.p.setViewport({ width: 1280, height: 900 });
+  await chooseFile(C.p, anyFile, FILES.png);
+  await chooseFile(C.p, anyFile, FILES.pdf);
+  const tiles = await C.p.evaluate(() => [...document.querySelectorAll('[aria-label="Attached files"] a[href^="/api/media/"]')].map((a) => a.getAttribute("href")));
+  ok(`diagnostic upload: photo and PDF attached (${tiles.length})`, tiles.length === 2 && !(await alertText(C.p)), await alertText(C.p));
+  await C.p.screenshot({ path: `${OUT}07b-uploads-1280.png`, fullPage: true });
+  const [photoUrl, pdfUrl] = tiles;
   await click(C.p, /^Continue/, "button"); await stepTo(4);
   await click(C.p, /this week|flexible/i, "label"); await sleep(300);
   // A refresh straight after moving on comes back to the same step (it used to fall back to step 1).
@@ -257,6 +299,12 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
   }, (x) => x === "in_progress");
   ok("diagnosis stored", /Front pads at 2 mm/.test(await psql(`select data::text from ${T('jobs')} id='${jobId}'`)));
   await go(M.p, `/mechanic/jobs/${jobId}`);
+  await chooseFile(M.p, 'input[type="file"][accept="image/*,video/*"]', FILES.svg);
+  ok("repair photo: SVG refused", /doesn't accept web pages, SVG images or scripts/.test(await alertText(M.p)), await alertText(M.p));
+  await chooseFile(M.p, 'input[type="file"][accept="image/*,video/*"]', FILES.png);
+  await M.p.waitForNetworkIdle({ idleTime: 800 }).catch(() => {});
+  const jobPhoto = await psql(`select data->'photos'->0->>'url' from ${T('jobs')} id='${jobId}'`);
+  ok(`repair photo attached to the job (${jobPhoto})`, /^\/api\/media\//.test(jobPhoto), await main(M.p));
   await mstep("mark complete", () => click(M.p, /^Mark complete/, "button"), (x) => x === "awaiting_customer");
   await go(C.p, `/customer/jobs/${jobId}`);
   t = await main(C.p);
@@ -286,6 +334,37 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
   await go(M2.p, `/mechanic/jobs/${jobId}`);
   t = await main(M2.p);
   ok("mechanic sees the same completed job", /[Cc]ompleted/.test(t) && /328i/.test(t) && !errPage(t), t.slice(0, 600));
+  // Who can open the uploads, and how they're served.
+  const photo = await fetchAs(C2.p, photoUrl);
+  ok("customer opens their diagnostic photo: inline, typed from the bytes, nosniff, sandboxed", photo.status === 200 && photo.h["content-type"] === "image/png" && /^inline; filename="clutch-photo-[a-z0-9]+\.png"$/.test(photo.h["content-disposition"]) && photo.h["x-content-type-options"] === "nosniff" && /sandbox/.test(photo.h["content-security-policy"]) && photo.h["cross-origin-resource-policy"] === "same-origin", JSON.stringify(photo));
+  const pdf = await fetchAs(C2.p, pdfUrl);
+  ok("the PDF is only ever a download", pdf.status === 200 && pdf.h["content-type"] === "application/pdf" && /^attachment;/.test(pdf.h["content-disposition"]), JSON.stringify(pdf));
+  const ranged = await fetchAs(C2.p, photoUrl, { Range: "bytes=0-7" });
+  ok("byte ranges work (video playback in Safari)", ranged.status === 206 && /^bytes 0-7\//.test(ranged.h["content-range"] ?? ""), JSON.stringify(ranged));
+  ok("the mechanic the request went to can open it", (await fetchAs(M2.p, photoUrl)).status === 200);
+  const G = await ctx("guest");
+  await go(G.p, "/");
+  ok("a signed-out visitor can't", (await fetchAs(G.p, photoUrl)).status === 401);
+  ok("the mechanic's portrait is public", (await fetchAs(G.p, portraitUrl)).status === 200);
+  // An unrelated signed-in customer.
+  const OTHER = { name: "Riley Fixture", email: `riley.${RUN}@example.test`, password: `Fixture-${RUN}-r1` };
+  await go(G.p, "/signup?role=customer");
+  await set(G.p, 'form input[name="name"]', OTHER.name);
+  await set(G.p, 'form input[name="email"]', OTHER.email);
+  await set(G.p, 'form input[name="password"]', OTHER.password);
+  await act(G.p, /^Create account$/, "button");
+  await confirmFromMailbox(G.p, OTHER.email);
+  ok(`unrelated customer signed in (${path(G.p)})`, path(G.p).startsWith("/customer"));
+  for (const [label, url] of [["diagnostic photo", photoUrl], ["PDF estimate", pdfUrl]]) ok(`an unrelated customer can't open the ${label} (404)`, (await fetchAs(G.p, url)).status === 404);
+  await go(G.p, photoUrl);
+  ok("…and opening it directly shows no file", !/PNG|IHDR/.test(await G.p.evaluate(() => document.body.innerText)));
+  for (const w of [1280, 390]) {
+    await C2.p.setViewport(w === 390 ? { width: 390, height: 844, isMobile: true, hasTouch: true } : { width: 1280, height: 900 });
+    await go(C2.p, `/customer/requests/${reqId}`);
+    ok(`customer sees their attachments on the request @${w}`, await C2.p.evaluate((u) => Boolean(document.querySelector(`a[href="${u}"]`)), photoUrl));
+    ok(`request page @${w} fits`, (await C2.p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) <= 0);
+    await C2.p.screenshot({ path: `${OUT}14-attachments-${w}.png`, fullPage: true });
+  }
   ok("nothing reached the demo scope", await psql(`select count(*) from app_records where scope='demo' and (data->>'email' in ('${CUST.email}','${MECH.email}') or id in ('${reqId}','${jobId}'))`) === "0");
   ok("no delivery was attempted (no provider configured)", await psql(`select count(*) from delivery_attempts where outcome='sent'`) === "0");
 

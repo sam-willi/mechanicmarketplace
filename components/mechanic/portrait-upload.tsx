@@ -49,7 +49,11 @@ export function PortraitUpload({ current }: { current?: string }) {
           {url ? "Change photo" : "Add your photo"}
           <input type="file" accept="image/*" className="sr-only" onChange={(e) => upload(e.target.files?.[0])} />
         </label>
-        {error ? <p className="mt-1 text-[0.8125rem] text-alert">{error}</p> : null}
+        {error ? (
+          <p className="mt-1 text-[0.8125rem] text-alert" role="alert">
+            {error}
+          </p>
+        ) : null}
       </div>
     </div>
   );

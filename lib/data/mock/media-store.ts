@@ -12,24 +12,24 @@ type Stored = { meta: RepairMedia; ownerId: string; bytes: Uint8Array; scope: Sc
 const g = globalThis as unknown as { __clutchMedia?: Map<string, Stored> };
 const store = (g.__clutchMedia ??= new Map());
 
-export const MAX_MEDIA_BYTES = 40 * 1024 * 1024;
-
-export function kindFor(contentType: string, name: string): MediaKind {
-  if (contentType.startsWith("image/")) return "photo";
-  if (contentType.startsWith("video/")) return "video";
-  if (contentType.startsWith("audio/")) return "audio";
-  if (/\.(heic|heif)$/i.test(name)) return "photo";
-  return "document";
-}
-
-export async function putMedia(scope: Scope, ownerId: string, file: { name: string; type: string; bytes: Uint8Array }, tag: MediaTag, description?: string): Promise<RepairMedia> {
+/**
+ * Store an upload that lib/media/policy.ts `checkUpload` has already accepted: the kind, type
+ * and name come from that check (from the bytes), never from the browser.
+ */
+export async function putMedia(
+  scope: Scope,
+  ownerId: string,
+  file: { displayName: string; contentType: string; kind: MediaKind; bytes: Uint8Array },
+  tag: MediaTag,
+  description?: string,
+): Promise<RepairMedia> {
   const id = crypto.randomUUID();
   const meta: RepairMedia = {
     id,
-    kind: kindFor(file.type, file.name),
+    kind: file.kind,
     tag,
-    name: file.name || "upload",
-    contentType: file.type || "application/octet-stream",
+    name: file.displayName,
+    contentType: file.contentType,
     size: file.bytes.byteLength,
     description,
     uploadedAt: new Date().toISOString(),
