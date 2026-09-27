@@ -122,7 +122,8 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
   /** The structured vehicle picker, driven like a person: type into the labelled combobox, click the option. */
   async function combo(p, label, text) {
     const input = await p.evaluateHandle((l) => {
-      const lab = [...document.querySelectorAll("label")].find((x) => x.innerText.trim().replace(/\s*\(required\)$/, "") === l && x.htmlFor);
+      document.querySelectorAll("form details").forEach((d) => (d.open = true));
+      const lab = [...document.querySelectorAll("label")].find((x) => (x.textContent ?? "").trim().replace(/\s*\(required\)$/, "") === l && x.htmlFor);
       return lab ? document.getElementById(lab.htmlFor) : null;
     }, label);
     if (!(await input.evaluate((x) => Boolean(x)))) throw new Error(`no ${label} picker on ${p.url()}`);
@@ -681,12 +682,18 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
     await act(P, /^Save/, "button");
     v = await vehRow();
     ok("saved with the conflict recorded; the selections and the likely engine are kept, not overwritten", v?.model === "135i" && v.spec?.vin?.conflicts?.some((c) => /VIN says 128i/.test(c)) && v.spec.engine?.status === "likely", JSON.stringify(v?.spec?.vin));
-    ok("the conflict is shown", /The VIN and the selections disagree/.test(await main(P)));
+    ok("the conflict is shown, and the VIN isn't called decoded", /The VIN and the selections disagree/.test(await main(P)) && /VIN on file doesn't match/.test(await main(P)) && !/VIN-decoded/.test(await P.evaluate(() => document.querySelector('section[aria-label="Vehicle"]')?.innerText ?? "")));
     // The right VIN: confirmed, VIN-decoded, the correction history kept.
     await go(P, `/customer/vehicles/${v.id}?edit=1#edit`);
     await P.evaluate(() => document.querySelectorAll("form details").forEach((d) => (d.open = true)));
-    await P.$eval('input[aria-label="VIN"]', (el) => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, ""); el.dispatchEvent(new Event("input", { bubbles: true })); });
+    await P.waitForSelector('input[aria-label="VIN"]', { visible: true, timeout: 20000 });
+    // Replace the old VIN like a person would: select it all, delete, type the new one.
+    await P.$eval('input[aria-label="VIN"]', (el) => { el.focus(); el.select(); });
+    await P.keyboard.press("Backspace");
     await P.type('input[aria-label="VIN"]', "WBAUC73508VF00135");
+    await P.waitForFunction(() => [...document.querySelectorAll("button")].some((b) => /Look up VIN/.test(b.innerText) && !b.disabled), { timeout: 20000 }).catch(async () => {
+      throw new Error(`VIN field holds "${await P.$eval('input[aria-label="VIN"]', (el) => el.value)}"`);
+    });
     await click(P, /Look up VIN/, "button");
     await P.waitForFunction(() => /This VIN is a 2008 BMW 135i/.test(document.body.innerText), { timeout: 20000 });
     await click(P, /Yes, that.s my car/, "button");

@@ -37,7 +37,8 @@ export async function run({ base, auth, db, chrome, out, profile = "full" }) {
   // The structured vehicle picker: year, make, then a model that existed for them.
   for (const [label, text] of [["Year", "2016"], ["Make", "BMW"], ["Model", "328i"]]) {
     const input = await p.evaluateHandle((l) => {
-      const lab = [...document.querySelectorAll("label")].find((x) => x.innerText.trim().replace(/\s*\(required\)$/, "") === l && x.htmlFor);
+      document.querySelectorAll("form details").forEach((d) => (d.open = true));
+      const lab = [...document.querySelectorAll("label")].find((x) => (x.textContent ?? "").trim().replace(/\s*\(required\)$/, "") === l && x.htmlFor);
       return lab ? document.getElementById(lab.htmlFor) : null;
     }, label);
     await p.waitForFunction((el) => el && !el.disabled, { timeout: 20000 }, input);

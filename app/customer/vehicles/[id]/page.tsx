@@ -45,7 +45,7 @@ export default async function VehiclePage({ params, searchParams }: { params: Pr
         <div className="min-w-0">
           <h1 className="display text-[2rem] sm:text-[2.5rem]">{vehicleLine(v)}</h1>
           <div className="mt-3">
-            <VehicleBrief v={v} spec={vehicleSpecOf(v)} audience="customer" showVinTail />
+            <VehicleBrief v={v} spec={vehicleSpecOf(v)} audience="customer" showVinTail hideName />
           </div>
           {!v.spec || !v.vin ? (
             <p className="mt-2 text-[0.875rem] text-ink-2">

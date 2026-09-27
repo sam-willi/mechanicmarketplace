@@ -23,6 +23,7 @@ export function VehicleBrief({
   warn,
   editHref,
   showVinTail = false,
+  hideName = false,
 }: {
   v: Pick<Vehicle, "year" | "make" | "model" | "mileage">;
   spec: VehicleSpec;
@@ -31,6 +32,8 @@ export function VehicleBrief({
   warn?: "quote" | "book";
   editHref?: string;
   showVinTail?: boolean;
+  /** The page's own heading already names the car. */
+  hideName?: boolean;
 }) {
   const rows: Row[] = [
     { key: "trim", name: "Trim / series", f: spec.trim },
@@ -42,8 +45,8 @@ export function VehicleBrief({
   const sub = [spec.platform?.status !== "needs_confirmation" ? spec.platform?.label : undefined, spec.body?.status !== "needs_confirmation" ? spec.body?.label : undefined, fuel ? String(fuel).replace(/^./, (c) => c.toUpperCase()) : undefined]
     .filter(Boolean)
     .join(" · ");
-  const vinState = spec.vin.status === "decoded" || spec.vin.status === "partial" ? "decoded" : spec.vin.status === "failed" ? "failed" : "none";
   const { gaps, conflicts } = unconfirmedEssentials(spec);
+  const vinState = spec.vin.status === "decoded" || spec.vin.status === "partial" ? "decoded" : spec.vin.status === "failed" ? "failed" : "none";
   const names = gaps.map((g) => g.label);
   const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : (names[0] ?? "");
   const unsure = (f?: SpecField) => !f || f.status === "likely" || f.status === "needs_confirmation" || f.status === "not_recorded";
@@ -51,14 +54,24 @@ export function VehicleBrief({
     <section aria-label="Vehicle" className="sheet">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-rule-soft px-4 py-3 sm:px-5">
         <div className="min-w-0">
-          <p className="text-[1.0625rem] font-bold">
-            {v.year} {v.make} {v.model}
-          </p>
+          {hideName ? null : (
+            <p className="text-[1.0625rem] font-bold">
+              {v.year} {v.make} {v.model}
+            </p>
+          )}
           {sub ? <p className="text-[0.875rem] text-ink-2">{sub}</p> : null}
         </div>
         <p className="tnum text-[0.875rem] text-ink-2">
           {v.mileage ? `${v.mileage.toLocaleString()} mi · ` : ""}
-          {vinState === "decoded" ? <span className="font-semibold text-carbon">VIN-decoded{showVinTail && spec.vin.last6 ? ` (…${spec.vin.last6})` : ""}</span> : vinState === "failed" ? "VIN couldn't be decoded" : "No VIN yet"}
+          {vinState === "decoded" && conflicts.length ? (
+            <span className="font-semibold text-amber">VIN on file doesn&apos;t match{showVinTail && spec.vin.last6 ? ` (…${spec.vin.last6})` : ""}</span>
+          ) : vinState === "decoded" ? (
+            <span className="font-semibold text-carbon">VIN-decoded{showVinTail && spec.vin.last6 ? ` (…${spec.vin.last6})` : ""}</span>
+          ) : vinState === "failed" ? (
+            "VIN couldn't be decoded"
+          ) : (
+            "No VIN yet"
+          )}
         </p>
       </div>
       <dl className="divide-y divide-rule-soft">
@@ -68,7 +81,7 @@ export function VehicleBrief({
             <dd className="min-w-0">
               <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                 <span className={unsure(f) ? "text-ink-2" : "font-semibold"}>{!f || f.status === "not_recorded" ? "Unknown" : f.status === "needs_confirmation" ? `Not confirmed${f.options?.length ? `: ${f.options.join(" or ")}` : ""}` : f.status === "likely" ? `Likely ${f.label}` : f.label}</span>
-                <FactTag level={levelOfSpec(f?.status ?? "not_recorded")} label={STATUS_LABEL[f?.status ?? "not_recorded"]} />
+                {!f || f.status === "not_recorded" || (f.status === "needs_confirmation" && !f.options?.length) ? null : <FactTag level={levelOfSpec(f.status)} label={STATUS_LABEL[f.status]} />}
               </span>
               {unsure(f) && HOW_TO_CONFIRM[key] ? <span className="block text-[0.8125rem] text-ink-3">To confirm: {HOW_TO_CONFIRM[key]}</span> : null}
             </dd>
