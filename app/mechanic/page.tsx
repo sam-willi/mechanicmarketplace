@@ -129,7 +129,9 @@ export default async function MechanicHome({ searchParams }: { searchParams: Pro
           },
         ]
       : []),
-    ...(deciding
+    // While the profile is incomplete, estimates can't be accepted: the readiness card explains
+    // them instead of listing them as "customer deciding".
+    ...(deciding && ready.matchable
       ? [
           {
             icon: Hourglass,
@@ -217,7 +219,7 @@ export default async function MechanicHome({ searchParams }: { searchParams: Pro
       </div>
 
       {!ready.matchable ? (
-        <ReadinessPanel steps={ready.steps} done={ready.done} waitingDemand={waitingDemand} waitingOnProvider={ready.waitingOnProvider} />
+        <ReadinessPanel steps={ready.steps} done={ready.done} waitingDemand={waitingDemand} waitingOnProvider={ready.waitingOnProvider} earlierEstimates={deciding} />
       ) : null}
 
       {ready.matchable || actions.length ? (

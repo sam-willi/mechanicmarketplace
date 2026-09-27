@@ -2,6 +2,8 @@
 // a throwaway Postgres cluster, the local auth fixture (scripts/local-auth.mjs, a stand-in for
 // Supabase Auth: nothing is emailed), and a production build of the app with demo logins off,
 // built into its own folder (.next-browser-test) so a running dev server is never touched.
+// Then tests-browser/uploads.mjs, and finally tests-browser/demo-ui.mjs on the same build restarted
+// with demo logins on (the demo marketplace lives in the throwaway database too).
 // Never uses DATABASE_URL, Supabase keys or anything else from your environment or .env.local.
 //
 // Needs: Postgres 16+ server binaries (as npm run test:db), Google Chrome or Chromium, and
@@ -101,8 +103,8 @@ const waitFor = async (url, what) => {
   throw new Error(`${what} didn't start (${url})`);
 };
 let app;
-const startApp = async () => {
-  app = start("npx", ["next", "start", "-p", appPort], appEnv, "app");
+const startApp = async (extra = {}) => {
+  app = start("npx", ["next", "start", "-p", appPort], { ...appEnv, ...extra }, "app");
   await waitFor(`http://localhost:${appPort}/login`, "the app");
 };
 /** Stop the whole group: SIGTERM, then SIGKILL after 5 s (Next waits for the browser's keep-alive
@@ -208,7 +210,13 @@ try {
   }), shots);
   const { run: uploads } = await import("../tests-browser/uploads.mjs");
   const uploadFails = await watched("uploads", () => uploads({ base: `http://localhost:${appPort}`, auth: `http://127.0.0.1:${authPort}`, db: DB, chrome, out: shots, profile: appEnv.CLUTCH_UPLOAD_PROFILE === "hosted" ? "hosted" : "full" }), shots);
-  code = fails || uploadFails ? 1 : 0;
+  // The same build with the demo marketplace on: the demo picker, leaving the demo to sign up,
+  // and the demo accounts' screens at phone and desktop widths.
+  await stopApp();
+  await startApp({ CLUTCH_DEMO_LOGINS: "on" });
+  const { run: demoUi } = await import("../tests-browser/demo-ui.mjs");
+  const demoFails = await watched("demo-ui", () => demoUi({ base: `http://localhost:${appPort}`, db: DB, chrome, out: shots }), shots);
+  code = fails || uploadFails || demoFails ? 1 : 0;
 } catch (e) {
   console.error(e);
   for (const p of procs) console.error(`--- ${p.label} log (tail) ---\n${p.log().slice(-3000)}`);

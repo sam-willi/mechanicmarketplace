@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { placeLabel } from "@/lib/domain/areas";
 import { StarRating } from "@/components/visual/stars";
 import { MapPin } from "lucide-react";
 import type { PublicMechanicProfile } from "@/lib/domain/public-profile";
@@ -36,7 +37,7 @@ export function PersonFacts({ p }: { p: PublicMechanicProfile }) {
 
 /** "Who" — the record header. */
 export function RecordHeader({ p }: { p: PublicMechanicProfile }) {
-  const place = p.neighborhood ? `${p.neighborhood}, ${p.city}` : p.city;
+  const place = placeLabel(p.neighborhood, p.city);
   const reach = `Comes to you within ${p.serviceRadiusMi} mi`;
   return (
     <div className="flex items-start gap-4 sm:gap-6">

@@ -548,7 +548,7 @@ export function RequestWizard({
         {/* ---------------------------------------------------- 2. THE PROBLEM */}
         {step === 1 && (
           <>
-            <Q req title="What is the car doing?">
+            <Q req title="What is the car doing?" hint="In your own words; you don't need to know the part. For example: “Grinding from the front when I brake, worse in the morning.”">
               <textarea
                 value={d.symptomDescription}
                 onChange={(e) => set("symptomDescription", e.target.value)}
@@ -559,7 +559,10 @@ export function RequestWizard({
               />
             </Q>
             <fieldset>
-              <legend className="text-[1.0625rem] font-bold">Does it start and drive?</legend>
+              <legend className="text-[1.0625rem] font-bold">
+                Does it start and drive?
+                <span className="ml-2 align-middle text-[0.6875rem] font-bold tracking-[0.06em] text-ink uppercase">Required</span>
+              </legend>
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5" role="radiogroup">
                 {CONDITIONS.map((c) => (
                   <label

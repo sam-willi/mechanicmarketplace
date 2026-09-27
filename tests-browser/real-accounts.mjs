@@ -161,6 +161,10 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
     f.querySelector('[name="categories"][value="brakes"]').click(); f.querySelector('[name="makes"][value="BMW"]').click();
     s("hourlyRate", "95"); s("diagnosticFee", "60");
   }, MECH.name);
+  {
+    const o = await M.p.evaluate(() => ({ city: Boolean(document.querySelector('[name="city"]')), summary: document.body.textContent.match(/\d+ repairs? · \d+ makes? selected/)?.[0] ?? "", optional: /Experience and first proof \(optional\)/.test(document.body.textContent), text: document.body.textContent }));
+    ok(`onboarding: one service-base choice (no City field), picker shows "${o.summary}", step 4 optional`, !o.city && o.summary === "1 repair · 1 make selected" && o.optional && !/Send estimates and be booked[^.]*verified/i.test(o.text), o.summary);
+  }
   for (let i = 0; i < 8 && path(M.p).startsWith("/mechanic/onboarding"); i++) {
     const more = await M.p.evaluate(() => [...document.querySelectorAll("button")].some((x) => x.innerText.trim().startsWith("Continue") && x.offsetParent));
     if (more) { await click(M.p, /^Continue/, "button"); await sleep(400); continue; }
@@ -418,6 +422,74 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
     ok(`customer sees their attachments on the request @${w}`, await C2.p.evaluate((u) => Boolean(document.querySelector(`a[href="${u}"]`)), photoUrl));
     ok(`request page @${w} fits`, (await C2.p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) <= 0);
     await C2.p.screenshot({ path: `${OUT}14-attachments-${w}.png`, fullPage: true });
+  }
+  // ============================================================ 10. a request nobody fits yet waits, then reaches a mechanic exactly once
+  // The live case of 2026-09-26: a real mechanic whose profile (from older onboarding) had no service
+  // area and a stray demo flag. The customer's request is saved; setting the area sends it on, once.
+  if (store !== "snapshot") {
+    console.log("SKIP  waiting-request dispatch: runs on the snapshot store (what production uses)");
+  } else {
+    await go(C2.p, "/customer/requests/new?repair=starters&make=BMW&area=silver-lake");
+    const step = (n) => C2.p.waitForFunction((n) => document.body.innerText.includes(`Step ${n} of 4`), { timeout: 20000 }, n);
+    await click(C2.p, /^Continue/, "button"); await step(2);
+    await C2.p.type("textarea", "Clicks but won't crank on cold mornings.");
+    await click(C2.p, /^Starts normally|^Won.t start|^Doesn.t start/, "label"); await sleep(200);
+    await click(C2.p, /^Continue/, "button"); await step(3);
+    await click(C2.p, /^Continue/, "button"); await step(4);
+    await click(C2.p, /this week|flexible/i, "label"); await sleep(600);
+    const send2 = await C2.p.evaluate(() => [...document.querySelectorAll("button")].filter((x) => x.offsetParent).map((x) => x.innerText.trim()).find((x) => /^Send|^Save/.test(x)));
+    await act(C2.p, new RegExp(`^${(send2 ?? "Send").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), "button");
+    const waitId = path(C2.p).split("?")[0].split("/").pop();
+    t = await main(C2.p);
+    const matched = async () => JSON.parse((await psql(`select data->'matchedMechanicIds' from ${T('requests')} id='${waitId}'`)) || "null");
+    ok(`starter request saved while no mechanic fits (${waitId})`, /^req-/.test(waitId) && !errPage(t) && (await matched())?.length === 0 && (await psql(`select data->>'status' from ${T('requests')} id='${waitId}'`)) === "open", t.slice(0, 400));
+    await C2.p.screenshot({ path: `${OUT}15-waiting-request-1280.png`, fullPage: true });
+    // Make our mechanic's record look like the legacy one: starters offered, no area, the old flag.
+    await sql`update app_records set data = (data - 'neighborhood') || '{"isDemo": true}'::jsonb || jsonb_build_object('declaredRepairCategories', (data->'declaredRepairCategories') || '["starters"]'::jsonb) where scope = 'live' and collection = 'mechanics' and id = ${mechId}`;
+    await sql`update app_meta set version = version + 1 where key = 'main'`;
+    const mechUser = await psql(`select data->>'userId' from ${T('mechanics')} id='${mechId}'`);
+    const notes = async () => Number(await psql(`select count(*) from ${T('notifications')} data->>'userId'='${mechUser}' and data->>'href'='/mechanic/requests/${waitId}'`));
+    await go(M2.p, "/mechanic");
+    t = await M2.p.evaluate(() => document.getElementById("ready-title")?.innerText ?? "");
+    ok("mechanic home: the service area is the required next step", t === "Add your service area to start receiving requests.", t);
+    await M2.p.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+    await M2.p.reload({ waitUntil: "networkidle0" });
+    await M2.p.screenshot({ path: `${OUT}16-needs-area-390.png`, fullPage: true });
+    await M2.p.setViewport({ width: 1280, height: 900 });
+    ok("…nothing sent to them yet", (await matched()).length === 0 && (await notes()) === 0);
+    await act(M2.p, /^Set area/, "a");
+    ok(`"Set area" opens the profile editor (${path(M2.p)})`, path(M2.p).startsWith("/mechanic/onboarding"));
+    const publish = async (P) => {
+      for (let i = 0; i < 8 && path(P).startsWith("/mechanic/onboarding"); i++) {
+        const more = await P.evaluate(() => [...document.querySelectorAll("button")].some((x) => x.innerText.trim().startsWith("Continue") && x.offsetParent));
+        if (more) { await click(P, /^Continue/, "button"); await sleep(400); continue; }
+        const label = await P.evaluate(() => [...document.querySelectorAll("form button:not([type=button])")].filter((x) => x.offsetParent).map((x) => x.innerText.trim()).filter(Boolean).at(-1));
+        await act(P, new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`), "button");
+      }
+    };
+    await set(M2.p, 'select[name="neighborhood"]', "echo-park");
+    await publish(M2.p);
+    ok(`area saved → ${path(M2.p)}`, path(M2.p).startsWith("/mechanic") && !path(M2.p).startsWith("/mechanic/onboarding"), await main(M2.p));
+    ok("the waiting request went to them, once", JSON.stringify(await matched()) === JSON.stringify([mechId]), JSON.stringify(await matched()));
+    ok("one notification for it", (await notes()) === 1, String(await notes()));
+    ok("the stray demo flag is gone from the real profile", (await psql(`select coalesce(data->>'isDemo', 'absent') from ${T('mechanics')} id='${mechId}'`)) === "absent");
+    const sees = async (p) => { await go(p, "/mechanic/requests"); const x = await main(p); return /won.t crank/i.test(x) && (await p.evaluate((id) => Boolean(document.querySelector(`a[href="/mechanic/requests/${id}"]`)), waitId)); };
+    ok("it's in their Requests", await sees(M2.p));
+    await M2.p.reload({ waitUntil: "networkidle0" });
+    ok("…after a refresh", /won.t crank/i.test(await main(M2.p)));
+    await logout(M2.p);
+    const M3 = await ctx("mechanic-3");
+    await login(M3.p, MECH);
+    ok("…and after logging in again", await sees(M3.p));
+    await M3.p.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+    await M3.p.reload({ waitUntil: "networkidle0" });
+    await M3.p.screenshot({ path: `${OUT}17-dispatched-390.png`, fullPage: true });
+    await M3.p.setViewport({ width: 1280, height: 900 });
+    // Saving the profile again never sends it twice.
+    await go(M3.p, "/mechanic/onboarding?edit=1");
+    await publish(M3.p);
+    ok("saving the profile again: still sent once, one notification", JSON.stringify(await matched()) === JSON.stringify([mechId]) && (await notes()) === 1, `${JSON.stringify(await matched())} ${await notes()}`);
+    ok("the demo never sees it", (await psql(`select count(*) from app_records where scope='demo' and (id='${waitId}' or data::text like '%${waitId}%')`)) === "0");
   }
   ok("nothing reached the demo scope", await psql(`select count(*) from app_records where scope='demo' and (data->>'email' in ('${CUST.email}','${MECH.email}') or id in ('${reqId}','${jobId}'))`) === "0");
   ok("no delivery was attempted (no provider configured)", await psql(`select count(*) from delivery_attempts where outcome='sent'`) === "0");

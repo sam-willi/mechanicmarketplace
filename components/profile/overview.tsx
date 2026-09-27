@@ -1,4 +1,5 @@
 import { CalendarClock, MapPin, ShieldAlert, ShieldCheck } from "lucide-react";
+import { placeLabel } from "@/lib/domain/areas";
 import { StarRating } from "@/components/visual/stars";
 import type { PublicMechanicProfile } from "@/lib/domain/public-profile";
 import type { FitInput } from "@/lib/domain/recommend";
@@ -23,7 +24,7 @@ export function TrustOverview({ p, fit, ctx }: { p: PublicMechanicProfile; fit: 
   const e = eligibility(p);
   const s = screeningSummary(p);
   const o = soonest(p.openings);
-  const place = p.neighborhood ? `${p.neighborhood}, ${p.city}` : p.city;
+  const place = placeLabel(p.neighborhood, p.city);
   const reach = `comes to you within ${p.serviceRadiusMi} mi`;
   const job = [ctx.make, ctx.repair ? repairNoun(ctx.repair, 1) : "repair"].filter(Boolean).join(" ");
   const strong = dom ? isStrongFit(fit, ctx) : false;

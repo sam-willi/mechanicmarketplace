@@ -43,3 +43,11 @@ export function serves(m: { lat: number; lng: number; serviceRadiusMi: number; w
   const d = milesBetween(m, at);
   return d <= m.serviceRadiusMi + 2;
 }
+
+/** "Mid-City, Los Angeles", or just "Inglewood" when the area is the city itself. Never "Inglewood, Inglewood". */
+export function placeLabel(neighborhood: string | undefined, city: string | undefined) {
+  const n = neighborhood?.trim();
+  const c = city?.trim();
+  if (n && c && n.toLowerCase() !== c.toLowerCase()) return `${n}, ${c}`;
+  return n || c || "";
+}

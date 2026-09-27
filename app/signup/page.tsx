@@ -5,7 +5,8 @@ import { getAccount } from "@/lib/session";
 import { homeFor } from "@/lib/auth/provision";
 import { redirect } from "next/navigation";
 import { ArrowLeft, ArrowRight, Car, Wrench } from "lucide-react";
-import { signUpWithPassword } from "@/app/actions/account";
+import { exitDemoToSignup, signUpWithPassword } from "@/app/actions/account";
+import { requestScope } from "@/lib/data";
 import { VEHICLE_MAKES } from "@/lib/domain/types";
 import { MODEL_YEARS } from "@/lib/domain/intake";
 import { Wordmark } from "@/components/brand/wordmark";
@@ -33,6 +34,8 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
   if (acct && !acct.user.demo) redirect(homeFor(acct.user, sp.next));
   // Coming from the customer app (e.g. a car search), they're here as a customer.
   const role = sp.role === "mechanic" ? "mechanic" : sp.role === "customer" || sp.next?.startsWith("/customer") ? "customer" : null;
+  // Opened from the demo: a real account is never created inside the demo shell. Leave it first.
+  if ((await requestScope()) === "demo") return <LeaveDemoFirst role={role} next={sp.next} />;
 
   return (
     <div className="min-h-dvh">
@@ -156,5 +159,31 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
         )}
       </main>
     </div>
+  );
+}
+
+/** Shown instead of the sign-up form while this browser is in the demo marketplace. */
+function LeaveDemoFirst({ role, next }: { role: "customer" | "mechanic" | null; next?: string }) {
+  return (
+    <main className="mx-auto max-w-[520px] px-4 pt-14 pb-16">
+      <p className="flex items-center gap-2 text-[0.8125rem] font-semibold text-ink-3">
+        <span className="border border-ink-3 px-1.5 text-[0.6875rem] font-extrabold tracking-[0.08em] uppercase">Demo</span>
+        You&apos;re in the demo
+      </p>
+      <h1 className="display mt-2 text-[2rem]">Create a real account</h1>
+      <p className="mt-3 text-ink-2">
+        Real accounts are separate from the demo: they use your own email, and nothing from the demo comes with you. Leave the demo to continue.
+      </p>
+      <form action={exitDemoToSignup} className="mt-6">
+        <input type="hidden" name="role" value={role ?? ""} />
+        <input type="hidden" name="next" value={next ?? ""} />
+        <SubmitButton className="btn btn-ink min-h-12 w-full text-[1rem]" pending="Leaving the demo…">
+          Leave the demo and sign up
+        </SubmitButton>
+      </form>
+      <Link href="/demo" className="btn btn-quiet mt-2 min-h-11 w-full">
+        Stay in the demo
+      </Link>
+    </main>
   );
 }

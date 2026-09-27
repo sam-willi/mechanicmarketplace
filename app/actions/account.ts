@@ -236,6 +236,16 @@ export async function exitDemo() {
   redirect("/");
 }
 
+/** Leave the demo on the way to creating a real account: real sign-up never happens inside the demo. */
+export async function exitDemoToSignup(formData: FormData) {
+  const jar = await cookies();
+  leaveDemo(jar);
+  jar.delete(MODE_COOKIE);
+  const role = str(formData, "role");
+  const next = safeNext(str(formData, "next"), "");
+  redirect(back("/signup", { role: role === "mechanic" || role === "customer" ? role : undefined, next: next || undefined }));
+}
+
 /** Switch modes on a dual-role account. Same login; lands on that side's home. */
 /** The same place in the other app, where there is one. */
 const EQUIVALENT: [string, string][] = [

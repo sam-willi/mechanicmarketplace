@@ -35,7 +35,7 @@ export default async function MechanicLayout({ children }: { children: React.Rea
         <div className="min-h-dvh">
           <header className="bg-brand-night text-sheet">
             <div className="mx-auto flex h-14 max-w-[1100px] items-center px-4 sm:px-6">
-              <Link href="/" aria-label="Clutch home" className="text-sheet">
+              <Link href="/" aria-label="Clutch home" className="inline-flex min-h-11 items-center text-sheet">
                 <Logo height={22} />
               </Link>
               <span className="ml-3 text-[0.8125rem] font-semibold text-[#a9bfb1]">for mechanics</span>
@@ -108,7 +108,7 @@ export default async function MechanicLayout({ children }: { children: React.Rea
       <div className="min-w-0">
         <header className="sticky top-0 z-30 border-b border-brand-deep bg-brand-night text-sheet lg:border-rule lg:bg-paper/95 lg:text-ink lg:backdrop-blur-sm">
           <div className="flex h-14 items-center justify-between gap-3 px-4 sm:px-6">
-            <Link href="/mechanic" aria-label="Clutch mechanic home" className="text-sheet lg:hidden">
+            <Link href="/mechanic" aria-label="Clutch mechanic home" className="inline-flex min-h-11 items-center text-sheet lg:hidden">
               <Logo height={20} />
             </Link>
             <span className="hidden lg:block" />

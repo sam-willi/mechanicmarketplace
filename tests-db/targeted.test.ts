@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import postgres from "postgres";
 import { liveSlice, repoOver, type LiveContext, type Viewer } from "@/lib/data";
 import { NormalizedLiveStore } from "@/lib/data/normalized/store";
-import { SOURCE_COLLECTIONS, textArray } from "@/lib/data/normalized/reader";
+import { SOURCE_COLLECTIONS, textArray, ACCOUNT_BATCH } from "@/lib/data/normalized/reader";
 import { paginate, paginateAsc, parseCursor } from "@/lib/data/page";
 import { memoryQueries } from "@/lib/data/normalized/queries";
 import { rankSearch, explainSearch, type SearchInput } from "@/lib/domain/search";
@@ -518,4 +518,38 @@ test("exact-rule sanity: every profile the targeted pool calls bookable is booka
     assert.ok(whole.eligible, p.id);
     assert.deepEqual(eligibility(p).checks.map((c) => c.label), whole.checks.map((c) => c.label), `${p.id}: the same check statuses from the lightweight read`);
   }
+});
+
+test("id batches: a long id list (a write's candidate accounts) is read by primary key in batches of 50, never a scan", async () => {
+  // As closeForWrite reads the accounts of every candidate mechanic when a request is matched.
+  const ids = (await db<{ id: string }[]>`select id from lv_users where id like 'big-mu-%' order by id limit 180`).map((r) => r.id);
+  assert.equal(ids.length, 180);
+  assert.equal(ACCOUNT_BATCH, 50);
+  await db`analyze lv_users`;
+  const ctx = liveSlice(A);
+  const from = captured.length;
+  tag = "id batches";
+  const rows = await ctx.reader.users(ids);
+  tag = "";
+  assert.equal(rows.length, 180, "every account read");
+  const batches = captured.slice(from).filter((c) => c.tag === "id batches" && /from "lv_users" where id = any/.test(c.query));
+  assert.equal(batches.length, 4, "180 ids → 4 queries");
+  const plans: string[] = [];
+  for (const b of batches) {
+    const [arr] = b.params as string[];
+    const n = String(arr).replace(/^\{|\}$/g, "").split(",").length;
+    assert.ok(n <= ACCOUNT_BATCH, `batch of ${n} ids`);
+    // The plan Postgres itself chooses (sequential scans allowed): it must read by primary key.
+    const [{ "QUERY PLAN": plan }] = (await db.unsafe(`explain (format json) ${b.query}`, b.params as never[])) as unknown as { "QUERY PLAN": { Plan: Record<string, unknown> }[] }[];
+    const nodes: string[] = [];
+    const walk = (p: Record<string, unknown>) => {
+      nodes.push(`${p["Node Type"]}${p["Index Name"] ? ` using ${p["Index Name"]}` : ""}`);
+      for (const c of (p.Plans as Record<string, unknown>[] | undefined) ?? []) walk(c);
+    };
+    walk(plan[0].Plan);
+    plans.push(nodes.join(" > "));
+    assert.deepEqual(scans(plan[0].Plan), [], `batch of ${n}: ${nodes.join(" > ")}`);
+    assert.ok(nodes.some((x) => /Index|Bitmap/.test(x) && /lv_users_pkey/.test(x)), `batch of ${n} reads by primary key: ${nodes.join(" > ")}`);
+  }
+  report.idBatches = { ids: ids.length, batches: batches.length, plans: [...new Set(plans)], server: (await db<{ v: string }[]>`select current_setting('server_version') as v`)[0].v };
 });

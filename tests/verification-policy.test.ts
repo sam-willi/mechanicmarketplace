@@ -287,3 +287,25 @@ test("an estimate can't be sent until the basic profile is complete (a draft can
   assert.equal(sent.status, "submitted");
   assert.equal(eligibility(profileOf(m.id)).fullyVerified, false);
 });
+
+test("onboarding says what's actually required: the basic profile, not verification (one source, lib/domain/mechanic-requirements.ts)", async () => {
+  const { UNLOCKS } = await import("@/lib/domain/mechanic-requirements");
+  const { readiness } = await import("@/lib/domain/eligibility");
+  const book = UNLOCKS.find((u) => /be booked/.test(u.goal))!;
+  // Each required readiness item is named in the words onboarding shows.
+  const labels = readiness({ neighborhood: undefined, serviceRadiusMi: 0, pricing: { hourlyRateCents: 0, diagnosticFeeCents: 0, fixed: [] }, availabilityNote: "", openings: [], selfReported: { declaredCategories: [] } } as never).items.map((i) => i.key);
+  assert.deepEqual(labels, ["area", "repairs", "pricing", "availability"]);
+  for (const words of [/where you start from and how far you travel/, /repairs you do/, /prices/, /available/]) assert.match(book.needs, words);
+  assert.doesNotMatch(book.needs, /verif|ID check|background|insurance|driving record/i, "checks aren't a requirement");
+  const checks = UNLOCKS.find((u) => /Verification checks/.test(u.goal))!;
+  assert.match(checks.goal, /optional/);
+  assert.match(checks.needs, /None is required to be booked/);
+  // And the stale sentence can't come back anywhere in the app.
+  const { readdirSync, readFileSync, statSync } = await import("node:fs");
+  const files: string[] = [];
+  const walk = (d: string) => readdirSync(d).forEach((f) => (statSync(`${d}/${f}`).isDirectory() ? walk(`${d}/${f}`) : /\.tsx?$/.test(f) && files.push(`${d}/${f}`)));
+  ["app", "components", "lib"].forEach(walk);
+  const stale = [/ID check, background check and insurance verified/i, /(checks?|identity|background|insurance)[^."]{0,40}\b(must|need to|has to|have to) be verified[^."]{0,40}(send|book|request)/i, /verified,? plus a driving record check/i];
+  const hits = files.filter((f) => stale.some((r) => r.test(readFileSync(f, "utf8"))));
+  assert.deepEqual(hits, []);
+});

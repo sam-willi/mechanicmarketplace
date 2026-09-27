@@ -419,6 +419,8 @@ export class MockRepository implements RepositoryCore {
         availabilityNote: input.availabilityNote ?? existing.availabilityNote,
         ...(input.neighborhood ? baseOf(input.neighborhood) : {}),
       });
+      // A real profile never keeps a demo-only flag (older onboarding set it on every new mechanic).
+      if (this.scope === "live") delete existing.isDemo;
       this.matchWaiting();
       return existing;
     }

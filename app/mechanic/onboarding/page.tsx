@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { ServicePicker } from "@/components/mechanic/service-picker";
+import { UNLOCKS } from "@/lib/domain/mechanic-requirements";
 import { getRepo } from "@/lib/data";
 import { getSession } from "@/lib/session";
 import { REPAIR_LABEL } from "@/lib/domain/provenance";
@@ -15,9 +17,9 @@ export const metadata: Metadata = { title: "Build your profile" };
 
 const STEPS = [
   { title: "You and your photo", why: "Customers book people. A clear photo and a few honest lines are the first things they look at.", minutes: 2, required: ["displayName"] },
-  { title: "Where and how you work", why: "Decides which nearby requests you're matched with: you go to the car, so this is where you start and how far you'll travel.", minutes: 1, required: ["city"] },
+  { title: "Where you work", why: "You go to the customer's car. Requests are matched by distance from where you start, within how far you'll travel.", minutes: 1, required: ["neighborhood"] },
   { title: "Services, makes and prices", why: "What you pick routes requests to you before you have verified jobs. Prices are shown before anyone asks you for an estimate.", minutes: 2, required: ["hourlyRate", "diagnosticFee"] },
-  { title: "Experience and first proof", why: "Verified proof is what ranks you for matching jobs. Anything you haven't proven yet is labelled self-reported.", minutes: 3 },
+  { title: "Experience and first proof (optional)", why: "Proof ranks you higher for matching jobs, but you don't need it to start. Skip this for now and add it any time from your profile.", minutes: 3, optional: true },
   { title: "Verification checks (optional)", why: "Customers see which of your checks Clutch has verified before they book you. They aren't required to receive requests or be booked, but verified checks build trust and improve your ranking.", minutes: 1 },
   { title: "Preview and publish", why: "This is your public profile as it starts. It grows with every verified job.", minutes: 1 },
 ];
@@ -40,11 +42,7 @@ function ProofExplainer() {
 
 /** What's needed to publish, to send estimates, and to be booked. */
 function Requirements({ compact = false }: { compact?: boolean }) {
-  const rows: [string, string][] = [
-    ["Publish your profile", "Name, city and prices."],
-    ["Send estimates and be booked", "ID check, background check and insurance verified, plus a driving record check if you drive to customers."],
-    ["Rank for matching jobs", "Verified repairs of that type and make, from Clutch jobs or confirmed by past customers."],
-  ];
+  const rows: [string, string][] = UNLOCKS.map((u) => [u.goal, u.needs]);
   return (
     <div>
       {!compact ? <p className="heading text-[1.0625rem]">What each step unlocks</p> : <p className="field-label">What you need for each</p>}
@@ -66,12 +64,6 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   const s = await getSession();
   const sp = await searchParams;
   const m = sp.edit && s.role === "mechanic" ? repo.getMechanic(s.mechanicId) : undefined;
-  const Check = ({ name, value, label, checked }: { name: string; value: string; label: string; checked?: boolean }) => (
-    <label className="flex cursor-pointer items-center gap-2 border border-rule bg-sheet px-3 py-2 text-[0.9375rem] has-[:checked]:border-brand has-[:checked]:font-semibold">
-      <input type="checkbox" name={name} value={value} defaultChecked={checked} className="accent-[var(--ink)]" />
-      {label}
-    </label>
-  );
 
   return (
     <div className="max-w-[900px] space-y-8">
@@ -109,13 +101,9 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
 
           {/* 2 */}
           <div className="space-y-5">
-            <p className="text-[0.9375rem] text-ink-2">Every Clutch mechanic is mobile: you go to the customer&apos;s car. Tell us where you start from and how far you&apos;ll go.</p>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="City (required)">
-                <input name="city" required defaultValue={m?.city ?? "Los Angeles"} className="input" />
-              </Field>
-              <Field label="Where you're based (required)">
-                {/* Distances in search and matching are measured from here. */}
+              {/* One place to pick: the launch area you start from. Distances in search and matching are measured from here. */}
+              <Field label="Where you start from (required)" hint="The Los Angeles area you usually leave from.">
                 <select name="neighborhood" required defaultValue={AREAS.find((a) => a.label === m?.neighborhood)?.key ?? ""} className="input">
                   <option value="" disabled>
                     Choose an area
@@ -127,7 +115,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
                   ))}
                 </select>
               </Field>
-              <Field label="How far you'll travel (miles)">
+              <Field label="How far you'll travel (miles)" hint="Requests farther than this don't reach you.">
                 <input name="serviceRadiusMi" inputMode="numeric" defaultValue={m?.serviceRadiusMi ?? 15} className="input tnum" />
               </Field>
               <Field label="Usual hours">
@@ -138,22 +126,13 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
 
           {/* 3 */}
           <div className="space-y-5">
-            <div>
-              <p className="field-label">Repairs you do</p>
-              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {REPAIR_CATEGORIES.map((c) => (
-                  <Check key={c} name="categories" value={c} label={REPAIR_LABEL[c]} checked={m?.declaredRepairCategories.includes(c)} />
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="field-label">Makes you know best</p>
-              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {VEHICLE_MAKES.map((mk) => (
-                  <Check key={mk} name="makes" value={mk} label={mk} checked={m?.declaredMakes.includes(mk)} />
-                ))}
-              </div>
-            </div>
+            <ServicePicker
+              repairs={REPAIR_CATEGORIES.map((c) => ({ value: c, label: REPAIR_LABEL[c] }))}
+              makes={[...VEHICLE_MAKES]}
+              chosenRepairs={m?.declaredRepairCategories}
+              chosenMakes={m?.declaredMakes}
+            />
+            <p className="field-label">Your prices</p>
             <div className="grid gap-3 sm:grid-cols-3">
               <Field label="Hourly labor rate ($, required)">
                 <input name="hourlyRate" inputMode="decimal" required defaultValue={m ? m.hourlyRateCents / 100 : undefined} className="input tnum" />
@@ -173,11 +152,11 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
             <ProofExplainer />
             {m ? (
               <div className="grid gap-2 sm:grid-cols-2">
-                <Link href="/mechanic/verification" className="btn btn-line min-h-11">
-                  Add certifications and work history
+                <Link href="/mechanic/verification" target="_blank" className="btn btn-line min-h-11">
+                  Add certifications and work history <span className="text-[0.8125rem] font-normal">(new tab)</span>
                 </Link>
-                <Link href="/mechanic/repairs" className="btn btn-line min-h-11">
-                  Add past repairs for customers to confirm
+                <Link href="/mechanic/repairs" target="_blank" className="btn btn-line min-h-11">
+                  Add past repairs for customers to confirm <span className="text-[0.8125rem] font-normal">(new tab)</span>
                 </Link>
               </div>
             ) : (
@@ -253,8 +232,8 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
                 </div>
               </fieldset>
             ) : (
-              <Link href="/mechanic/verification" className="btn btn-line min-h-11">
-                Open the Verification Center
+              <Link href="/mechanic/verification" target="_blank" className="btn btn-line min-h-11">
+                Open the Verification Center <span className="text-[0.8125rem] font-normal">(new tab)</span>
               </Link>
             )}
             <p className="text-[0.875rem] text-ink-2">

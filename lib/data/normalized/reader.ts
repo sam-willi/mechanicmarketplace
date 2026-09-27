@@ -27,6 +27,13 @@ const SPEC = Object.fromEntries(SPECS.map((s) => [s.collection, s])) as Record<k
  */
 /** Largest id list read in one query (see byIds). */
 const ID_BATCH = 200;
+/**
+ * Accounts are read in smaller batches: a write that matches a request reads the accounts of
+ * every candidate mechanic, and at 200 ids Postgres 16 read the whole (narrow) users table
+ * instead of the primary key. At 50, 16, 17 and 18 all use the key
+ * (tests-db/targeted.test.ts "id batches").
+ */
+export const ACCOUNT_BATCH = 50;
 
 export const PUBLIC_STRIP: Partial<Record<keyof DB, string[]>> = {
   screenings: ["provider", "providerRef", "result", "consentAt"],
@@ -106,12 +113,13 @@ export class Reader {
   async byIds(collection: keyof DB, ids: (string | undefined | null)[], level: Level = "full") {
     const need = this.uniq(ids).filter((id) => !this.slice.has(collection, id, level));
     if (!need.length) return [];
-    if (need.length <= ID_BATCH) return this.load(collection, this.sql`id = any(${textArray(need)}::text[])`, level);
+    const size = collection === "users" ? ACCOUNT_BATCH : ID_BATCH;
+    if (need.length <= size) return this.load(collection, this.sql`id = any(${textArray(need)}::text[])`, level);
     // A long id list (e.g. the accounts of every candidate a write considers) is read in primary-key
     // batches: one huge "= any(...)" makes the planner scan the whole table instead.
-    const out = [];
-    for (let i = 0; i < need.length; i += ID_BATCH) out.push(...(await this.load(collection, this.sql`id = any(${textArray(need.slice(i, i + ID_BATCH))}::text[])`, level)));
-    return out;
+    const batches = [];
+    for (let i = 0; i < need.length; i += size) batches.push(need.slice(i, i + size));
+    return (await Promise.all(batches.map((b) => this.load(collection, this.sql`id = any(${textArray(b)}::text[])`, level)))).flat();
   }
 
   private any(col: string, ids: string[]) {
