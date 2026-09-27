@@ -540,7 +540,7 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
     await finishTest("verified", "twice");
     const rec = (await idRec())[0];
     t = await main(V.p);
-    ok("verified: one record, verified once despite a duplicate webhook", rec?.status === "verified" && rec.events.filter((e) => e.to === "verified").length === 1 && rec.nameMatches === true, JSON.stringify(rec?.events?.map((e) => e.action)));
+    ok("verified: one record, verified once despite a duplicate webhook", rec?.status === "verified" && rec.events.filter((e) => e.to === "verified" && e.from !== "verified").length === 1 && rec.events.filter((e) => e.to === "verified").length === 1 && rec.nameMatches === true, JSON.stringify(rec?.events?.map((e) => `${e.action}:${e.from}>${e.to}`)));
     ok("the center says who verified it (a test provider, not a real check)", /Identity verified by Clutch's test provider \(not a real check\)/.test(t), t.slice(0, 400));
     ok("nothing identifying stored: no ID number, date of birth, images or scores", !/(idNumber|dateOfBirth|dob|selfieUrl|documentUrl|score)/i.test(JSON.stringify(rec)));
     // Insurance with a real (private) document.
@@ -584,7 +584,7 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
     ok(`review link is short-lived and private (${(link ?? "").replace(/vt=.*/, "vt=…")})`, /\?vt=\d+\.[0-9a-f]{64}$/.test(link ?? ""));
     const opened = await fetchAs(A.p, link);
     ok("the reviewer opens it through the link, never cached", opened.status === 200 && /no-store/.test(opened.h["cache-control"] ?? ""), JSON.stringify(opened));
-    ok("the same link is useless to someone else", (await fetchAs(V.p, link.replace(/vt=\d+/, "vt=1"))).status === 404 && (await fetchAs(C2.p, link)).status === 404);
+    ok("the same link is useless to anyone else, and a tampered one to the reviewer too", (await fetchAs(C2.p, link)).status === 404 && (await fetchAs(G2.p, link)).status === 404 && (await fetchAs(A.p, link.replace(/vt=\d+/, "vt=1"))).status === 404);
     // Approve without a reason is refused by the form (required); with one, it's recorded.
     await A.p.evaluate(() => document.querySelector('input[name="action"][value="approve"]').click());
     await set(A.p, 'select[name="reasonCode"]', "evidence_matches");
@@ -602,7 +602,7 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
     const opens = await C2.p.evaluate(() => [...document.querySelectorAll("button[aria-haspopup=dialog]")].find((b) => /Insurance/.test(b.getAttribute("aria-label") ?? ""))?.click());
     await sleep(300);
     t = await C2.p.evaluate(() => document.querySelector("dialog[open]")?.innerText ?? "");
-    ok("insurance evidence: who, when, what it means, what Clutch checked", /Insurance verified by Clutch staff on/.test(t) && /What this means/.test(t) && /What Clutch checked/.test(t), `${opens} ${t.slice(0, 400)}`);
+    ok("insurance evidence: who, when, what it means, what Clutch checked", /Insurance verified by Clutch staff on/.test(t) && /What this means/i.test(t) && /What Clutch checked/i.test(t), `${opens} ${t.slice(0, 400)}`);
     // Revoke: gone from every positive claim at once.
     await go(A.p, `/admin/reviews/${ins.id}`);
     await set(A.p, 'select[name="reasonCode"]', "policy_cancelled");

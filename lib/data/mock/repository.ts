@@ -568,10 +568,11 @@ export class MockRepository implements RepositoryCore {
     const m = this.mustMechanic(mechanicId);
     const v = this.getVerification(input.recordId);
     if (!v || v.mechanicId !== m.id || v.category !== "identity") throw new LifecycleError("That identity check wasn't found.", "not_found");
-    if (v.providerRef && v.providerRef !== input.providerRef) v.events!.push({ at: nowISO(), actor: { kind: "mechanic", id: m.userId }, action: "started", from: v.status, to: v.status, note: "New provider session." });
+    const newSession = Boolean(v.providerRef && v.providerRef !== input.providerRef);
     v.provider = input.provider;
     v.providerRef = input.providerRef;
-    if (v.status !== "in_progress") this.move(v, "in_progress", { actor: { kind: "mechanic", id: m.userId }, action: "started" });
+    if (v.status !== "in_progress") this.move(v, "in_progress", { actor: { kind: "mechanic", id: m.userId }, action: "started", note: newSession ? "New provider session." : undefined });
+    else if (newSession) v.events!.push({ at: nowISO(), actor: { kind: "mechanic", id: m.userId }, action: "started", from: v.status, to: v.status, note: "New provider session." });
   }
 
   /**
@@ -607,7 +608,9 @@ export class MockRepository implements RepositoryCore {
     const actor: VActor = { kind: "provider", id: `${input.provider}:${input.eventId}` };
     if (input.nameMatches !== undefined) v.nameMatches = input.nameMatches;
     const to = input.status;
-    if (to === v.status || !canMove(v.status, to)) {
+    // The same state again (a return after the webhook, a re-sent event): nothing new to record.
+    if (to === v.status) return { applied: false, status: v.status };
+    if (!canMove(v.status, to)) {
       // Recorded, not applied (e.g. a late "processing" after "verified").
       v.events!.push({ at: nowISO(), actor, action: "provider_update", from: v.status, to: v.status, note: `Provider reported ${to.replace(/_/g, " ")}; no change.`, idempotencyKey: input.eventId, ...(input.reasonCodes.length ? { reasonCodes: input.reasonCodes } : {}) });
       return { applied: false, status: v.status };
@@ -1402,7 +1405,7 @@ export class MockRepository implements RepositoryCore {
     if (action === "approve" && needsDoc && !v.documentIds?.length) throw new LifecycleError("There's no stored document to approve. Request more information instead.", "invalid_input");
     const to: VerificationStatus = action === "approve" ? "verified" : action === "reject" ? "failed" : "needs_more_info";
     // Staff take a submitted item into review first, so the history shows who looked.
-    if (v.status === "submitted" && to !== "needs_more_info") transition(v, "under_review", { actor, action: "provider_update", note: "Opened for review." });
+    if (v.status === "submitted" && to !== "needs_more_info") transition(v, "under_review", { actor, action: "review_started" });
     const expiresAt = input.expiresAt || (v.category === "insurance" ? this.db().insurance.find((x) => x.id === v.subjectId)?.expiresOn : v.expiresAt);
     this.move(v, to, { actor, action: action === "approve" ? "approved" : action === "reject" ? "rejected" : "requested_info", reasonCodes: [input.reasonCode], note, expiresAt });
     v.reviewerId = reviewerId;

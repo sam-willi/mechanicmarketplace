@@ -15,6 +15,7 @@ export type EventAction =
   | "created"
   | "started"
   | "submitted"
+  | "review_started"
   | "provider_update"
   | "approved"
   | "rejected"
@@ -168,7 +169,8 @@ export function reconstructedHistory(
   const events: VerificationEvent[] = [{ at: start, actor: origin.actor, action: "migrated", to: v.status === "not_started" ? "not_started" : "submitted", note: origin.note }];
   if (v.status !== "not_started" && v.status !== "submitted") {
     const decider: Actor = v.reviewerId ? { kind: "staff", id: v.reviewerId } : v.provider ? { kind: "provider", id: v.provider } : origin.actor;
-    const action: EventAction = v.status === "verified" || v.status === "expired" ? "approved" : v.status === "failed" ? "rejected" : v.status === "needs_more_info" ? "requested_info" : v.status === "revoked" ? "revoked" : "provider_update";
+    const action: EventAction =
+      v.status === "verified" || v.status === "expired" ? "approved" : v.status === "failed" ? "rejected" : v.status === "needs_more_info" ? "requested_info" : v.status === "revoked" ? "revoked" : v.status === "under_review" && !v.provider ? "review_started" : "provider_update";
     events.push({ at: at(v.verifiedAt) ?? at(v.reviewedAt) ?? start, actor: decider, action, from: "submitted", to: v.status === "expired" ? "verified" : v.status, ...(v.notes ? { note: v.notes } : {}) });
   }
   return events;

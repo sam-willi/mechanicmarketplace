@@ -90,7 +90,7 @@ test("a full review cycle through the normalized store keeps the history in the 
   await liveSlice(A).repo.decideVerification(v.id, "approve", su.id, { reasonCode: "evidence_matches" });
   const [row] = await db<{ status: string; events: { action: string; to: string; actor: { kind: string } }[]; docs: string[] }[]>`select status, data->'events' as events, data->'documentIds' as docs from lv_verifications where id = ${v.id}`;
   assert.equal(row.status, "verified");
-  assert.deepEqual(row.events.map((e) => e.action), ["created", "submitted", "requested_info", "submitted", "provider_update", "approved"]);
+  assert.deepEqual(row.events.map((e) => e.action), ["created", "submitted", "requested_info", "submitted", "review_started", "approved"]);
   assert.deepEqual(row.docs, ["doc-vc", "doc-vc-2"], "both documents kept");
   const [email] = await db<{ n: number }[]>`select count(*)::int as n from lv_verifications where mechanic_id = ${mechId} and category = 'email' and status = 'verified'`;
   assert.equal(email.n, 1, "the email check was recorded when the profile was created");

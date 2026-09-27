@@ -44,7 +44,7 @@ const item = (mid: string, key: string) => pub(mid).find((i) => i.key === key)!;
 test("statuses are explicit; moves are checked; history is appended, never overwritten", () => {
   const r = { status: "not_started" as CheckStatus, events: [] as never[] };
   transition(r, "submitted", { actor: { kind: "mechanic", id: "u" }, action: "submitted" });
-  transition(r, "under_review", { actor: { kind: "staff", id: "s" }, action: "provider_update" });
+  transition(r, "under_review", { actor: { kind: "staff", id: "s" }, action: "review_started" });
   transition(r, "verified", { actor: { kind: "staff", id: "s" }, action: "approved", reasonCodes: ["evidence_matches"], expiresAt: "2030-01-01" });
   assert.throws(() => transition(r, "submitted", { actor: { kind: "mechanic", id: "u" }, action: "submitted" }), TransitionError, "a verified record never goes back");
   assert.deepEqual(
@@ -93,7 +93,7 @@ test("review is least-privilege: staff only, never your own, a reason always, an
   const after = live.getVerification(v.id)!;
   assert.equal(after.status, "verified");
   assert.deepEqual(after.decidedBy, { kind: "staff", id: sid });
-  assert.deepEqual(after.events!.map((e) => e.action), ["created", "submitted", "provider_update", "approved"]);
+  assert.deepEqual(after.events!.map((e) => e.action), ["created", "submitted", "review_started", "approved"]);
   assert.equal(after.expiresAt, "2027-06-30", "insurance uses the policy's own expiry");
   assert.match(item(m.id, "insurance").statement, /^Insurance verified by Clutch staff on .+, valid until Jun 2027$/);
   // Self-review: a staff member who is also a mechanic can't decide their own record.
