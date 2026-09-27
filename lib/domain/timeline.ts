@@ -22,7 +22,7 @@ export function customerTimeline(
 
   const raw: { label: string; detail?: string; at?: string; done: boolean }[] = [
     { label: "Request submitted", at: dayMonth(r.createdAt), done: true },
-    { label: "Mechanics reviewing", detail: matched ? `Sent to ${plural(matched, "qualified mechanic")}` : undefined, done: matched > 0 },
+    { label: "Mechanics reviewing", detail: matched ? `Sent to ${plural(matched, "matching mechanic")}` : undefined, done: matched > 0 },
     { label: "Mechanics interested", detail: interested ? `${interested} so far` : "No replies yet", done: interested > 0 },
     { label: "Estimates received", detail: sent.length ? plural(sent.length, "written estimate") : undefined, done: sent.length > 0 },
     { label: "Mechanic selected", detail: accepted ? `You chose ${who}` : undefined, done: Boolean(accepted) },

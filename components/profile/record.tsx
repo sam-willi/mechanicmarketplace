@@ -37,12 +37,7 @@ export function PersonFacts({ p }: { p: PublicMechanicProfile }) {
 /** "Who" — the record header. */
 export function RecordHeader({ p }: { p: PublicMechanicProfile }) {
   const place = p.neighborhood ? `${p.neighborhood}, ${p.city}` : p.city;
-  const reach =
-    p.workModel === "shop"
-      ? "Shop only"
-      : p.workModel === "both"
-        ? `Shop, or comes to you within ${p.serviceRadiusMi} mi`
-        : `Comes to you within ${p.serviceRadiusMi} mi`;
+  const reach = `Comes to you within ${p.serviceRadiusMi} mi`;
   return (
     <div className="flex items-start gap-4 sm:gap-6">
       <div className="sm:hidden">
@@ -55,8 +50,7 @@ export function RecordHeader({ p }: { p: PublicMechanicProfile }) {
         <h1 className="display text-[2.125rem] text-ink sm:text-[3rem]">{p.displayName}</h1>
         {p.tagline ? <p className="mt-1.5 max-w-[52ch] text-[1rem] leading-snug text-ink-2 sm:text-[1.0625rem]">{p.tagline}</p> : null}
         <p className="mt-2 text-[0.9375rem] font-semibold text-ink">
-          {WORK_MODEL_LABEL[p.workModel]}
-          {p.shopName ? <span className="font-normal text-ink-2"> · {p.shopName.replace(" (demo)", "")}</span> : null}
+          {WORK_MODEL_LABEL.mobile}
         </p>
         <p className="mt-0.5 flex items-start gap-1 text-[0.875rem] text-ink-2">
           <MapPin size={14} strokeWidth={1.75} className="mt-[3px] shrink-0 text-ink-3" aria-hidden />
@@ -75,7 +69,7 @@ export function RecordHeader({ p }: { p: PublicMechanicProfile }) {
   );
 }
 
-/** "Safe" — identity and baseline screening, as checked boxes on the form. */
+/** Identity, background, driving record and insurance: each with its own status, never summed up as "screened". */
 export function SafetyBox({ p }: { p: PublicMechanicProfile }) {
   const s = p.safety;
   const items = [
@@ -90,7 +84,7 @@ export function SafetyBox({ p }: { p: PublicMechanicProfile }) {
         <ProvenanceMark detail={safetyEvidence("identity", s.identity, p.firstName)} size="md" className="mt-1.5" />
       </div>
       <div className="px-3.5 py-3">
-        <p className="field-label">Screened · safety baseline</p>
+        <p className="field-label">Other checks · each with its own status</p>
         <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
           {items.map((d) => (
             <ProvenanceMark key={d.title} detail={d} size="md" />

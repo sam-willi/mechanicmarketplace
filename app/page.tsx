@@ -8,7 +8,7 @@ import { SearchBar } from "@/components/find/search-bar";
 
 const STEPS = [
   { icon: ClipboardList, title: "Describe your car and problem", body: "Pick your car and what's wrong. Photos help, but they're optional." },
-  { icon: Scale, title: "Compare qualified mechanics", body: "See verified experience, screening, availability and price side by side." },
+  { icon: Scale, title: "Compare available mechanics", body: "See each mechanic's Clutch-verified repairs, the status of each check (identity, background, driving record, insurance), availability and price side by side." },
   { icon: Wrench, title: "Choose and book", body: "Approve a written estimate and the job is booked." },
 ];
 
@@ -68,7 +68,7 @@ export default function Home() {
           <div className="flex flex-wrap items-center justify-between gap-6 bg-brand-deep px-6 py-8 text-on-brand sm:px-10">
             <div>
               <h2 className="heading text-[1.5rem] text-on-brand sm:text-[1.75rem]">Are you a mechanic?</h2>
-              <p className="mt-1 text-on-brand-2">Set your price, prove your work, keep your customers.</p>
+              <p className="mt-1 text-on-brand-2">Set your price, prove your work, keep your customers. We&apos;re onboarding our first mechanics in Los Angeles now.</p>
             </div>
             <div className="flex flex-wrap items-center gap-4">
               <Link href="/for-mechanics" className="text-on-brand-2 underline decoration-on-brand-2/50 underline-offset-[3px] hover:text-on-brand">

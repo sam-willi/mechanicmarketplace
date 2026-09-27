@@ -228,28 +228,26 @@ export function RequestSummary({
             {distanceMi !== undefined ? ` · ${distanceMi < 1 ? "under a mile" : `${Math.round(distanceMi)} mi`} away` : ""}
           </span>
           <span className="block text-ink-2">
-            {L.serviceMode === "mobile" ? `Mobile repair${L.parkingType ? ` · ${parkingLabel(L.parkingType)}` : ""}` : "Customer will bring it to a shop"}
+            {`Mechanic goes to the car${L.parkingType ? ` · ${parkingLabel(L.parkingType)}` : ""}`}
           </span>
         </Row>
         <Row label="Site">
           <SiteSummary a={site} />
         </Row>
         {L.notes && !site.mitigations.length && !site.conflicts.length ? <Row label="Location notes">{L.notes}</Row> : null}
-        {L.serviceMode === "mobile" && (
-          <Row label="Address & access">
-            {revealPrivate ? (
-              <>
-                {L.address ?? "No address given"}
-                {L.accessInstructions ? <span className="block text-ink-2">{L.accessInstructions}</span> : null}
-              </>
-            ) : (
-              <span className="text-ink-2">
-                {L.accessAvailable === true ? "Someone will be there to give access. " : L.accessAvailable === false ? "No one will be there; access instructions provided. " : ""}
-                {audience === "mechanic" ? "Exact address and access details are shared once you're booked." : "Shared with a mechanic only once you book them."}
-              </span>
-            )}
-          </Row>
-        )}
+        <Row label="Address & access">
+          {revealPrivate ? (
+            <>
+              {L.address ?? "No address given"}
+              {L.accessInstructions ? <span className="block text-ink-2">{L.accessInstructions}</span> : null}
+            </>
+          ) : (
+            <span className="text-ink-2">
+              {L.accessAvailable === true ? "Someone will be there to give access. " : L.accessAvailable === false ? "No one will be there; access instructions provided. " : ""}
+              {audience === "mechanic" ? "Exact address and access details are shared once you're booked." : "Shared with a mechanic only once you book them."}
+            </span>
+          )}
+        </Row>
       </Section>
 
       <Section title="Timing">

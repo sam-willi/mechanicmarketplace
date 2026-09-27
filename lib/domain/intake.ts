@@ -236,14 +236,6 @@ export interface Feasibility {
 /** Can this realistically be done where the car is? Facts only, the mechanic decides. */
 export function mobileFeasibility(r: RepairRequest): Feasibility {
   const l = r.location;
-  if (l.serviceMode === "shop") {
-    const needsTow = r.driveability === "no" || r.startsStatus === "no_response" || r.startsStatus === "clicks_no_crank" || r.startsStatus === "cranks_no_start";
-    return {
-      label: needsTow ? "Shop repair: car may need a tow" : "Customer can bring it to a shop",
-      tone: needsTow ? "caution" : "neutral",
-      reasons: [],
-    };
-  }
   const reasons: string[] = [];
   if (l.flatGround === "no") reasons.push("Not on flat ground");
   if (l.workSpace === "limited") reasons.push("Limited room around the car");

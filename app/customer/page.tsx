@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Plus, Search, Wrench } from "lucide-react";
-import { ready, repo } from "@/lib/data";
-import { getSession } from "@/lib/session";
+import { getRepo } from "@/lib/data";
+import { getSession, needs } from "@/lib/session";
 import { primarySymptom, vehicleLine } from "@/lib/domain/intake";
-import { customerRepairStatus, needsNewMechanic } from "@/lib/domain/status";
+import { customerRepairStatus, isWaitingForMatch, needsNewMechanic } from "@/lib/domain/status";
 import { monthYear, plural } from "@/lib/format";
 import { PhotoPrint } from "@/components/profile/photo";
 import { StatusChip } from "@/components/app/status-chip";
@@ -43,10 +43,11 @@ function greeting() {
 }
 
 export default async function CustomerHome({ searchParams }: { searchParams: Promise<{ welcome?: string; saved?: string }> }) {
-  await ready();
+  const repo = await getRepo();
   const s = await getSession();
   if (s.role !== "customer") return null;
   const sp = await searchParams;
+  await (await needs(s)).customerHome();
   const vehicles = repo.listVehicles(s.customerId);
   const requests = repo.listRequestsForCustomer(s.customerId);
   const jobs = repo.listJobsForCustomer(s.customerId);
@@ -56,6 +57,7 @@ export default async function CustomerHome({ searchParams }: { searchParams: Pro
   const recentIds = [...new Set(history.map((h) => h.mechanicId))].slice(0, 3);
   const savedIds = repo.listSaved(s.customerId).filter((id) => !recentIds.includes(id));
   const profile = (id: string) => repo.getPublicProfile(repo.getMechanic(id)!.slug)!;
+  const noSupply = !(await repo.anyBookable());
   const draft = repo.getDraft(s.customerId);
   const draftVehicle = draft ? (vehicles.find((v) => v.id === draft.vehicleId) ?? (draft.vehicle.make ? draft.vehicle : null)) : null;
   const draftCar = draftVehicle ? [draftVehicle.year, draftVehicle.make, draftVehicle.model].filter(Boolean).join(" ") : "";
@@ -71,7 +73,7 @@ export default async function CustomerHome({ searchParams }: { searchParams: Pro
             <Wrench size={26} aria-hidden className="shrink-0" />
             <span className="min-w-0 flex-1">
               <span className="heading block text-[1.25rem] text-sheet">Describe the problem</span>
-              <span className="block text-[0.875rem] text-on-brand-2">Get estimates from qualified mechanics.</span>
+              <span className="block text-[0.875rem] text-on-brand-2">{noSupply ? "Save a request for the first mechanic who fits." : "Get estimates from available mechanics who match your car, repair and area."}</span>
             </span>
             <ArrowRight size={20} aria-hidden className="shrink-0 transition-transform group-hover:translate-x-0.5" />
           </Link>
@@ -84,6 +86,15 @@ export default async function CustomerHome({ searchParams }: { searchParams: Pro
             <ArrowRight size={20} aria-hidden className="shrink-0 transition-transform group-hover:translate-x-0.5" />
           </Link>
         </div>
+        {noSupply ? (
+          <div role="note" className="border-l-4 border-brass bg-sheet px-4 py-3 text-[0.9375rem]">
+            <p className="font-semibold">Clutch is launching in Los Angeles.</p>
+            <p className="mt-1 max-w-[70ch] text-ink-2">
+              No mechanic has finished a Clutch profile yet, so there&apos;s no one to book today. You can still describe a repair: Clutch saves it and sends it to a
+              mechanic who fits it once one joins. You&apos;ll see replies on the request here.
+            </p>
+          </div>
+        ) : null}
         {draft ? (
           <div className="flex flex-wrap items-center justify-between gap-3 border border-ink bg-sheet px-4 py-3">
             <div className="min-w-0">
@@ -144,7 +155,7 @@ export default async function CustomerHome({ searchParams }: { searchParams: Pro
               const v = repo.getVehicle(r.vehicleId)!;
               const rq = repo.listQuotesForRequest(r.id).filter((q) => q.status !== "draft");
               const fresh = rq.filter((q) => q.status === "submitted");
-              const faces = rq.map((q) => profile(q.mechanicId)).slice(0, 3);
+              const faces = rq.slice(0, 3).map((q) => profile(q.mechanicId));
               return (
                 <li key={r.id}>
                   <Link href={`/customer/requests/${r.id}`} className="sheet flex flex-wrap items-center gap-4 p-4 hover:border-ink">
@@ -155,7 +166,9 @@ export default async function CustomerHome({ searchParams }: { searchParams: Pro
                       </p>
                       <p className="line-clamp-1 text-[0.875rem] text-ink-2">{primarySymptom(r)}</p>
                       <p className="mt-1 text-[0.9375rem] font-bold">
-                        {needsNewMechanic(r, rq)
+                        {isWaitingForMatch(r)
+                          ? "Saved. No mechanic matches it yet"
+                          : needsNewMechanic(r, rq)
                           ? `${repo.getMechanic(r.declines!.at(-1)!.mechanicId)?.displayName.split(" ")[0] ?? "Your mechanic"} can't take it. See who else could`
                           : fresh.length
                           ? `${plural(fresh.length, "new estimate")} to review`
@@ -178,7 +191,7 @@ export default async function CustomerHome({ searchParams }: { searchParams: Pro
             })}
           </ul>
         ) : (
-          <p className="border-y border-rule py-5 text-[0.9375rem] text-ink-3">No open requests.</p>
+          <p className="border-y border-rule py-5 text-[0.9375rem] text-ink-3">No open requests. Requests you send or save appear here.</p>
         )}
       </Block>
 

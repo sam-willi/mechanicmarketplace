@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { getSession } from "@/lib/session";
+import { getSession, needs } from "@/lib/session";
+import { getRepo } from "@/lib/data";
 import { earnings } from "@/lib/mechanic-insights";
 import { usd } from "@/lib/format";
 import { PageTitle } from "@/components/workspace/ui";
@@ -11,7 +12,9 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 export default async function Earnings() {
   const s = await getSession();
   if (s.role !== "mechanic") return null;
-  const e = earnings(s.mechanicId);
+  await (await needs(s)).mechanicEarnings();
+  const repo = await getRepo();
+  const e = earnings(repo, s.mechanicId);
   const max = Math.max(...e.byMonth.map((m) => m.cents), 1);
 
   return (

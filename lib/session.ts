@@ -1,7 +1,9 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
-import { ready, repo } from "@/lib/data";
+import { getRepo, needsFor, requestScope } from "@/lib/data";
+import type { Repository } from "@/lib/data/repository";
 import { unsign } from "@/lib/auth/signing";
+import { TEST_USER_COOKIE, testLoginsEnabled } from "@/lib/auth/test-login";
 import { authConfigured, demoLoginsEnabled } from "@/lib/supabase/config";
 import { createSupabase } from "@/lib/supabase/server";
 import type { AppMode, EvidenceVariant, Role } from "@/lib/domain/types";
@@ -26,22 +28,53 @@ export const SESSION_COOKIE = "clutch_sid";
 export const AREA_HEADER = "x-clutch-area";
 
 /**
- * Who is signed in:
- *  - Real accounts: a Supabase Auth session (verified JWT claims); the app
- *    user's id is the Supabase auth user id.
- *  - Demo accounts (seeded, `demo: true`): a signed cookie from one-click demo
- *    sign-in, when demo logins are enabled.
+ * Who is signed in, resolved inside this request's data scope (lib/data/scope.ts):
+ *  - Live scope: a Supabase Auth session (verified JWT claims); the app user's
+ *    id is the Supabase auth user id, looked up in the live store only.
+ *  - Demo scope: a signed cookie from one-click demo sign-in, looked up in the
+ *    demo store only. A real account exploring the demo is a guest there, and
+ *    a demo cookie never signs anyone in to the live marketplace.
  */
-async function signedInUserId() {
-  await ready();
-  const jar = await cookies();
-  if (demoLoginsEnabled()) {
+async function signedIn(): Promise<{ repo: Repository; userId?: string }> {
+  const scope = await requestScope();
+  const repo = await getRepo();
+  if (scope === "demo") {
+    if (!demoLoginsEnabled()) return { repo };
+    const jar = await cookies();
     const raw = jar.get(USER_COOKIE)?.value;
-    const id = unsign(raw) ?? raw ?? legacyUserId(jar.get(PERSONA_COOKIE)?.value);
-    if (id && repo.getUser(id)?.demo) return id;
+    const id = unsign(raw) ?? legacyUserId(repo, jar.get(PERSONA_COOKIE)?.value);
+    return { repo, userId: id && repo.getUser(id)?.demo ? id : undefined };
+  }
+  if (testLoginsEnabled()) {
+    // Local in-memory test accounts (lib/auth/test-login.ts); never with a database or in production.
+    const id = unsign((await cookies()).get(TEST_USER_COOKIE)?.value);
+    if (id) await loadAccount(id);
+    const u = id ? repo.getUser(id) : undefined;
+    if (u && !u.demo && u.email.endsWith("@example.test")) return { repo, userId: u.id };
   }
   const auth = await getAuthUser();
-  return auth && repo.getUser(auth.id) ? auth.id : undefined;
+  if (auth) await loadAccount(auth.id);
+  const user = auth ? repo.getUser(auth.id) : undefined;
+  return { repo, userId: user && !user.demo ? user.id : undefined };
+}
+
+/** Live targeted reads: this account and its role profiles, into the request's slice (a no-op elsewhere). */
+async function loadAccount(userId: string) {
+  await (await needsFor({ userId, staff: false })).account(userId);
+}
+
+/**
+ * This request's loaders for the signed-in viewer (lib/data/normalized/needs.ts). Access is
+ * decided by the session: the customer or mechanic profile of the area being used, and staff
+ * rights only for accounts holding the admin role. A no-op for the demo and in-memory stores.
+ */
+export async function needs(s: Session) {
+  return needsFor({
+    userId: s.role === "guest" ? undefined : s.userId,
+    customerId: s.role === "customer" ? s.customerId : undefined,
+    mechanicId: s.role === "mechanic" ? s.mechanicId : undefined,
+    staff: isStaff(s),
+  });
 }
 
 /** The Supabase Auth user for this request (verified), whether or not they've finished sign-up. */
@@ -54,7 +87,7 @@ export async function getAuthUser(): Promise<{ id: string; email: string; meta: 
   return { id: c.sub, email: String(c.email ?? ""), meta: (c.user_metadata as Record<string, unknown>) ?? {} };
 }
 
-function legacyUserId(persona?: string) {
+function legacyUserId(repo: Repository, persona?: string) {
   if (!persona) return undefined;
   const [role, id] = persona.split(":");
   if (role === "admin") return "user-admin";
@@ -65,7 +98,7 @@ function legacyUserId(persona?: string) {
 
 export async function getSession(): Promise<Session> {
   const jar = await cookies();
-  const userId = await signedInUserId();
+  const { repo, userId } = await signedIn();
   const user = userId ? repo.getUser(userId) : undefined;
   if (!user) return { role: "guest" };
   const area = (await headers()).get(AREA_HEADER) as AppMode | "" | null;
@@ -97,7 +130,7 @@ export function isStaff(s: Session): s is Exclude<Session, { role: "guest" }> {
 
 /** Which roles the signed-in account holds, regardless of the current area. */
 export async function getAccount() {
-  const userId = await signedInUserId();
+  const { repo, userId } = await signedIn();
   const user = userId ? repo.getUser(userId) : undefined;
   if (!user) return null;
   return {

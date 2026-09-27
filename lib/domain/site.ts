@@ -7,7 +7,7 @@ import type { RepairRequest } from "./types";
  */
 export type SiteFactKind = "ok" | "missing" | "unsure" | "risk" | "blocker";
 export type SiteFact = { kind: SiteFactKind; text: string };
-export type SiteStatus = "ok" | "unknown" | "risk" | "blocker" | "conflict" | "shop";
+export type SiteStatus = "ok" | "unknown" | "risk" | "blocker" | "conflict";
 
 export interface SiteAssessment {
   status: SiteStatus;
@@ -27,16 +27,6 @@ export function siteAssessment(r: RepairRequest): SiteAssessment {
   const l = r.location;
   const notes = l.notes ?? "";
   const carMoves = !(r.driveability === "no" || r.startsStatus === "no_response" || r.startsStatus === "clicks_no_crank" || r.startsStatus === "cranks_no_start");
-
-  if (l.serviceMode === "shop") {
-    return {
-      status: "shop",
-      headline: carMoves ? "Customer will bring the car to a shop" : "Shop repair: the car may need a tow",
-      facts: carMoves ? [] : [{ kind: "risk", text: "Car may not drive to the shop" }],
-      conflicts: [],
-      mitigations: [],
-    };
-  }
 
   const facts: SiteFact[] = [];
   const conflicts: string[] = [];
@@ -78,7 +68,6 @@ export function siteAssessment(r: RepairRequest): SiteAssessment {
     risk: mitigations.length ? "Mobile repair possible with some difficulty" : "Mobile repair may be difficult",
     unknown: "Mobile repair likely possible: some details unknown",
     ok: "Mobile repair looks possible",
-    shop: "",
   }[status];
   return { status, headline, facts, conflicts, mitigations };
 }

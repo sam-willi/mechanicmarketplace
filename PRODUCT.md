@@ -21,12 +21,12 @@ Two-sided, both first-class:
 ## Product Structure
 
 **One network, two products, one account.**
-- **Customer Clutch** ("Find someone you trust to fix your car"): simple, reassuring, low cognitive load. Home, Find Mechanics, My Requests, Quotes, My Repairs, Saved Mechanics, My Vehicles, Account. It holds no mechanic-business features.
+- **Customer Clutch** ("Find a mechanic for your car and see what Clutch has verified"): simple, reassuring, low cognitive load. Home, Find Mechanics, My Requests, Quotes, My Repairs, Saved Mechanics, My Vehicles, Account. It holds no mechanic-business features.
 - **Mechanic Clutch** ("Build your independent mechanic business"): operational and information-dense. Home, Job Opportunities, Quotes, My Jobs, Customers, Reputation, Verification, Earnings, Public Profile, Settings.
 - **One login can hold both roles.** Sign-up asks "How do you want to use Clutch?". The account menu switches between Customer and Mechanic mode. Role-specific data lives on customer and mechanic profiles, never on the shared user.
 - **Public mechanic profiles** at `/mechanics/[slug]` sit outside both apps and never need a login.
 - **Jobs complete in two steps.** The mechanic marks the job complete, then the customer confirms. Only the confirmation creates the Platform Verified repair.
-- **Mechanics can sign up and explore first.** Identity, background and insurance (plus driving record for mobile work) are required before they can send estimates for real work.
+- **Mechanics can sign up and be booked after a basic profile.** Service area, repairs, pricing and availability are what's required (policy of 2026-09-26, pending legal review). Identity, background, driving record and insurance checks are shown separately with their status; they are not required, and customers acknowledge any that aren't verified before booking.
 
 ## Product Purpose
 
@@ -60,7 +60,7 @@ What sets it apart:
 ## Operating Context
 
 - Customers often open profiles on a phone from a text message, so the mobile profile experience is critical.
-- Mechanics may work mobile, at a shop, or both; this is set per mechanic.
+- Every Clutch mechanic is mobile: they go to the customer's car (since 2026-09-26). Customers aren't asked where the repair happens, only where the car is. Older records that say "shop" or "both" are treated as mobile.
 - For the MVP, verification is manual through an admin dashboard. Confirmation links to prior customers can be sent or simulated.
 - Estimates are approved in-app. There is no real payment processing in the MVP.
 
@@ -70,7 +70,7 @@ What sets it apart:
 
 **Verification statuses** (Verification Center, admin): Not Submitted, Pending, Verified, Rejected, Needs More Information, Expired. Categories: Identity, Background Check, Certification, Employment, Insurance, Previous Repairs. Records store subject type and ID, method, status, reviewer, verified_at, expires_at, and notes.
 
-**Verification model: follow the gig and marketplace norm (Uber, DoorDash, Instacart, Airbnb).** Mechanics go through the same kind of screening those platforms use for their providers:
+**Verification model: follow the gig and marketplace norm (Uber, DoorDash, Instacart, Airbnb).** These are the checks Clutch offers, the same kind those platforms use for their providers. Since the 2026-09-26 policy (pending legal review) none of them is required to be booked; each is shown to customers with its own status, and customers acknowledge any that aren't verified before booking:
 - **Identity:** a photo of a government-issued ID plus a live selfie matched against it, checked through a third-party identity provider such as Persona, Stripe Identity or Jumio.
 - **Background check:** run through a consumer reporting agency such as Checkr, with FCRA-compliant disclosure and consent captured in onboarding. It covers criminal records (county, state and national) and a sex offender registry search. A motor vehicle record check applies to mechanics who test-drive customer cars or work mobile.
 - **Insurance:** an uploaded proof-of-insurance document, reviewed by the platform, with an expiration date that sets the record to Expired when it lapses.
@@ -88,9 +88,9 @@ For the MVP, identity and background checks run behind a provider-agnostic adapt
 
 **Repair intake:** the customer describes evidence, Clutch structures it, the mechanic interprets it and makes the diagnosis. The intake asks "What is your car doing?", never which part failed. It answers three questions for the mechanic: what exact vehicle this is, what it's actually doing, and whether the repair can realistically happen where the car is. Diagnostic codes, the customer's suspected issue and another shop's opinion are always labelled as such and never presented as a diagnosis. The address and access details stay private until the customer books a mechanic. Mechanics can ask questions before quoting, and customers can reply with photos, video or audio.
 
-**Marketplace model:** customers post jobs, qualified mechanics choose whether to respond, mechanics set their own estimate, and customers choose their mechanic. Clutch never decides who is "best"; it supplies evidence.
+**Marketplace model:** customers post jobs, available mechanics who match the car, repair and area choose whether to respond, mechanics set their own estimate, and customers choose their mechanic. Clutch never decides who is "best"; it supplies evidence.
 - **Find a mechanic** (customer roughly knows the job, e.g. BMW → Brakes → Los Angeles): results are ordered by relevant verified repair experience, then make and model experience, availability, distance, reputation, and price last. Never primarily by price. A quote requested from a profile goes to that mechanic only.
-- **Post a repair request** (customer unsure who to choose): the request goes to a small set of qualified mechanics (identity verified, serving the area, with relevant verified or declared experience). Each can decline, ask a question, say they're interested, or send an estimate. Mechanics never see each other's estimates. There is no live auction and nothing encourages undercutting.
+- **Post a repair request** (customer unsure who to choose): the request goes to a small set of available mechanics who match it (complete basic profile, serving the area, with relevant Clutch-verified or declared experience). Under the 2026-09-26 policy they may have checks that aren't verified; each check's status is shown. Each can decline, ask a question, say they're interested, or send an estimate. Mechanics never see each other's estimates. There is no live auction and nothing encourages undercutting.
 - **Shortlist:** the customer sees everyone interested or quoting, with trust and relevant experience leading each card, the mechanic's own notes, and a side-by-side table of facts so the trade-off between price and experience is visible without a winner being picked.
 - **Language:** quote, estimate, "interested in this job", "available to help". Never bid, lowest bid or winning bid.
 
@@ -166,13 +166,14 @@ For the MVP, identity and background checks run behind a provider-agnostic adapt
 
 Tradeoff order, in this sequence: trust, mechanic ownership, portable reputation, evidence, customer conversion, then marketplace functionality. In the marketplace itself: trust over lowest price, relevant experience over generic rating, customer choice over platform assignment, mechanic pricing control over platform-set pricing. When one surface has to be weaker, the marketplace flow gives way before the mechanic profile.
 
-1. **Safety screening and skill verification are separate systems.** Identity, background, driving record and insurance are the baseline safety layer. Competence is proven separately through certifications, employment and repair evidence. A mechanic can pass screening without being proven competent, and the UI never blurs the two.
+1. **Verification checks and skill verification are separate systems.** Identity, background, driving record and insurance are verification checks, each shown with its own status. Competence is proven separately through certifications, employment and repair evidence. A mechanic can pass checks without being proven competent, and the UI never blurs the two.
+   *Policy of 2026-09-26 (needs legal review before public launch):* a mechanic with a complete basic profile can be matched, quote and be booked even if checks are missing, pending, failed to run or unverified. Unverified checks are never presented as verified; customers see exactly which checks Clutch hasn't verified and acknowledge that before booking, and the acknowledgement is kept with the booking. Fully verified mechanics rank higher at equal experience; nobody is hidden for missing checks unless the customer filters.
 2. **Repair-specific proof is the core differentiator.** "18 verified brake jobs, including 6 BMWs" matters more than a generic "4.9 stars". Surface experience relevant to this repair on this make first.
 3. **Every claim has provenance.** Each claim is Platform, Institution, Employer, Customer or Document Verified, or Self-Reported, and that is always visible. Self-reported claims are never presented as equal to verified ones.
-4. **Never expose sensitive screening information.** Public profiles show only outcome statuses: Identity Verified, Background Check Passed, Driving Record Check Passed, Insurance Verified. ID, criminal, driving and insurance documents never appear publicly.
+4. **Never expose sensitive screening information.** Public profiles show only each check's status (Verified, Pending, Not completed, Not verified, Expired, Could not be verified). ID, criminal, driving and insurance documents never appear publicly.
 5. **Expiration and re-verification are built in.** Credentials, insurance and screenings carry a verified date, an expiration date and a status (Pending, Verified, Expired, Reverification Required, and so on).
 6. **Mechanics own their reputation.** The profile stays useful outside the marketplace and is easy to share by text, on social media or through referrals.
 7. **Not a lowest-bid marketplace.** Mechanics set their prices, and customers compare price alongside relevant verified experience.
 8. **Completed work compounds reputation automatically.** Every completed Clutch job adds to the mechanic's repair-category history, vehicle-make history, verified reviews and repeat-customer history.
-9. **Trust is legible within seconds.** A nervous customer on a profile quickly understands: is this person who they say they are, are they safe to hire, have they done my kind of repair on my kind of car, what evidence supports that, and what do they charge.
+9. **Trust is legible within seconds.** A nervous customer on a profile quickly understands: which of identity, background, driving record and insurance Clutch has verified (and which it hasn't), have they done my kind of repair on my kind of car, what evidence supports that, and what do they charge.
 10. **Vendors are swappable and mocked for now.** Persona, Stripe Identity, Jumio and Checkr sit behind provider interfaces. No vendor is hard-coded into the mechanic model, and nothing is live in the MVP.

@@ -11,7 +11,6 @@ const FACT: Record<SiteFactKind, { icon: typeof CircleCheck; cls: string; tag?: 
 
 export const SITE_TONE: Record<SiteStatus, string> = {
   ok: "border-ink bg-sheet text-ink",
-  shop: "border-rule bg-sheet text-ink-2",
   unknown: "border-rule bg-sheet text-ink",
   risk: "border-amber bg-amber-wash text-amber",
   blocker: "border-alert bg-alert-wash text-alert",

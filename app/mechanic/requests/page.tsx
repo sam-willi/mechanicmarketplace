@@ -1,22 +1,26 @@
 import type { Metadata } from "next";
-import { ready, repo } from "@/lib/data";
-import { getSession } from "@/lib/session";
+import { getRepo } from "@/lib/data";
+import { getSession, needs } from "@/lib/session";
 import { toPublicProfile } from "@/lib/domain/public-profile";
 import { repairNoun } from "@/lib/domain/provenance";
 import { opportunities } from "@/lib/mechanic-insights";
 import { Notice, PageTitle } from "@/components/workspace/ui";
 import { RequestCard } from "@/components/request/request-card";
+import Link from "next/link";
+import { matchReadiness } from "@/lib/matchable";
 
 export const metadata: Metadata = { title: "Repair requests" };
 
 export default async function Opportunities({ searchParams }: { searchParams: Promise<{ sent?: string }> }) {
-  await ready();
+  const repo = await getRepo();
   const s = await getSession();
   if (s.role !== "mechanic") return null;
+  await (await needs(s)).mechanicRequests();
   const sp = await searchParams;
   const m = repo.getMechanic(s.mechanicId)!;
   const p = toPublicProfile(repo.getMechanicSources(s.mechanicId));
-  const opps = opportunities(m, p);
+  const opps = opportunities(repo, m, p);
+  const ready = matchReadiness(repo, m);
 
   return (
     <div className="space-y-8">
@@ -51,7 +55,18 @@ export default async function Opportunities({ searchParams }: { searchParams: Pr
           })}
         </ul>
       ) : (
-        <p className="border-y border-rule py-6 text-ink-3">No new repair requests. We&apos;ll notify you when one matches.</p>
+        <div className="border-y border-rule py-6 text-ink-2">
+          {ready.matchable ? (
+            <p>No new repair requests. Requests that fit your repairs and area appear here and in Notifications.</p>
+          ) : (
+            <p>
+              No requests yet. Clutch sends you requests once your profile is complete ({ready.done} of {ready.steps.length} steps done).{" "}
+              <Link href="/mechanic" className="font-semibold text-ink underline decoration-rule underline-offset-2">
+                See what&apos;s left
+              </Link>
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

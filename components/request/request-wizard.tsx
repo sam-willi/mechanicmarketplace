@@ -79,6 +79,8 @@ export function RequestWizard({
   customerId,
   target,
   rebook,
+  noSupply = false,
+  alertsOn = false,
 }: {
   initial: IntakeDraft;
   resumed: boolean;
@@ -86,7 +88,12 @@ export function RequestWizard({
   customerId: string;
   target: Target;
   rebook: boolean;
+  /** No mechanic can be booked yet: the request is saved, not sent. */
+  noSupply?: boolean;
+  /** Email alerts are configured and on (lib/notify/config.ts). */
+  alertsOn?: boolean;
 }) {
+  const saveOnly = noSupply && !target;
   // Drafts saved under the old seven-step flow resume at the nearest new step.
   const [d, setD] = useState<IntakeDraft>({ ...initial, step: Math.min(initial.step, STEPS.length - 1) });
   const [maxStep, setMaxStep] = useState(Math.min(initial.step, STEPS.length - 1));
@@ -157,6 +164,9 @@ export function RequestWizard({
     setErrors([]);
     setMaxStep((m) => Math.max(m, to));
     setD((x) => ({ ...x, step: to }));
+    // Save the new step right away (the debounced autosave waits for a pause), so a refresh
+    // straight after "Continue" comes back to this step, not an earlier one.
+    void saveIntakeDraft({ ...d, step: to }).catch(() => undefined);
     requestAnimationFrame(() => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
 
@@ -425,7 +435,7 @@ export function RequestWizard({
         <div role="alert" className="mt-4 flex gap-3 border-2 border-alert bg-alert-wash px-4 py-3 text-[0.9375rem]">
           <ShieldAlert size={20} className="mt-0.5 shrink-0 text-alert" aria-hidden />
           <p>
-            <span className="font-bold text-alert">Don&apos;t drive it.</span> Choose a mechanic who comes to you, or arrange a tow. In an emergency, call 911.
+            <span className="font-bold text-alert">Don&apos;t drive it.</span> Your mechanic comes to the car, so leave it where it is. In an emergency, call 911.
           </p>
         </div>
       )}
@@ -592,20 +602,8 @@ export function RequestWizard({
                 <MediaCapture tag="issue" value={d.media} onChange={setMedia} modes={["photo", "video", "audio", "file"]} />
               </div>
             </Q>
-            <Q req title="Where should the repair happen?">
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Choice name="mode" checked={d.serviceMode === "mobile"} onChange={() => set("serviceMode", "mobile")}>
-                  <span className="font-bold">Mechanic comes to me</span>
-                </Choice>
-                <Choice name="mode" checked={d.serviceMode === "shop"} onChange={() => set("serviceMode", "shop")}>
-                  <span className="font-bold">I&apos;ll take it to a shop</span>
-                </Choice>
-              </div>
-              {d.serviceMode === "shop" && (d.driveability === "no" || ["clicks_no_crank", "cranks_no_start", "no_response"].includes(d.startsStatus)) && (
-                <p className="mt-3 border border-amber bg-amber-wash px-4 py-3 text-[0.9375rem]">It may need a tow. A mobile mechanic could come to it instead.</p>
-              )}
-            </Q>
-            <Field label="Area" className="max-w-[20rem]">
+            <p className="text-[0.9375rem] text-ink-2">Clutch mechanics come to the car, at home, at work or wherever it&apos;s parked.</p>
+            <Field label="Area the car is in" className="max-w-[20rem]">
               <select value={d.area} onChange={(e) => set("area", e.target.value)} className="input">
                 <option value="">Choose</option>
                 {AREAS.map((a) => (
@@ -615,59 +613,55 @@ export function RequestWizard({
                 ))}
               </select>
             </Field>
-            {d.serviceMode === "mobile" && (
-              <>
-                <Field label="Address" hint="Shared only with the mechanic you book.">
-                  <input value={d.address} onChange={(e) => set("address", e.target.value)} className="input" autoComplete="street-address" placeholder="Street address" />
+            <Field label="Address" hint="Shared only with the mechanic you book.">
+              <input value={d.address} onChange={(e) => set("address", e.target.value)} className="input" autoComplete="street-address" placeholder="Street address" />
+            </Field>
+            <Q title="Where is it parked?">
+              <Chips single options={PARKING.map((p) => p.label)} value={d.parkingType ? [PARKING.find((p) => p.value === d.parkingType)!.label] : []} onChange={(v) => set("parkingType", PARKING.find((p) => p.label === v[0])?.value ?? "")} />
+            </Q>
+            <div className="grid gap-6 sm:grid-cols-2">
+              <Q title="Flat ground?">
+                <Segmented value={d.flatGround} onChange={(v) => set("flatGround", v as IntakeDraft["flatGround"])} options={YNU} name="flat" />
+              </Q>
+              <Q title="Repairs allowed there?">
+                <Segmented value={d.repairsAllowed} onChange={(v) => set("repairsAllowed", v as IntakeDraft["repairsAllowed"])} options={YNU} name="allowed" />
+              </Q>
+            </div>
+            <Q title="Room to work around the car?">
+              <Segmented value={d.workSpace} onChange={(v) => set("workSpace", v as IntakeDraft["workSpace"])} options={WORK_SPACE} name="space" />
+            </Q>
+            <details className="group" open={Boolean(d.accessAvailable || d.locationNotes)}>
+              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 font-semibold [&::-webkit-details-marker]:hidden">
+                <Plus size={17} className="transition-transform group-open:rotate-45" aria-hidden /> Access and notes
+                <span className="text-[0.8125rem] font-normal text-ink-3">Optional</span>
+              </summary>
+              <div className="mt-3 space-y-5">
+                <Q title="Will someone be there?">
+                  <Segmented
+                    value={d.accessAvailable}
+                    onChange={(v) => set("accessAvailable", v as "yes" | "no")}
+                    options={[
+                      { value: "yes", label: "Yes" },
+                      { value: "no", label: "No" },
+                    ]}
+                    name="access"
+                  />
+                  {d.accessAvailable && (
+                    <textarea
+                      value={d.accessInstructions}
+                      onChange={(e) => set("accessInstructions", e.target.value)}
+                      rows={2}
+                      className="input mt-3"
+                      placeholder={d.accessAvailable === "no" ? "Where are the keys? Any gate code?" : "Gate or parking instructions"}
+                      aria-label="Access instructions"
+                    />
+                  )}
+                </Q>
+                <Field label="Anything else about the location?">
+                  <textarea value={d.locationNotes} onChange={(e) => set("locationNotes", e.target.value)} rows={2} className="input" placeholder="e.g. low garage, parked on a slope" />
                 </Field>
-                <Q title="Where is it parked?">
-                  <Chips single options={PARKING.map((p) => p.label)} value={d.parkingType ? [PARKING.find((p) => p.value === d.parkingType)!.label] : []} onChange={(v) => set("parkingType", PARKING.find((p) => p.label === v[0])?.value ?? "")} />
-                </Q>
-                <div className="grid gap-6 sm:grid-cols-2">
-                  <Q title="Flat ground?">
-                    <Segmented value={d.flatGround} onChange={(v) => set("flatGround", v as IntakeDraft["flatGround"])} options={YNU} name="flat" />
-                  </Q>
-                  <Q title="Repairs allowed there?">
-                    <Segmented value={d.repairsAllowed} onChange={(v) => set("repairsAllowed", v as IntakeDraft["repairsAllowed"])} options={YNU} name="allowed" />
-                  </Q>
-                </div>
-                <Q title="Room to work around the car?">
-                  <Segmented value={d.workSpace} onChange={(v) => set("workSpace", v as IntakeDraft["workSpace"])} options={WORK_SPACE} name="space" />
-                </Q>
-                <details className="group" open={Boolean(d.accessAvailable || d.locationNotes)}>
-                  <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 font-semibold [&::-webkit-details-marker]:hidden">
-                    <Plus size={17} className="transition-transform group-open:rotate-45" aria-hidden /> Access and notes
-                    <span className="text-[0.8125rem] font-normal text-ink-3">Optional</span>
-                  </summary>
-                  <div className="mt-3 space-y-5">
-                    <Q title="Will someone be there?">
-                      <Segmented
-                        value={d.accessAvailable}
-                        onChange={(v) => set("accessAvailable", v as "yes" | "no")}
-                        options={[
-                          { value: "yes", label: "Yes" },
-                          { value: "no", label: "No" },
-                        ]}
-                        name="access"
-                      />
-                      {d.accessAvailable && (
-                        <textarea
-                          value={d.accessInstructions}
-                          onChange={(e) => set("accessInstructions", e.target.value)}
-                          rows={2}
-                          className="input mt-3"
-                          placeholder={d.accessAvailable === "no" ? "Where are the keys? Any gate code?" : "Gate or parking instructions"}
-                          aria-label="Access instructions"
-                        />
-                      )}
-                    </Q>
-                    <Field label="Anything else about the location?">
-                      <textarea value={d.locationNotes} onChange={(e) => set("locationNotes", e.target.value)} rows={2} className="input" placeholder="e.g. low garage, parked on a slope" />
-                    </Field>
-                  </div>
-                </details>
-              </>
-            )}
+              </div>
+            </details>
           </>
         )}
 
@@ -689,7 +683,7 @@ export function RequestWizard({
                 <h3 id="preview-title" className="font-bold">
                   What mechanics will see
                 </h3>
-                <p className="text-[0.8125rem] text-ink-2">{target ? `Goes to ${target.displayName}${rebook ? " again" : " only"}` : "Goes to a few qualified mechanics"}</p>
+                <p className="text-[0.8125rem] text-ink-2">{target ? `Goes to ${target.displayName}${rebook ? " again" : " only"}` : saveOnly ? "Saved until a mechanic fits it" : "Goes to a few available mechanics who match your car, repair and area"}</p>
               </div>
               <dl className="grid gap-x-6 px-4 py-3 text-[0.9375rem] sm:grid-cols-2">
                 {(
@@ -698,7 +692,7 @@ export function RequestWizard({
                     ["Problem", d.symptomDescription.trim() || "Not described"],
                     ["Condition", CONDITIONS.find((c) => c.id === condition)?.label ?? "Not set"],
                     ["Photos and recordings", String(d.media.length)],
-                    ["Where", `${d.serviceMode === "shop" ? "At a shop" : d.serviceMode === "mobile" ? "Comes to the car" : "Not set"}${d.area ? ` · ${AREAS.find((a) => a.key === d.area)?.label}` : ""}`],
+                    ["Where", d.area ? `Comes to the car · ${AREAS.find((a) => a.key === d.area)?.label}` : "Not set"],
                   ] as const
                 ).map(([k, v]) => (
                   <div key={k} className="border-b border-rule-soft py-2 last:border-b-0 sm:[&:nth-last-child(2)]:border-b-0">
@@ -719,6 +713,16 @@ export function RequestWizard({
                 <div className="pb-4">{vehicle.year ? <RequestSummary r={preview} v={vehicle} audience="mechanic" /> : null}</div>
               </details>
             </section>
+            {saveOnly ? (
+              <div role="note" className="border-l-4 border-brass bg-sheet px-4 py-3 text-[0.9375rem]">
+                <p className="font-semibold">No mechanics are available on Clutch yet.</p>
+                <p className="mt-1 text-ink-2">
+                  Saving keeps this request on your Requests page, where you can edit or cancel it. When a mechanic who fits your car, repair and area joins, Clutch
+                  sends it to them and their reply shows on the request.{" "}
+                  {alertsOn ? "You'll also get an email alert if alerts are on in your settings." : "Clutch doesn't send email or text alerts yet, so check back there."}
+                </p>
+              </div>
+            ) : null}
             <p className="text-[0.8125rem] text-ink-3">Your address and access details stay private until you book.</p>
           </>
         )}
@@ -751,7 +755,7 @@ export function RequestWizard({
           ) : (
             <button type="button" onClick={submit} disabled={submitting} className="btn btn-ink min-h-12 px-6 text-[0.9375rem]">
               {submitting ? <Loader2 size={18} className="animate-spin" aria-hidden /> : <Check size={18} aria-hidden />}
-              {target ? `Send to ${target.firstName}` : "Send request"}
+              {target ? `Send to ${target.firstName}` : saveOnly ? "Save request" : "Send request"}
             </button>
           )}
         </div>

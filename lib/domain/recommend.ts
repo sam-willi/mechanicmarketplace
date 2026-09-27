@@ -2,7 +2,7 @@ import type { PublicMechanicProfile } from "./public-profile";
 import { REPAIR_LABEL, repairNoun } from "./provenance";
 import type { RepairCategory, VehicleMake } from "./types";
 import { daysUntil, openingLabel, soonest } from "./availability";
-import { eligibility } from "./eligibility";
+import { eligibility, screeningItems } from "./eligibility";
 import { vehicleEvidence, type TargetVehicle } from "./vehicle-evidence";
 
 export type FitInput = {
@@ -61,9 +61,9 @@ export type PickKind = "best" | "soonest" | "both";
 export type TopPick<T> = { row: T; kind: PickKind; title: string; definition: string };
 
 export const PICK_COPY: Record<PickKind, { title: string; definition: (c: string) => string }> = {
-  best: { title: "Best Fit", definition: (c) => `Most verified experience with ${c || "this job"}.` },
-  soonest: { title: "Soonest Strong Fit", definition: (c) => `The earliest opening among mechanics with strong verified ${c || "relevant"} experience.` },
-  both: { title: "Best Fit · soonest available", definition: (c) => `Most verified experience with ${c || "this job"}, and no strong fit can come sooner.` },
+  best: { title: "Best Fit", definition: (c) => `Most Clutch-verified repairs like ${c || "this job"}.` },
+  soonest: { title: "Soonest Strong Fit", definition: (c) => `The earliest opening among mechanics with several Clutch-verified ${c || "relevant"} repairs.` },
+  both: { title: "Best Fit · soonest available", definition: (c) => `Most Clutch-verified repairs like ${c || "this job"}, and no strong fit can come sooner.` },
 };
 
 const when = (p: PublicMechanicProfile) => {
@@ -124,6 +124,8 @@ export function rankingFactors(r: FitInput, ctx: Ctx) {
   const o = soonest(r.p.openings);
   f.push({ label: "Earliest opening", value: o ? openingLabel(o) : "Not posted" });
   f.push({ label: "Verified rating", value: r.p.reputation.rating ? `${r.p.reputation.rating.average.toFixed(1)} (${r.p.reputation.rating.count})` : "None yet" });
+  const checks = screeningItems(r.p);
+  f.push({ label: "Checks Clutch verified", value: `${checks.filter((c) => c.verified).length} of ${checks.length}` });
   return f;
 }
 

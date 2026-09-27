@@ -1,0 +1,84 @@
+# Checks every push and pull request, forks included. Needs no secrets, writes nowhere:
+# read-only token, a throwaway Postgres inside the runner, no deploys, no external services.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify (Node ${{ matrix.node }}, Ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        # 20: the oldest supported (package.json engines). 24: the version in .nvmrc.
+        node: ["20", "24"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - name: Postgres server binaries (for the throwaway test cluster)
+        run: |
+          if ! ls /usr/lib/postgresql/*/bin/initdb >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends postgresql
+          fi
+          ls -d /usr/lib/postgresql/*/bin
+      - run: npm ci
+      # Lint, type-check, app tests, database tests on a temporary local cluster, production build.
+      # DATABASE_URL and every service key are blanked inside the script.
+      - run: npm run verify
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          # Shared runners are slower than a laptop: double the load test's latency budget (row budgets unchanged).
+          CLUTCH_LATENCY_FACTOR: "2"
+
+  # Optional: only runs where the repository owner has added these secrets (never on forks,
+  # which don't receive them). Builds against the configured public Supabase project; it
+  # reads configuration only and writes nothing anywhere.
+  supabase-config:
+    name: build with Supabase configuration (optional)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: verify
+    env:
+      HAS_SUPABASE: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL != '' && secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY != '' }}
+    steps:
+      - name: Skip without secrets
+        if: env.HAS_SUPABASE != 'true'
+        run: echo "No Supabase secrets configured; nothing to check."
+      - uses: actions/checkout@v4
+        if: env.HAS_SUPABASE == 'true'
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        if: env.HAS_SUPABASE == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - if: env.HAS_SUPABASE == 'true'
+        run: npm ci
+      - if: env.HAS_SUPABASE == 'true'
+        run: npx next build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          # Never a database from CI.
+          DATABASE_URL: ""

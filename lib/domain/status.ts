@@ -13,7 +13,8 @@ export type CustomerRepairStatus =
   | "Confirm Completion"
   | "Completed"
   | "Cancelled"
-  | "Pick a New Mechanic";
+  | "Pick a New Mechanic"
+  | "Waiting for a Match";
 
 export function customerRepairStatus(r: RepairRequest, quotes: Quote[], job?: Job): CustomerRepairStatus {
   if (job) {
@@ -32,6 +33,7 @@ export function customerRepairStatus(r: RepairRequest, quotes: Quote[], job?: Jo
   }
   if (r.status === "cancelled") return "Cancelled";
   if (r.status === "booked") return "Mechanic Selected";
+  if (isWaitingForMatch(r)) return "Waiting for a Match";
   if (needsNewMechanic(r, quotes)) return "Pick a New Mechanic";
   if (quotes.some((q) => q.status === "submitted")) return "Responses In";
   return "Requested";
@@ -66,4 +68,9 @@ export function needsNewMechanic(r: RepairRequest, quotes: Quote[]) {
   const picked = last.mechanicId === r.requestedMechanicId || Boolean(last.cancelledJob);
   const nobodyLeft = r.matchedMechanicIds.every((mid) => r.declinedBy.includes(mid)) && !quotes.some((q) => q.status === "submitted");
   return picked || nobodyLeft;
+}
+
+/** Saved while no mechanic fit it; Clutch sends it on when one does. */
+export function isWaitingForMatch(r: RepairRequest) {
+  return r.status === "open" && r.matchedMechanicIds.length === 0;
 }

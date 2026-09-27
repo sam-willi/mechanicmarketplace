@@ -66,13 +66,15 @@ export function EmptyRow({ children }: { children: React.ReactNode }) {
 }
 
 export function NeedsPersona({ role }: { role: "mechanic" | "customer" | "admin" }) {
-  const label = role === "mechanic" ? "a mechanic" : role === "admin" ? "the verification reviewer" : "a customer";
+  const label = role === "mechanic" ? "mechanics" : role === "admin" ? "Clutch staff" : "customers";
   return (
     <div className="mx-auto max-w-[560px] px-4 py-20 text-center">
       <h1 className="display text-[2rem]">This page is for {label}.</h1>
-      <p className="mt-3 text-ink-2">Sign-in is mocked in this demo. Switch persona to continue.</p>
-      <Link href="/demo" className="btn btn-ink mt-6">
-        Choose a demo persona
+      <p className="mt-3 text-ink-2">
+        {role === "admin" ? "Log in with a Clutch staff account to continue." : `Log in with a ${role} account to continue.`}
+      </p>
+      <Link href="/login" className="btn btn-ink mt-6">
+        Log in
       </Link>
     </div>
   );

@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ready, repo } from "@/lib/data";
+import { getRepo, needsFor } from "@/lib/data";
 import type { PublicMechanicProfile } from "@/lib/domain/public-profile";
 import type { ContextMatch } from "@/lib/domain/reputation";
 import { REPAIR_CATEGORIES, VEHICLE_MAKES, type RepairCategory, type VehicleMake } from "@/lib/domain/types";
-import { getSession, getSessionId, getVariant } from "@/lib/session";
+import { getSession, getSessionId, getVariant, needs } from "@/lib/session";
 import { usd, WORK_MODEL_LABEL } from "@/lib/format";
 import { Wordmark } from "@/components/brand/wordmark";
 import { EvidenceProvider } from "@/components/trust/evidence-sheet";
@@ -40,8 +40,9 @@ type Params = { slug: string };
 type Search = { repair?: string; make?: string; variant?: string; ref?: string };
 
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
-  await ready();
+  const repo = await getRepo();
   const { slug } = await params;
+  await (await needsFor({ staff: false })).publicProfile(slug);
   const p = repo.getPublicProfile(slug);
   if (!p) return {};
   const r = p.reputation;
@@ -79,9 +80,10 @@ export default async function MechanicProfilePage({
   params: Promise<Params>;
   searchParams: Promise<Search>;
 }) {
-  await ready();
+  const repo = await getRepo();
   const { slug } = await params;
   const sp = await searchParams;
+  await (await needsFor({ staff: false })).publicProfile(slug);
   const p = repo.getPublicProfile(slug);
   if (!p) notFound();
 
@@ -122,6 +124,7 @@ export default async function MechanicProfilePage({
   const qs = new URLSearchParams({ mechanic: p.slug, ...(repair ? { repair } : {}), ...(make ? { make } : {}) }).toString();
   const quoteHref = `/customer/requests/new?${qs}`;
   const sharePath = `/mechanics/${p.slug}${repair || make ? `?${new URLSearchParams({ ...(repair ? { repair } : {}), ...(make ? { make } : {}) })}` : ""}`;
+  if (session.role === "customer") await (await needs(session)).customerSavedIds();
   const saved = session.role === "customer" ? repo.listSaved(session.customerId).includes(p.id) : false;
 
   return (
@@ -182,7 +185,7 @@ export default async function MechanicProfilePage({
                     How Clutch verifies claims
                   </Link>
                 </p>
-                <DemoNote className="mt-2" />
+                {repo.scope === "demo" ? <DemoNote className="mt-2" /> : null}
               </footer>
             </div>
           </div>
@@ -198,7 +201,14 @@ export default async function MechanicProfilePage({
               <p className="flex items-center gap-2 text-[0.9375rem] font-semibold">
                 <CalendarClock size={16} className="text-ink-3" aria-hidden /> {nextLabel}
               </p>
-              {elig.eligible ? <QuoteLink href={quoteHref} mechanicId={p.id} variant={variant} className="w-full" /> : <EligibilityNotice e={elig} />}
+              {elig.eligible ? (
+                <>
+                  {!elig.fullyVerified ? <EligibilityNotice e={elig} compact /> : null}
+                  <QuoteLink href={quoteHref} mechanicId={p.id} variant={variant} className="w-full" />
+                </>
+              ) : (
+                <EligibilityNotice e={elig} />
+              )}
               <details className="text-[0.8125rem] text-ink-2">
                 <summary className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 font-semibold text-ink">
                   <Info size={14} aria-hidden /> How estimates work
@@ -222,7 +232,7 @@ export default async function MechanicProfilePage({
             </p>
             <p className="truncate text-[0.8125rem] text-ink-3">{nextLabel}</p>
           </div>
-          {elig.eligible ? <QuoteLink href={quoteHref} mechanicId={p.id} variant={variant} /> : <span className="max-w-[11rem] text-right text-[0.8125rem] font-semibold text-alert">Can&apos;t be booked right now</span>}
+          {elig.eligible ? <QuoteLink href={quoteHref} mechanicId={p.id} variant={variant} /> : <span className="max-w-[11rem] text-right text-[0.8125rem] font-semibold text-alert">Profile incomplete: can&apos;t be booked yet</span>}
         </div>
       </div>
     </EvidenceProvider>

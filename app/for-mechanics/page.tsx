@@ -8,8 +8,8 @@ export const metadata: Metadata = { title: "For mechanics" };
 
 const STEPS: [string, string][] = [
   ["Create your profile", "Your name, rates, what you work on and where you've worked. It's live at your own link right away."],
-  ["Get screened", "Identity, background and (for mobile work) driving record checks, run by independent providers. Customers only ever see the outcome."],
-  ["Prove your work", "Upload certifications and we check them with the issuer. We confirm your employment with the shop. Past customers confirm earlier repairs with one tap."],
+  ["Get verified", "Identity, background, driving record and insurance checks each show on your profile with their status. They aren't required to be booked, but verified mechanics rank higher at equal experience."],
+  ["Prove your work", "Upload certifications and Clutch staff check them with the issuer. Staff confirm your employment with the shop. Past customers confirm earlier repairs from a link you send them."],
   ["Share it anywhere", "Text it to a lead, post it on Nextdoor or Instagram, put it on your van. Send a link that opens on your BMW brake jobs when that's what they need."],
   ["Every job compounds", "Jobs booked through Clutch are verified automatically and count by repair type and make. Customers save and rebook you directly."],
 ];
@@ -23,7 +23,7 @@ export default function ForMechanics() {
           <div>
             <h1 className="display text-[2.75rem] sm:text-[4.25rem]">Your skill. Your proof. Your customers.</h1>
             <p className="mt-5 max-w-[52ch] text-[1.125rem] leading-relaxed text-ink-2">
-              Years of good work at a shop or dealership shouldn&apos;t stay with the shop. Clutch turns it into evidence you own, so strangers can trust you on day one of
+              Years of good work at a shop or dealership shouldn&apos;t stay with the shop. Clutch turns it into evidence you own, so strangers can check your record on day one of
               going independent.
             </p>
             <ul className="mt-8 space-y-2 text-[1.0625rem] font-semibold">
@@ -34,8 +34,15 @@ export default function ForMechanics() {
               ))}
             </ul>
             <Link href="/signup?role=mechanic" className="btn btn-ink mt-8 min-h-12 px-6 text-[1rem]">
-              Join as a Mechanic <ArrowRight size={16} aria-hidden />
+              Create a mechanic account <ArrowRight size={16} aria-hidden />
             </Link>
+            <p className="mt-3 text-[0.9375rem] text-ink-2">
+              Already have a Clutch account?{" "}
+              <Link href="/login?next=/mechanic/onboarding" className="font-semibold text-ink underline decoration-rule underline-offset-2">
+                Log in
+              </Link>{" "}
+              and add mechanic mode.
+            </p>
           </div>
           <dl className="content-start border-t-2 border-ink">
             {[
@@ -51,7 +58,20 @@ export default function ForMechanics() {
           </dl>
         </div>
 
-        <ol className="mt-20 border-t border-rule">
+        <section aria-labelledby="launch-title" className="mt-16 border-l-4 border-brass bg-sheet px-5 py-5 sm:px-6">
+          <h2 id="launch-title" className="heading text-[1.5rem]">
+            Launching in Los Angeles
+          </h2>
+          <div className="mt-2 max-w-[68ch] space-y-2 text-ink-2">
+            <p>
+              Clutch is new, and we&apos;re onboarding our first mechanics in Los Angeles now. We can&apos;t promise a number of jobs yet. Customers describe their repair on
+              Clutch; once you&apos;re verified, the requests that fit your repairs and area are sent to you, including ones customers saved before you joined.
+            </p>
+            <p>Joining now means your profile, checks and proof are in place when customers arrive.</p>
+          </div>
+        </section>
+
+        <ol className="mt-16 border-t border-rule">
           {STEPS.map(([t, d], i) => (
             <li key={t} className="grid gap-2 border-b border-rule-soft py-6 sm:grid-cols-[4rem_16rem_minmax(0,1fr)] sm:gap-6">
               <span className="num text-[2rem] text-rule">{i + 1}</span>

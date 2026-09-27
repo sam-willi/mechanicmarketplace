@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
-import { ready, repo } from "@/lib/data";
+import { getRepo } from "@/lib/data";
 import { getSession } from "@/lib/session";
 import { REPAIR_LABEL } from "@/lib/domain/provenance";
+import { AREAS } from "@/lib/domain/areas";
+import { screeningOpen } from "@/lib/verification/providers/registry";
 import { REPAIR_CATEGORIES, VEHICLE_MAKES } from "@/lib/domain/types";
 import { saveOnboarding } from "@/app/actions/mechanic";
 import Link from "next/link";
@@ -13,10 +15,10 @@ export const metadata: Metadata = { title: "Build your profile" };
 
 const STEPS = [
   { title: "You and your photo", why: "Customers book people. A clear photo and a few honest lines are the first things they look at.", minutes: 2, required: ["displayName"] },
-  { title: "Where and how you work", why: "Decides which nearby requests you're matched with and whether customers see you as mobile, shop, or both.", minutes: 1, required: ["city"] },
+  { title: "Where and how you work", why: "Decides which nearby requests you're matched with: you go to the car, so this is where you start and how far you'll travel.", minutes: 1, required: ["city"] },
   { title: "Services, makes and prices", why: "What you pick routes requests to you before you have verified jobs. Prices are shown before anyone asks you for an estimate.", minutes: 2, required: ["hourlyRate", "diagnosticFee"] },
   { title: "Experience and first proof", why: "Verified proof is what ranks you for matching jobs. Anything you haven't proven yet is labelled self-reported.", minutes: 3 },
-  { title: "Safety screening", why: "Customers need to know who's coming to their home and taking their keys. These checks decide whether you can quote and be booked.", minutes: 1 },
+  { title: "Verification checks (optional)", why: "Customers see which of your checks Clutch has verified before they book you. They aren't required to receive requests or be booked, but verified checks build trust and improve your ranking.", minutes: 1 },
   { title: "Preview and publish", why: "This is your public profile as it starts. It grows with every verified job.", minutes: 1 },
 ];
 
@@ -60,7 +62,7 @@ function Requirements({ compact = false }: { compact?: boolean }) {
 
 
 export default async function OnboardingPage({ searchParams }: { searchParams: Promise<{ edit?: string }> }) {
-  await ready();
+  const repo = await getRepo();
   const s = await getSession();
   const sp = await searchParams;
   const m = sp.edit && s.role === "mechanic" ? repo.getMechanic(s.mechanicId) : undefined;
@@ -99,7 +101,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
               <summary className="min-h-11 cursor-pointer content-center font-semibold">See strong examples</summary>
               <ul className="mt-2 space-y-2 text-ink-2">
                 <li className="border-l-2 border-rule pl-3">&ldquo;Eleven years at a Toyota dealership, now independent. I do brakes, suspension and diagnostics in your driveway, and I send photos of every part I replace.&rdquo;</li>
-                <li className="border-l-2 border-rule pl-3">&ldquo;Two-bay shop in Pasadena. Hybrids and European cars. I&apos;ll always call before doing anything that wasn&apos;t on the estimate.&rdquo;</li>
+                <li className="border-l-2 border-rule pl-3">&ldquo;Mobile around Pasadena. Hybrids and European cars. I&apos;ll always call before doing anything that wasn&apos;t on the estimate.&rdquo;</li>
               </ul>
               <p className="mt-2 text-ink-3">What works: where you learned, what you focus on, and one thing customers can count on.</p>
             </details>
@@ -107,38 +109,29 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
 
           {/* 2 */}
           <div className="space-y-5">
-            <div className="grid gap-2 sm:grid-cols-3">
-              {(
-                [
-                  ["mobile", "Mobile", "I go to the customer"],
-                  ["shop", "Shop", "Customers come to me"],
-                  ["both", "Both", "Shop and mobile"],
-                ] as const
-              ).map(([v, t, d]) => (
-                <label key={v} className="flex min-h-11 cursor-pointer items-start gap-2 border border-rule bg-sheet p-3 has-[:checked]:border-brand">
-                  <input type="radio" name="workModel" value={v} defaultChecked={(m?.workModel ?? "mobile") === v} className="mt-1 accent-[var(--ink)]" />
-                  <span>
-                    <span className="block font-semibold">{t}</span>
-                    <span className="block text-[0.875rem] text-ink-2">{d}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
+            <p className="text-[0.9375rem] text-ink-2">Every Clutch mechanic is mobile: you go to the customer&apos;s car. Tell us where you start from and how far you&apos;ll go.</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="City (required)">
                 <input name="city" required defaultValue={m?.city ?? "Los Angeles"} className="input" />
               </Field>
-              <Field label="Neighborhood">
-                <input name="neighborhood" defaultValue={m?.neighborhood} className="input" />
+              <Field label="Where you're based (required)">
+                {/* Distances in search and matching are measured from here. */}
+                <select name="neighborhood" required defaultValue={AREAS.find((a) => a.label === m?.neighborhood)?.key ?? ""} className="input">
+                  <option value="" disabled>
+                    Choose an area
+                  </option>
+                  {AREAS.map((a) => (
+                    <option key={a.key} value={a.key}>
+                      {a.label}
+                    </option>
+                  ))}
+                </select>
               </Field>
               <Field label="How far you'll travel (miles)">
                 <input name="serviceRadiusMi" inputMode="numeric" defaultValue={m?.serviceRadiusMi ?? 15} className="input tnum" />
               </Field>
               <Field label="Usual hours">
                 <input name="availability" defaultValue={m?.availabilityNote} placeholder="Weekdays 7am–6pm" className="input" />
-              </Field>
-              <Field label="Shop name (if any)" className="sm:col-span-2">
-                <input name="shopName" defaultValue={m?.shopName} className="input" />
               </Field>
             </div>
           </div>
@@ -264,7 +257,11 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
                 Open the Verification Center
               </Link>
             )}
-            <p className="text-[0.875rem] text-ink-2">ID and background checks need your consent in a secure flow, so they start in the Verification Center right after you publish.</p>
+            <p className="text-[0.875rem] text-ink-2">
+              {screeningOpen("background", repo.scope)
+                ? "ID and background checks need your consent in a secure flow, so they start in the Verification Center right after you publish."
+                : "ID, background and driving record checks open once Clutch connects an independent screening company. Until then they show as not completed on your profile. Customers see that before booking, and you can still be booked once your profile is complete."}
+            </p>
           </div>
 
           {/* 6 */}

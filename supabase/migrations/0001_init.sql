@@ -1,3 +1,7 @@
+-- REFERENCE ONLY. The app never applies this file. It is the original relational design,
+-- written for Supabase (it references auth.users), and it was superseded by
+-- 0004_live_normalized.sql. See the README "Migrations" note.
+--
 -- Clutch — initial schema. Mirrors lib/domain/types.ts (snake_case here).
 -- Money is integer cents. Reputation counts are DERIVED (see views at the end),
 -- never stored, so completed work compounds automatically.

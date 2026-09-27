@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { StarRating } from "@/components/visual/stars";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, ArrowLeft, Check, ShieldAlert, ShieldCheck } from "lucide-react";
-import { ready, repo } from "@/lib/data";
-import { getSession } from "@/lib/session";
+import { ArrowRight, ArrowLeft, Check, Clock3, Pencil, RefreshCw, ShieldAlert, ShieldCheck, XCircle } from "lucide-react";
+import { getRepo } from "@/lib/data";
+import { getSession, needs } from "@/lib/session";
 import { repairNoun } from "@/lib/domain/provenance";
 import { dayMonth, plural } from "@/lib/format";
 import { EvidenceProvider } from "@/components/trust/evidence-sheet";
@@ -12,21 +12,35 @@ import { PhotoPrint } from "@/components/profile/photo";
 import { RequestSummary } from "@/components/request/request-summary";
 import { QuestionReply } from "@/components/request/question-reply";
 import { MediaThumb } from "@/components/request/media-capture";
-import { primarySymptom, vehicleLine } from "@/lib/domain/intake";
+import { primarySymptom, urgencyLabel, vehicleLine } from "@/lib/domain/intake";
+import { REPAIR_LABEL } from "@/lib/domain/provenance";
+import { isWaitingForMatch } from "@/lib/domain/status";
+import { ConfirmButton } from "@/components/app/confirm-button";
+import { cancelRequest, rematchRequest } from "@/app/actions/customer";
+import type { RepairRequest, Vehicle } from "@/lib/domain/types";
 import { findArea } from "@/lib/domain/areas";
 import { topPicks } from "@/lib/domain/recommend";
-import { eligibility, notBookableStatus } from "@/lib/domain/eligibility";
+import { eligibility, notBookableStatus, screeningSummary } from "@/lib/domain/eligibility";
 import { quoteTotals } from "@/lib/domain/quote";
 import { HandoffNote, ReplacementPanel } from "@/components/request/replacement-panel";
 import { replacementFor } from "@/lib/replacement";
+import { emailAlertsOn } from "@/lib/notify/config";
 
 export const metadata: Metadata = { title: "Your shortlist" };
 
-export default async function CompareQuotes({ params }: { params: Promise<{ id: string }> }) {
-  await ready();
+export default async function CompareQuotes({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ edited?: string; cancelled?: string; checked?: string; error?: string }>;
+}) {
+  const repo = await getRepo();
   const s = await getSession();
   if (s.role !== "customer") return null;
   const { id } = await params;
+  await (await needs(s)).customerRequest(id);
+  const sp = await searchParams;
   const r = repo.getRequest(id);
   if (!r || r.customerId !== s.customerId) notFound();
   const v = repo.getVehicle(r.vehicleId)!;
@@ -71,7 +85,7 @@ export default async function CompareQuotes({ params }: { params: Promise<{ id: 
       })),
     { repair: r.repairCategory, make: v.make },
   );
-  const replacement = replacementFor(r);
+  const replacement = await replacementFor(repo, r);
   const lastHandoff = (r.handoffs ?? []).at(-1);
   // A quiet "sent to…" note until the mechanics it was sent on to respond.
   const handoffPending =
@@ -91,8 +105,13 @@ export default async function CompareQuotes({ params }: { params: Promise<{ id: 
       exact: p.verifiedWork.filter((x) => x.category === r.repairCategory && x.make === v.make).length,
     }));
   const stage = job ? (job.status === "scheduled" ? 2 : 3) : sentQuotes.length + interestedCount > 0 ? 1 : 0;
+  const waiting = isWaitingForMatch(r);
+  const cancelled = r.status === "cancelled";
+  // Editable until any mechanic responds; cancellable until it's booked.
+  const editable = r.status === "open" && !sentQuotes.length && !r.interested.length && !r.questions.length;
+  const cancellable = (r.status === "open" || r.status === "quoted") && !job;
   const stageNotes = [
-    `Sent ${dayMonth(r.createdAt)}`,
+    `${waiting ? "Saved" : "Sent"} ${dayMonth(r.createdAt)}`,
     sentQuotes.length ? plural(sentQuotes.length, "estimate") : interestedCount ? `${interestedCount} interested` : "",
     accepted ? (repo.getMechanic(accepted.mechanicId)?.firstName ?? "") : "",
     job?.status === "completed" ? "Done" : job && job.status !== "scheduled" ? "In progress" : "",
@@ -121,12 +140,32 @@ export default async function CompareQuotes({ params }: { params: Promise<{ id: 
         </details>
       </div>
 
+      {sp.error ? (
+        <p role="alert" className="mt-4 border-l-4 border-alert bg-sheet px-4 py-3 text-[0.9375rem]">
+          {sp.error}
+        </p>
+      ) : sp.checked && sp.checked !== "0" && !waiting ? (
+        <p role="status" className="mt-4 flex items-center gap-2 border-l-4 border-brand bg-sheet px-4 py-3 text-[0.9375rem] font-semibold">
+          <Check size={16} aria-hidden /> Sent to {plural(Number(sp.checked) || 1, "mechanic")}. Their replies will appear on this page.
+        </p>
+      ) : sp.edited ? (
+        <p role="status" className="mt-4 flex items-center gap-2 border-l-4 border-brand bg-sheet px-4 py-3 text-[0.9375rem] font-semibold">
+          <Check size={16} aria-hidden /> Your changes are saved.
+        </p>
+      ) : null}
+
+      {cancelled ? (
+        <CancelledPanel r={r} fresh={Boolean(sp.cancelled)} />
+      ) : waiting ? (
+        <WaitingPanel r={r} v={v} checked={sp.checked} editable={editable} />
+      ) : null}
+
       {replacement ? <ReplacementPanel r={r} rep={replacement} /> : null}
       {handoffPending.length ? (
         <HandoffNote r={r} names={handoffPending.length === 1 ? [repo.getMechanic(handoffPending[0])!.displayName] : handoffPending.map(String)} />
       ) : null}
 
-      <Lifecycle stage={stage} notes={stageNotes} />
+      {cancelled || waiting ? null : <Lifecycle stage={stage} notes={stageNotes} />}
 
       {job ? (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border border-brand bg-sheet px-4 py-3">
@@ -281,7 +320,7 @@ export default async function CompareQuotes({ params }: { params: Promise<{ id: 
                         <Link href={`/mechanics/${p.slug}?${ctx}`} className="heading block text-[1.1875rem] hover:underline">
                           {p.displayName}
                         </Link>
-                        <p className="text-[0.8125rem] text-ink-2">{q.serviceMode === "mobile" ? "Comes to you" : "At their shop"}</p>
+                        <p className="text-[0.8125rem] text-ink-2">Comes to you</p>
                       </div>
                     </div>
                     <p className="flex items-baseline gap-2">
@@ -295,9 +334,9 @@ export default async function CompareQuotes({ params }: { params: Promise<{ id: 
                         {rating ? <StarRating value={rating.average} size={14} /> : null}
                         {rating ? `${rating.average.toFixed(1)} (${rating.count})` : "No reviews yet"}
                       </li>
-                      <li className={`inline-flex items-center gap-1.5 ${e.eligible ? "" : "font-semibold text-alert"}`}>
-                        {e.eligible ? <ShieldCheck size={15} className="text-carbon" aria-hidden /> : <ShieldAlert size={15} aria-hidden />}
-                        {e.eligible ? "Screening current" : `Can't be booked: ${notBookableStatus(e).toLowerCase()}`}
+                      <li className={`inline-flex items-center gap-1.5 ${!e.eligible ? "font-semibold text-alert" : e.fullyVerified ? "" : "font-semibold text-amber"}`}>
+                        {e.eligible && e.fullyVerified ? <ShieldCheck size={15} className="text-carbon" aria-hidden /> : <ShieldAlert size={15} aria-hidden />}
+                        {!e.eligible ? `Can't be booked: ${notBookableStatus(e).toLowerCase()}` : screeningSummary(p).label}
                       </li>
                     </ul>
                     {q.notes ? <p className="line-clamp-2 text-[0.875rem] text-ink-2">&ldquo;{q.notes}&rdquo;</p> : null}
@@ -347,9 +386,11 @@ export default async function CompareQuotes({ params }: { params: Promise<{ id: 
             </ul>
           )}
         </section>
-      ) : !replacement && !job ? (
-        <p className="mt-8 border-y border-rule py-6 text-ink-2">Sent to {plural(pending, "qualified mechanic")}. Responses will appear here.</p>
+      ) : !replacement && !job && !waiting && !cancelled ? (
+        <p className="mt-8 border-y border-rule py-6 text-ink-2">Sent to {plural(pending, "mechanic")} who {pending === 1 ? "matches" : "match"} your car, repair and area. Their replies will appear on this page, with which of their checks Clutch has verified.</p>
       ) : null}
+
+      {!waiting && !cancelled && cancellable ? <ManageRequest r={r} editable={editable} /> : null}
     </EvidenceProvider>
   );
 }
@@ -373,5 +414,110 @@ function Lifecycle({ stage, notes }: { stage: number; notes: string[] }) {
         </li>
       ))}
     </ol>
+  );
+}
+
+/** Saved with no mechanic to send it to. Says what was kept and what happens next, without promising outreach. */
+function WaitingPanel({ r, v, checked, editable }: { r: RepairRequest; v: Vehicle; checked?: string; editable: boolean }) {
+  const area = findArea(r.location.area);
+  const facts: [string, string][] = [
+    ["Car", vehicleLine(v)],
+    ["Repair type", REPAIR_LABEL[r.repairCategory]],
+    ["Where", `Comes to the car${area ? ` · ${area.label}` : ""}`],
+    ["How soon", urgencyLabel(r.urgency) || "Not set"],
+    ["When works", r.preferredTimes || "Not set"],
+    ["Photos and recordings", String(r.media.length)],
+  ];
+  return (
+    <section aria-labelledby="waiting-title" className="mt-6 border-2 border-ink bg-sheet">
+      <div className="flex gap-3 border-b border-rule px-5 py-4">
+        <Clock3 size={20} className="mt-1 shrink-0" aria-hidden />
+        <div>
+          <h2 id="waiting-title" className="heading text-[1.25rem] sm:text-[1.375rem]">
+            Saved. No mechanic matches this request yet.
+          </h2>
+          <p className="mt-1 max-w-[65ch] text-[0.9375rem] text-ink-2">
+            Clutch checks again whenever a mechanic finishes their profile. When one fits your car, repair and area, Clutch sends them this request and their reply shows
+            on this page.{" "}
+            {emailAlertsOn() ? "You'll also get an email alert if alerts are on in your account settings." : "Clutch doesn't send email or text alerts yet, so check back here."}
+          </p>
+        </div>
+      </div>
+      <div className="space-y-5 p-5">
+        {checked === "0" ? (
+          <p role="status" className="text-[0.9375rem] font-semibold">
+            Checked just now: still no mechanic fits.
+          </p>
+        ) : null}
+        <div>
+          <h3 className="field-label">What Clutch saved</h3>
+          <dl className="mt-2 grid gap-x-6 text-[0.9375rem] sm:grid-cols-2">
+            {facts.map(([k, val]) => (
+              <div key={k} className="border-b border-rule-soft py-2">
+                <dt className="text-[0.75rem] text-ink-3">{k}</dt>
+                <dd className="font-semibold">{val}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-2 text-[0.8125rem] text-ink-3">Your address and access details stay private until you book someone.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {editable ? (
+            <Link href={`/customer/requests/${r.id}/edit`} className="btn btn-ink min-h-11">
+              <Pencil size={15} aria-hidden /> Edit request
+            </Link>
+          ) : null}
+          <form action={rematchRequest.bind(null, r.id)}>
+            <button className="btn btn-line min-h-11">
+              <RefreshCw size={15} aria-hidden /> Check again now
+            </button>
+          </form>
+          <form action={cancelRequest.bind(null, r.id)}>
+            <ConfirmButton message="Cancel this request? It will stay in your history, but no mechanic will be sent it." className="min-h-11 px-2 text-[0.9375rem] font-semibold text-alert underline decoration-rule underline-offset-2">
+              Cancel request
+            </ConfirmButton>
+          </form>
+          <Link href="/customer" className="min-h-11 px-2 py-2.5 text-[0.9375rem] text-ink-2 underline decoration-rule underline-offset-2">
+            Back to home
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CancelledPanel({ r, fresh }: { r: RepairRequest; fresh: boolean }) {
+  return (
+    <section aria-labelledby="cancelled-title" role={fresh ? "status" : undefined} className="mt-6 flex gap-3 border border-rule bg-sheet px-5 py-4">
+      <XCircle size={20} className="mt-1 shrink-0 text-ink-3" aria-hidden />
+      <div>
+        <h2 id="cancelled-title" className="heading text-[1.25rem]">
+          {fresh ? "Request cancelled" : "You cancelled this request"}
+          {r.cancelledAt ? <span className="font-normal text-ink-3"> · {dayMonth(r.cancelledAt)}</span> : null}
+        </h2>
+        <p className="mt-1 text-[0.9375rem] text-ink-2">It stays here for your records. No mechanic can quote it or be booked for it.</p>
+        <Link href="/customer/requests/new" className="btn btn-line mt-3 min-h-11">
+          Start a new request
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+/** Edit or withdraw a request that's out with mechanics but not booked. */
+function ManageRequest({ r, editable }: { r: RepairRequest; editable: boolean }) {
+  return (
+    <div className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-rule pt-4 text-[0.9375rem]">
+      {editable ? (
+        <Link href={`/customer/requests/${r.id}/edit`} className="font-semibold underline decoration-rule underline-offset-2">
+          Edit request
+        </Link>
+      ) : null}
+      <form action={cancelRequest.bind(null, r.id)}>
+        <ConfirmButton message="Cancel this request? Mechanics will see it's withdrawn, and any estimates on it will close." className="min-h-11 font-semibold text-alert underline decoration-rule underline-offset-2">
+          Cancel request
+        </ConfirmButton>
+      </form>
+    </div>
   );
 }

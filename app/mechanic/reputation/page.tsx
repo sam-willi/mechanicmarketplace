@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { StarRating } from "@/components/visual/stars";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { ready, repo } from "@/lib/data";
-import { getSession } from "@/lib/session";
+import { getRepo } from "@/lib/data";
+import { getSession, needs } from "@/lib/session";
 import { toPublicProfile } from "@/lib/domain/public-profile";
 import { milestones } from "@/lib/mechanic-insights";
 import { PageTitle } from "@/components/workspace/ui";
@@ -18,9 +18,10 @@ import type { RepairCategory } from "@/lib/domain/types";
 export const metadata: Metadata = { title: "Reputation" };
 
 export default async function Reputation() {
-  await ready();
+  const repo = await getRepo();
   const s = await getSession();
   if (s.role !== "mechanic") return null;
+  await (await needs(s)).mechanicProfile();
   const p = toPublicProfile(repo.getMechanicSources(s.mechanicId));
   const a = await repo.analyticsSummary(s.mechanicId);
   const r = p.reputation;

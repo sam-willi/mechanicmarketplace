@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Montserrat } from "next/font/google";
 import "./globals.css";
+import { DemoBanner } from "@/components/site/demo-banner";
 
 // Montserrat matches the logo's lettering: wide, heavy geometric forms with angled terminals.
 const montserrat = Montserrat({
@@ -25,7 +26,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={montserrat.variable}>
-      <body className="min-h-dvh">{children}</body>
+      <body className="min-h-dvh">
+        <DemoBanner />
+        {children}
+      </body>
     </html>
   );
 }

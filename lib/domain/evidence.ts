@@ -1,5 +1,5 @@
 import { monthYear } from "@/lib/format";
-import { screeningItems } from "./eligibility";
+import { INSURANCE_UNVERIFIED_NOTE, screeningItems } from "./eligibility";
 import type { PublicCredential, PublicEmployment, PublicRepair, PublicStatus } from "./public-profile";
 import { PROVENANCE, REPAIR_LABEL, SAFETY, STATUS_LABEL, type SafetyInfo } from "./provenance";
 import type { ProvenanceSource, VerificationStatus } from "./types";
@@ -35,6 +35,8 @@ export function safetyEvidence(cat: SafetyInfo["category"], s: PublicStatus, fir
   if (s.status === "rejected" || s.status === "needs_info") explanation = `This hasn't been verified. Clutch doesn't publish screening details, only whether a check is current.`;
   if (s.status === "not_submitted") explanation = `${firstName} hasn't provided this yet. Clutch shows the blank rather than hiding it.`;
   if (s.status === "reverification_required") explanation = `${info.explanation} It expires soon and ${firstName} has been asked to renew it.`;
+  if (s.unavailable) explanation = `${firstName} started this check, but Clutch hasn't connected a screening company that can run it yet, so it could not be verified.`;
+  if (cat === "insurance" && !passed) explanation = `${explanation} ${INSURANCE_UNVERIFIED_NOTE}`;
   return {
     title: label,
     kind: "safety",

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { updatePassword } from "@/app/actions/account";
 import { getAuthUser } from "@/lib/session";
 import { AuthShell, Notice } from "@/components/auth/auth-shell";
+import { SubmitButton } from "@/components/auth/submit-button";
 
 export const metadata: Metadata = { title: "Choose a new password" };
 
@@ -10,6 +11,8 @@ const ERRORS: Record<string, string> = {
   weak_password: "Use a password with at least 8 characters.",
   mismatch: "The two passwords don't match.",
   expired: "Your reset link expired. Request a new one.",
+  same: "Choose a password you haven't used here before.",
+  unavailable: "We couldn't reach the sign-in service. Try again in a moment.",
   failed: "We couldn't update your password. Try again.",
 };
 
@@ -40,7 +43,7 @@ export default async function ResetPassword({ searchParams }: { searchParams: Pr
               <span className="field-label">Confirm new password</span>
               <input name="confirm" type="password" required minLength={8} autoComplete="new-password" className="input mt-1" />
             </label>
-            <button className="btn btn-ink min-h-12 w-full">Save password</button>
+            <SubmitButton pending="Saving…">Save password</SubmitButton>
           </form>
         </>
       )}

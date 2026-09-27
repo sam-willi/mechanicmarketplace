@@ -7,8 +7,8 @@ export const metadata: Metadata = { title: "How It Works" };
 
 const DRIVER = [
   ["Tell us what's going on", "Describe what your car is doing (no need to know the part) or search for a mechanic by your car and repair."],
-  ["Compare evidence, not just price", "Mechanics with relevant verified experience reply with estimates at their own prices. See their verified jobs on cars like yours, their screening and their rating side by side."],
-  ["Choose, get it fixed, confirm", "You pick who you trust. When the work is done you confirm it, and it becomes part of that mechanic's verified record."],
+  ["Compare evidence, not just price", "Available mechanics who match your car, repair and area reply with estimates at their own prices. See their Clutch-verified jobs on cars like yours, the status of each check (identity, background, driving record, insurance) and their rating side by side."],
+  ["Choose, get it fixed, confirm", "You choose who to book. When the work is done you confirm it, and it becomes part of that mechanic's verified record."],
 ];
 const MECHANIC = [
   ["Build a profile you own", "Your rates, services and experience at your own link. Verification turns claims into proof customers can check."],
@@ -39,8 +39,11 @@ export default function HowItWorks() {
       <main className="mx-auto max-w-[1100px] px-4 pt-10 sm:px-6 sm:pt-16">
         <h1 className="display max-w-[18ch] text-[2.5rem] sm:text-[3.5rem]">One network, two products.</h1>
         <p className="mt-4 max-w-[60ch] text-[1.125rem] text-ink-2">
-          Drivers find someone they can trust to fix their car. Mechanics build an independent business on proof of their work. Clutch never decides who is best: it
+          Drivers find a mechanic for their car and see what Clutch has and hasn&apos;t verified about them. Mechanics build an independent business on proof of their work. Clutch never decides who is best: it
           shows the evidence and the customer chooses.
+        </p>
+        <p className="mt-3 max-w-[60ch] text-[0.9375rem] text-ink-2">
+          Clutch is launching in Los Angeles and verifying its first mechanics now. Until they&apos;re verified, you can describe a repair and Clutch saves it for them.
         </p>
         <div className="mt-14 grid gap-12 lg:grid-cols-2">
           <section>
@@ -58,7 +61,7 @@ export default function HowItWorks() {
               <Steps items={MECHANIC} />
             </div>
             <Link href="/signup?role=mechanic" className="btn btn-line mt-6">
-              Join as a Mechanic <ArrowRight size={16} aria-hidden />
+              Create a mechanic account <ArrowRight size={16} aria-hidden />
             </Link>
           </section>
         </div>

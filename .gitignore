@@ -46,3 +46,12 @@ next-env.d.ts
 
 # impeccable design-hook session cache (local paths, changes every edit)
 /.impeccable/hook.cache.json
+# impeccable per-machine state: build output with absolute paths, session logs, local consent
+/.impeccable/build/
+/.impeccable/questions/
+/.impeccable/config.local.json
+
+# local development database (npm run db:local)
+/.local-pg/
+# npm run test:browser build output
+/.next-browser-test/

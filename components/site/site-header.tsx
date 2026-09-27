@@ -2,6 +2,7 @@ import Link from "next/link";
 import { signOut } from "@/app/actions/account";
 import { getSession } from "@/lib/session";
 import { Wordmark } from "@/components/brand/wordmark";
+import { footerLinks } from "@/lib/site-links";
 
 const NAV = [
   { href: "/customer/mechanics", label: "Find a Mechanic" },
@@ -77,17 +78,15 @@ export function SiteFooter() {
       <div className="mx-auto grid max-w-[1200px] gap-6 px-4 py-10 text-[0.875rem] text-ink-2 sm:grid-cols-[1fr_auto] sm:px-6">
         <div className="space-y-2">
           <Wordmark />
-          <p className="max-w-[46ch]">One network, two products: find someone you trust to fix your car, or build your independent mechanic business. Launching in Los Angeles.</p>
-          <p className="text-ink-3">Demo build: every mechanic, shop, customer and review on this site is fictional.</p>
+          <p className="max-w-[46ch]">One network, two products: find a mechanic for your car and see what Clutch has verified, or build your independent mechanic business. Launching in Los Angeles.</p>
         </div>
         <nav aria-label="Footer" className="grid grid-cols-2 gap-x-8 gap-y-2">
-          <Link href="/customer/mechanics" className="hover:text-ink">Find a Mechanic</Link>
-          <Link href="/for-mechanics" className="hover:text-ink">For Mechanics</Link>
-          <Link href="/how-it-works" className="hover:text-ink">How It Works</Link>
-          <Link href="/verification" className="hover:text-ink">Verification</Link>
-          <Link href="/help" className="hover:text-ink">Help &amp; safety</Link>
-          <Link href="/login" className="hover:text-ink">Log in</Link>
-          <Link href="/demo" className="hover:text-ink">Demo accounts</Link>
+          {footerLinks().map((l) => (
+            <Link key={l.href} href={l.href} className={l.note ? "text-ink-3 hover:text-ink" : "hover:text-ink"}>
+              {l.label}
+              {l.note ? <span className="text-[0.75rem]"> {l.note}</span> : null}
+            </Link>
+          ))}
         </nav>
       </div>
     </footer>

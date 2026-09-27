@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { ready, repo } from "@/lib/data";
-import { getSession } from "@/lib/session";
+import { getRepo } from "@/lib/data";
+import { getSession, needs } from "@/lib/session";
 import { vehicleLine } from "@/lib/domain/intake";
 import { monthYear, usd } from "@/lib/format";
 import { setVehiclePhoto, updateVehicle } from "@/app/actions/customer";
@@ -19,10 +19,11 @@ import { VehicleFields } from "@/components/app/vehicle-form";
 export const metadata: Metadata = { title: "Vehicle" };
 
 export default async function VehiclePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string; edit?: string }> }) {
-  await ready();
+  const repo = await getRepo();
   const s = await getSession();
   if (s.role !== "customer") return null;
   const { id } = await params;
+  await (await needs(s)).customerVehicle(id);
   const sp = await searchParams;
   const v = repo.getVehicle(id);
   if (!v || v.customerId !== s.customerId) notFound();

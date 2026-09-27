@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { ready, repo } from "@/lib/data";
-import { getSession } from "@/lib/session";
+import { getRepo } from "@/lib/data";
+import { getSession, needs } from "@/lib/session";
 import { monthYear, plural, usd } from "@/lib/format";
 import { saveCustomerNote } from "@/app/actions/mechanic";
 import { PageTitle } from "@/components/workspace/ui";
@@ -16,9 +16,10 @@ function monthsSince(iso: string) {
 }
 
 export default async function Customers() {
-  await ready();
+  const repo = await getRepo();
   const s = await getSession();
   if (s.role !== "mechanic") return null;
+  await (await needs(s)).mechanicCustomers();
   const rows = repo.listMechanicCustomers(s.mechanicId);
   const jobs = repo.listJobsForMechanic(s.mechanicId);
   const repeat = rows.filter((r) => r.isRepeat).length;

@@ -3,8 +3,8 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import QRCode from "qrcode";
 import { BadgeCheck, ChevronRight, DollarSign, ExternalLink, FileText, Settings, Star } from "lucide-react";
-import { ready, repo } from "@/lib/data";
-import { getSession } from "@/lib/session";
+import { getRepo } from "@/lib/data";
+import { getSession, needs } from "@/lib/session";
 import { toPublicProfile } from "@/lib/domain/public-profile";
 import { profileSteps } from "@/lib/domain/completeness";
 import { PageTitle } from "@/components/workspace/ui";
@@ -18,9 +18,10 @@ import { Tick } from "@/components/trust/marks";
 export const metadata: Metadata = { title: "Public Profile" };
 
 export default async function PublicProfileTools({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
-  await ready();
+  const repo = await getRepo();
   const s = await getSession();
   if (s.role !== "mechanic") return null;
+  await (await needs(s)).mechanicProfile();
   const sp = await searchParams;
   const m = repo.getMechanic(s.mechanicId)!;
   const p = toPublicProfile(repo.getMechanicSources(s.mechanicId));

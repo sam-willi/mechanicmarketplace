@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { StarRating } from "@/components/visual/stars";
 import Link from "next/link";
-import { ready, repo } from "@/lib/data";
-import { getSession } from "@/lib/session";
+import { getRepo } from "@/lib/data";
+import { getSession, needs } from "@/lib/session";
 import { monthYear, plural, usd } from "@/lib/format";
 import { PhotoPrint } from "@/components/profile/photo";
 import { SaveMechanicButton } from "@/components/profile/save-button";
@@ -10,9 +10,10 @@ import { SaveMechanicButton } from "@/components/profile/save-button";
 export const metadata: Metadata = { title: "Saved Mechanics" };
 
 export default async function SavedMechanics() {
-  await ready();
+  const repo = await getRepo();
   const s = await getSession();
   if (s.role !== "customer") return null;
+  await (await needs(s)).customerSaved();
   const saved = repo.listSaved(s.customerId);
   const history = repo.listCustomerHistory(s.customerId);
   const ids = [...new Set([...saved, ...history.map((h) => h.mechanicId)])];
@@ -21,7 +22,7 @@ export default async function SavedMechanics() {
     <div className="space-y-8">
       <div className="border-b-2 border-ink pb-4">
         <h1 className="display text-[2rem] sm:text-[2.5rem]">Saved Mechanics</h1>
-        <p className="mt-1 text-ink-2">The people you trust with your car. Booking them again goes straight to them.</p>
+        <p className="mt-1 text-ink-2">Mechanics you&apos;ve saved. Booking them again goes straight to them.</p>
       </div>
       {ids.length === 0 && (
         <p className="border-y border-rule py-6 text-ink-3">

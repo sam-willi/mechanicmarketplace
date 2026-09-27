@@ -30,3 +30,12 @@ export function getScreeningProvider(kind: ScreeningKind): ScreeningProvider {
 export function getProviderByKey(key: string): ScreeningProvider {
   return PROVIDERS[key] ?? mock;
 }
+
+/**
+ * Whether a check of this kind can actually be run for someone in this marketplace.
+ * The mock provider only stands in for fictional (demo) people; with real mechanics
+ * a check that no real provider runs must never be started or approved.
+ */
+export function screeningOpen(kind: ScreeningKind, scope: "live" | "demo") {
+  return scope === "demo" || getScreeningProvider(kind).key !== "mock";
+}

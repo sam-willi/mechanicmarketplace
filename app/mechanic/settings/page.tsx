@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ready, repo } from "@/lib/data";
+import { getRepo } from "@/lib/data";
 import { getSession } from "@/lib/session";
 import { REPAIR_LABEL } from "@/lib/domain/provenance";
 import { REPAIR_CATEGORIES } from "@/lib/domain/types";
@@ -11,7 +11,7 @@ import { getAccount } from "@/lib/session";
 export const metadata: Metadata = { title: "Settings" };
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
-  await ready();
+  const repo = await getRepo();
   const s = await getSession();
   if (s.role !== "mechanic") return null;
   const acct = (await getAccount())!;

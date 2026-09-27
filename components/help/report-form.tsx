@@ -15,7 +15,7 @@ export function ReportForm({
     <form action={reportIssue} className="sheet space-y-4 p-4 sm:p-5">
       <div>
         <h2 className="heading text-[1.25rem]">Report an issue</h2>
-        <p className="text-[0.9375rem] text-ink-2">Tell us what happened. The trust team sees the job&apos;s estimate, notes and photos alongside your report.</p>
+        <p className="text-[0.9375rem] text-ink-2">Tell us what happened. Clutch staff see the job&apos;s estimate, history and photos next to your report, and reply on this page.</p>
       </div>
       <label className="block">
         <span className="field-label">What&apos;s this about?</span>
