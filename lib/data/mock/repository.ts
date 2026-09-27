@@ -741,6 +741,12 @@ export class MockRepository implements RepositoryCore {
     this.mustMechanic(input.mechanicId);
     if (!req.matchedMechanicIds.includes(input.mechanicId)) throw new ScopeError("request sent to this mechanic", input.requestId, this.scope);
     if (req.declinedBy.includes(input.mechanicId)) throw new LifecycleError("You declined this request, so you can't send an estimate for it.", "stale");
+    // A customer should never be sent an estimate they can't accept: sending needs the basic profile
+    // (area, repairs, pricing, availability). Drafts can still be saved. Verification isn't required.
+    if (!opts.draft) {
+      const e = eligibility(toPublicProfile(this.getMechanicSources(input.mechanicId)));
+      if (!e.eligible) throw new LifecycleError(`Finish your profile before sending estimates: ${e.missing.map((x) => x.label.toLowerCase()).join(", ")}.`, "forbidden");
+    }
     const prev = d.quotes.find((x) => x.requestId === input.requestId && x.mechanicId === input.mechanicId);
     // Once accepted, an estimate is frozen: extra work goes through the customer's approval on the job.
     if (prev?.status === "accepted") throw new LifecycleError("The customer accepted this estimate, so it can't be changed. Ask them to approve any extra work from the job page.", "stale");

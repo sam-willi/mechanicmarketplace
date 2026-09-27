@@ -32,3 +32,17 @@ test("Derek can send an estimate on every seeded request waiting for one", async
     assert.ok(demo.listNotifications?.(c.userId, "customer")?.some((n) => n.kind === "new_quote") ?? true, "the customer is told");
   }
 });
+
+test("every demo mechanic has a complete basic profile, so no demo estimate is one the customer can't accept", async () => {
+  const { toPublicProfile } = await import("@/lib/domain/public-profile");
+  const { eligibility } = await import("@/lib/domain/eligibility");
+  await ready("demo");
+  const d = current("demo");
+  for (const m of d.mechanics) {
+    const e = eligibility(toPublicProfile(demo.getMechanicSources(m.id)));
+    assert.ok(e.eligible, `${m.slug}: missing ${e.missing.map((x) => x.label).join(", ")}`);
+  }
+  for (const q of d.quotes.filter((x) => x.status === "submitted")) {
+    assert.ok(eligibility(toPublicProfile(demo.getMechanicSources(q.mechanicId))).eligible, `estimate ${q.id} comes from a mechanic who can't be booked`);
+  }
+});

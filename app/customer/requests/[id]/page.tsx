@@ -74,7 +74,7 @@ export default async function CompareQuotes({
   const interestedCount = new Set([...r.interested.map((i) => i.mechanicId), ...sentQuotes.map((q) => q.mechanicId)]).size;
   const picks = topPicks(
     withProfiles
-      .filter(({ q }) => q.status === "submitted")
+      .filter(({ q, p }) => q.status === "submitted" && eligibility(p).eligible)
       .map(({ q, p }) => ({
         q,
         p,
@@ -95,7 +95,7 @@ export default async function CompareQuotes({
             !r.declinedBy.includes(mid) && !quotes.some((q) => q.mechanicId === mid && q.status !== "draft") && !r.interested.some((i) => i.mechanicId === mid),
         )
       : [];
-  const rows = withProfiles
+  const allRows = withProfiles
     .filter(({ q }) => q.status !== "draft")
     .map(({ q, p }) => ({
       q,
@@ -104,6 +104,11 @@ export default async function CompareQuotes({
       t: quoteTotals(q),
       exact: p.verifiedWork.filter((x) => x.category === r.repairCategory && x.make === v.make).length,
     }));
+  // Only estimates the customer could accept are compared. A response from a mechanic whose basic
+  // profile isn't complete (older or demo data; they can't send new ones) is listed apart, with the
+  // reason and no price comparison.
+  const rows = allRows.filter((x) => x.e.eligible || x.q.status === "accepted");
+  const unavailable = allRows.filter((x) => !x.e.eligible && x.q.status !== "accepted");
   const stage = job ? (job.status === "scheduled" ? 2 : 3) : sentQuotes.length + interestedCount > 0 ? 1 : 0;
   const waiting = isWaitingForMatch(r);
   const cancelled = r.status === "cancelled";
@@ -222,7 +227,7 @@ export default async function CompareQuotes({
             {pending ? <p className="text-[0.875rem] text-ink-3">{pending} more still reviewing</p> : null}
           </div>
 
-          {sentQuotes.length >= 2 && (
+          {rows.length >= 2 && (
             <div className="mt-3 hidden overflow-x-auto sm:block">
               <table className="w-full border-collapse text-left text-[0.9375rem]">
                 <thead>
@@ -302,7 +307,7 @@ export default async function CompareQuotes({
           )}
 
           {/* Cards on phones; on larger screens the table above is the comparison. */}
-          <ul className={`mt-5 grid gap-4 lg:grid-cols-3 ${sentQuotes.length >= 2 ? "sm:hidden" : ""}`}>
+          <ul className={`mt-5 grid gap-4 lg:grid-cols-3 ${rows.length >= 2 ? "sm:hidden" : ""}`}>
             {rows.map(({ q, p, e, t, exact }) => {
               const chosen = q.status === "accepted";
               const pick = badgesFor(q.id)[0];
@@ -384,6 +389,30 @@ export default async function CompareQuotes({
                 </li>
               ))}
             </ul>
+          )}
+          {unavailable.length > 0 && (
+            <section aria-labelledby="unavailable-title" className="mt-6 border-t border-rule pt-4">
+              <h3 id="unavailable-title" className="text-[1rem] font-bold">
+                Can&apos;t be booked right now
+              </h3>
+              <p className="mt-1 max-w-[62ch] text-[0.875rem] text-ink-2">
+                {unavailable.length === 1 ? "This mechanic replied, but their" : "These mechanics replied, but their"} Clutch profile isn&apos;t complete, so the estimate
+                can&apos;t be accepted. It isn&apos;t part of the comparison above.
+              </p>
+              <ul className="mt-3 space-y-3">
+                {unavailable.map(({ q, p, e }) => (
+                  <li key={q.id} className="flex items-center gap-3">
+                    <PhotoPrint photoUrl={p.photoUrl} initials={p.initials} name={p.displayName} size={40} />
+                    <div className="min-w-0 text-[0.9375rem]">
+                      <Link href={`/mechanics/${p.slug}?${ctx}`} className="font-semibold hover:underline">
+                        {p.displayName}
+                      </Link>
+                      <p className="text-[0.8125rem] text-alert">{notBookableStatus(e)}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
         </section>
       ) : !replacement && !job && !waiting && !cancelled ? (

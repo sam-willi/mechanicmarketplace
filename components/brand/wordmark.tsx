@@ -12,7 +12,7 @@ export function Logo({ height = 24, className = "" }: { height?: number; classNa
 
 export function Wordmark({ href = "/", className = "" }: { href?: string; className?: string }) {
   return (
-    <Link href={href} className={`inline-flex items-center text-ink ${className}`} aria-label="Clutch home">
+    <Link href={href} className={`inline-flex min-h-11 items-center text-ink ${className}`} aria-label="Clutch home">
       <Logo height={24} />
     </Link>
   );

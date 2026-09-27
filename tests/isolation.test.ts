@@ -34,7 +34,7 @@ async function setupLive() {
   await provisionUser(realCustomer);
   await provisionUser(realMechanic);
   if (!live.getMechanicByUser(realMechanic.id)) {
-    await live.upsertMechanicProfile({ userId: realMechanic.id, displayName: "Quinn Real", city: "Los Angeles", serviceRadiusMi: 15, bio: "", workModel: "mobile", declaredRepairCategories: ["brakes"], declaredMakes: ["BMW"], hourlyRateCents: 9000, diagnosticFeeCents: 5000, availabilityNote: "Weekdays" });
+    await live.upsertMechanicProfile({ userId: realMechanic.id, displayName: "Quinn Real", city: "Los Angeles", neighborhood: "mid-city", serviceRadiusMi: 15, bio: "", workModel: "mobile", declaredRepairCategories: ["brakes"], declaredMakes: ["BMW"], hourlyRateCents: 9000, diagnosticFeeCents: 5000, availabilityNote: "Weekdays" });
   }
   const cust = live.getCustomerByUser(realCustomer.id)!;
   const mech = live.getMechanicByUser(realMechanic.id)!;

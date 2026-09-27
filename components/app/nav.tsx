@@ -136,7 +136,7 @@ export function BottomNav({ items, tone = "light", hideOn = [], until = "lg" }: 
 
 export function BellLink({ href, unread, tone = "light" }: { href: string; unread: number; tone?: "light" | "dark" }) {
   return (
-    <Link href={href} className={`relative grid size-10 place-items-center ${tone === "dark" ? "text-sheet" : "text-ink"}`} aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`}>
+    <Link href={href} className={`relative grid size-11 place-items-center ${tone === "dark" ? "text-sheet" : "text-ink"}`} aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`}>
       <Bell size={20} strokeWidth={1.9} aria-hidden />
       {unread ? <span className={`tnum absolute top-1 right-0.5 min-w-4 px-1 text-center text-[0.625rem] font-extrabold bg-brass text-brand-night`}>{unread}</span> : null}
     </Link>

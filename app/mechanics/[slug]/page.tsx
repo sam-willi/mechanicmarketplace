@@ -224,15 +224,25 @@ export default async function MechanicProfilePage({
 
       {/* Mobile stub */}
       <div className="perf-top fixed inset-x-0 bottom-0 z-30 border-t border-rule bg-sheet pt-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
-        <div className="mx-auto flex max-w-[1120px] items-center justify-between gap-3 px-4 pt-2">
+        {/* Two columns that never overlap: the price and next opening wrap rather than hide under the button. */}
+        <div className="mx-auto grid max-w-[1120px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 pt-2">
           <div className="min-w-0">
-            <p className="num text-[1.5rem] text-ink">
+            <p className="num text-[1.375rem] leading-tight whitespace-nowrap text-ink">
               {price.amount}
-              <span className="ml-1 text-[0.875rem] font-normal text-ink-2">{price.unit}</span>
+              <span className="ml-1 text-[0.8125rem] font-normal text-ink-2">{price.unit}</span>
             </p>
-            <p className="truncate text-[0.8125rem] text-ink-3">{nextLabel}</p>
+            <p className="text-[0.8125rem] leading-snug text-ink-2">
+              <span className="sr-only">Next opening: </span>
+              {nextLabel}
+            </p>
           </div>
-          {elig.eligible ? <QuoteLink href={quoteHref} mechanicId={p.id} variant={variant} /> : <span className="max-w-[11rem] text-right text-[0.8125rem] font-semibold text-alert">Profile incomplete: can&apos;t be booked yet</span>}
+          {elig.eligible ? (
+            <QuoteLink href={quoteHref} mechanicId={p.id} variant={variant} className="min-h-12 px-4 whitespace-nowrap">
+              Request estimate
+            </QuoteLink>
+          ) : (
+            <span className="max-w-[10rem] text-right text-[0.8125rem] font-semibold text-alert">Profile incomplete: can&apos;t be booked yet</span>
+          )}
         </div>
       </div>
     </EvidenceProvider>

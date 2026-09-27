@@ -63,6 +63,10 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
     p.on("pageerror", (e) => { fails++; console.log(`PAGEERROR (${label})`, e.message); });
     p.on("response", (r) => { if (r.status() >= 500) console.log(`HTTP ${r.status()} (${label}) ${r.url()}`); });
     await p.setViewport({ width: 1280, height: 900 });
+    // Every wait is bounded; the runner's watchdog reports a step that makes no progress at all.
+    p.setDefaultTimeout(30000);
+    p.setDefaultNavigationTimeout(45000);
+    (globalThis.__clutchTestPages ??= []).push({ label, p });
     return { c, p };
   }
   const go = (p, url) => p.goto(u + url, { waitUntil: "networkidle0" });
@@ -90,6 +94,25 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
     await p.setViewport({ width: 1280, height: 900 });
     await p.goto(url, { waitUntil: "networkidle0" });
     await p.screenshot({ path: `${OUT}${shot}-1280.png`, fullPage: true });
+  }
+  /** The app header at a phone width: the mode shown in full, 44px targets, nothing clipped or overflowing. */
+  async function headerCheck(p, label, mode) {
+    const url = p.url();
+    for (const width of [390, 360]) {
+      await p.setViewport({ width, height: 844, isMobile: true, hasTouch: true });
+      await p.goto(url, { waitUntil: "networkidle0" });
+      const h = await p.evaluate(() => {
+        const btn = [...document.querySelectorAll('button[aria-haspopup="menu"][aria-label^="Account"]')].find((x) => x.offsetParent);
+        const b = btn?.getBoundingClientRect();
+        const clipped = btn ? [...btn.querySelectorAll("span")].some((x) => x.scrollWidth > x.clientWidth + 1) : true;
+        const header = btn?.closest("header");
+        const targets = header ? [...header.querySelectorAll("a, button")].filter((x) => x.offsetParent).map((x) => Math.round(x.getBoundingClientRect().height)) : [];
+        return { text: btn?.innerText.replace(/\s+/g, " ").trim(), h: b ? Math.round(b.height) : 0, right: b ? Math.round(b.right) : 0, vw: innerWidth, clipped, minTarget: Math.min(...targets), over: document.documentElement.scrollWidth - innerWidth };
+      });
+      ok(`${label} header @${width}: "${mode}" shown in full, 44px targets, fits`, h.text?.includes(mode) && !h.clipped && h.h >= 44 && h.minTarget >= 44 && h.right <= h.vw && h.over <= 0, JSON.stringify(h));
+    }
+    await p.setViewport({ width: 1280, height: 900 });
+    await p.goto(url, { waitUntil: "networkidle0" });
   }
   async function confirmFromMailbox(p, email) {
     const box = await (await fetch(`${AUTH}/__local/mailbox?email=${encodeURIComponent(email)}`)).json();
@@ -151,6 +174,7 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
   let t = await main(M.p);
   ok("mechanic home: can receive requests and be booked; every check not completed", /You can receive requests and be booked/.test(t) && /identity \(not completed\)/.test(t) && /insurance \(not completed\)/.test(t), t);
   await phone(M.p, "mechanic home", "03-mech-home");
+  await headerCheck(M.p, "mechanic home", "Mechanic");
 
   // ============================================================ 2. customer signs up with a car, confirms
   const C = await ctx("customer");
@@ -177,6 +201,7 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
   ok(`customer confirmed → customer home (${path(C.p)})`, path(C.p).startsWith("/customer") && !errPage(t), t);
   ok("the car from sign-up is saved", /2016 BMW 328i/.test(t), t);
   await phone(C.p, "customer home", "06-cust-home");
+  await headerCheck(C.p, "customer home", "Customer");
 
   // ============================================================ 3. repair request
   await go(C.p, "/customer/requests/new?repair=brakes&make=BMW&area=mid-city");
@@ -186,7 +211,7 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
   await click(C.p, /^Starts normally/, "label"); await sleep(200);
   await click(C.p, /^Continue/, "button"); await stepTo(3);
   // Diagnostic media: HTML disguised as a JPEG is refused; a photo and a PDF estimate are accepted.
-  const anyFile = 'input[type="file"][accept="image/*,video/*,audio/*,application/pdf"]';
+  const anyFile = 'input[type="file"][accept*="application/pdf"]';
   await chooseFile(C.p, anyFile, FILES.fakeJpg);
   ok("diagnostic upload: HTML named .jpg refused with the reason", /doesn't accept web pages, SVG images or scripts/.test(await alertText(C.p)), await alertText(C.p));
   await C.p.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
@@ -255,6 +280,35 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
   t = await main(C.p);
   ok("estimate shows each check not completed + insurance note", /Identity: Not completed/.test(t) && /Driving record: Not completed/.test(t) && /Ask the mechanic for proof of insurance/.test(t), t);
   await phone(C.p, "estimate", "10-estimate");
+  // Estimate page: the policies are one labelled disclosure on phones, open on desktop; nothing is removed.
+  for (const width of [390, 1280]) {
+    await C.p.setViewport(width === 390 ? { width: 390, height: 844, isMobile: true, hasTouch: true } : { width: 1280, height: 900 });
+    await C.p.goto(C.p.url(), { waitUntil: "networkidle0" });
+    const e = await C.p.evaluate(() => {
+      const d = [...document.querySelectorAll("details")].find((x) => /Before you book/.test(x.querySelector("summary")?.innerText ?? ""));
+      const visibleText = document.body.innerText;
+      return { hasDetails: Boolean(d && d.offsetParent), open: d?.open ?? null, inDom: /If something goes wrong/.test(document.body.textContent), policiesVisible: /If something goes wrong/.test(visibleText), bookVisible: [...document.querySelectorAll("a")].some((a) => /^Review verification and book/.test(a.innerText.trim()) && a.offsetParent) };
+    });
+    ok(`estimate @${width}: ${width === 390 ? "'Before you book' collapsed" : "policies open"}, action in view, nothing removed`, e.inDom && e.bookVisible && (width === 390 ? e.hasDetails && e.open === false && !e.policiesVisible : e.policiesVisible && !e.hasDetails), JSON.stringify(e));
+  }
+  await C.p.setViewport({ width: 1280, height: 900 });
+  // The mechanic's public profile bar at phone width: price and next opening fully visible, never under the button.
+  const slugRow = await psql(`select data->>'slug' from ${T('mechanics')} id='${mechId}'`);
+  for (const width of [390, 360]) {
+    await C.p.setViewport({ width, height: 844, isMobile: true, hasTouch: true });
+    await go(C.p, `/mechanics/${slugRow}`);
+    const bar = await C.p.evaluate(() => {
+      const bar = [...document.querySelectorAll("div")].find((x) => getComputedStyle(x).position === "fixed" && x.getBoundingClientRect().bottom >= innerHeight - 1 && /Request estimate/.test(x.innerText));
+      if (!bar) return null;
+      const btn = [...bar.querySelectorAll("a")].find((a) => /Request estimate/.test(a.innerText));
+      const texts = [...bar.querySelectorAll("p")].map((x) => ({ right: x.getBoundingClientRect().right, clipped: x.scrollWidth > x.clientWidth + 1 }));
+      const bb = btn.getBoundingClientRect();
+      return { overlap: texts.some((t) => t.right > bb.left + 1), clipped: texts.some((t) => t.clipped), btnH: Math.round(bb.height), pad: parseFloat(getComputedStyle(bar).paddingBottom), over: document.documentElement.scrollWidth - innerWidth };
+    });
+    ok(`profile bar @${width}: price and next opening legible, not under the button`, bar && !bar.overlap && !bar.clipped && bar.btnH >= 44 && bar.pad >= 12 && bar.over <= 0, JSON.stringify(bar));
+  }
+  await C.p.setViewport({ width: 1280, height: 900 });
+  await go(C.p, `/customer/quotes/${quoteId}`);
   await act(C.p, /^Review verification and book/, "a");
   ok(`booking step (${path(C.p)})`, path(C.p) === `/customer/quotes/${quoteId}/book`);
   ok("acknowledgement unticked", await C.p.$eval('input[name="acknowledge"]', (x) => !x.checked));
@@ -299,9 +353,9 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
   }, (x) => x === "in_progress");
   ok("diagnosis stored", /Front pads at 2 mm/.test(await psql(`select data::text from ${T('jobs')} id='${jobId}'`)));
   await go(M.p, `/mechanic/jobs/${jobId}`);
-  await chooseFile(M.p, 'input[type="file"][accept="image/*,video/*"]', FILES.svg);
+  await chooseFile(M.p, 'input[type="file"][multiple][accept^="image/*"]', FILES.svg);
   ok("repair photo: SVG refused", /doesn't accept web pages, SVG images or scripts/.test(await alertText(M.p)), await alertText(M.p));
-  await chooseFile(M.p, 'input[type="file"][accept="image/*,video/*"]', FILES.png);
+  await chooseFile(M.p, 'input[type="file"][multiple][accept^="image/*"]', FILES.png);
   await M.p.waitForNetworkIdle({ idleTime: 800 }).catch(() => {});
   const jobPhoto = await psql(`select data->'photos'->0->>'url' from ${T('jobs')} id='${jobId}'`);
   ok(`repair photo attached to the job (${jobPhoto})`, /^\/api\/media\//.test(jobPhoto), await main(M.p));

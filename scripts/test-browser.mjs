@@ -61,6 +61,8 @@ const appEnv = {
   CLUTCH_DEMO_LOGINS: "off",
   CLUTCH_TEST_LOGINS: "",
   CLUTCH_LIVE_STORE: process.env.CLUTCH_BROWSER_STORE ?? "",
+  // "hosted" builds as Vercel would (4 MB uploads, no video/audio); default "full".
+  CLUTCH_UPLOAD_PROFILE: process.env.CLUTCH_UPLOAD_PROFILE ?? "full",
   CLUTCH_LIVE_READS: "",
   CLUTCH_OUTBOUND_ALERTS: "",
   CLUTCH_EMAIL_PROVIDER: "",
@@ -79,7 +81,8 @@ for (const f of [".env", ".env.local", ".env.production", ".env.production.local
 for (const [k, v] of Object.entries({ DATABASE_URL: DB, NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${authPort}`, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "local-test-key", APP_URL: `http://localhost:${appPort}`, CLUTCH_DEMO_LOGINS: "off" })) appEnv[k] = v;
 const procs = [];
 const start = (cmd, args, env, label) => {
-  const p = spawn(cmd, args, { env, stdio: ["ignore", "pipe", "pipe"] });
+  // Its own process group, so stopping it stops the real server too (npx/npm wrappers don't forward signals).
+  const p = spawn(cmd, args, { env, stdio: ["ignore", "pipe", "pipe"], detached: true });
   let log = "";
   p.stdout.on("data", (d) => (log += d));
   p.stderr.on("data", (d) => (log += d));
@@ -102,11 +105,80 @@ const startApp = async () => {
   app = start("npx", ["next", "start", "-p", appPort], appEnv, "app");
   await waitFor(`http://localhost:${appPort}/login`, "the app");
 };
+/** Stop the whole group: SIGTERM, then SIGKILL after 5 s (Next waits for the browser's keep-alive
+ *  connections otherwise), then wait until the port is free. Bounded throughout. */
+const killGroup = (p, sig) => {
+  try {
+    process.kill(-p.pid, sig);
+  } catch {}
+};
+const portFree = async (port) => {
+  for (let i = 0; i < 40; i++) {
+    try {
+      await fetch(`http://localhost:${port}/login`, { signal: AbortSignal.timeout(500) });
+    } catch {
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  throw new Error(`port ${port} still in use after stopping the app`);
+};
 const stopApp = async () => {
   if (!app) return;
-  app.kill("SIGTERM");
-  await new Promise((r) => app.once("exit", r));
+  const exited = new Promise((r) => (app.exitCode !== null ? r() : app.once("exit", r)));
+  killGroup(app, "SIGTERM");
+  const forced = setTimeout(() => killGroup(app, "SIGKILL"), 5000);
+  await Promise.race([exited, new Promise((r) => setTimeout(r, 10000))]);
+  clearTimeout(forced);
+  killGroup(app, "SIGKILL");
+  await portFree(appPort);
 };
+
+/**
+ * Run a flow, failing it (instead of waiting forever) if it prints nothing for IDLE_MS: every
+ * check prints a line, so silence means a stuck step. On a stall, the last step, each open page's
+ * URL and a screenshot of it are reported.
+ */
+const IDLE_MS = Number(process.env.CLUTCH_BROWSER_IDLE_MS ?? 120000);
+async function watched(name, run, shots) {
+  let last = Date.now();
+  let lastLine = "(nothing yet)";
+  const log = console.log;
+  console.log = (...a) => {
+    last = Date.now();
+    const line = a.join(" ").trim();
+    if (line) lastLine = line.slice(0, 200);
+    log(...a);
+  };
+  let timer;
+  const stalled = new Promise((_, reject) => {
+    timer = setInterval(async () => {
+      if (Date.now() - last < IDLE_MS) return;
+      clearInterval(timer);
+      const pages = [];
+      for (const [i, { label, p }] of (globalThis.__clutchTestPages ?? []).entries()) {
+        try {
+          const file = path.join(shots, `stalled-${i}-${label}.png`);
+          await p.screenshot({ path: file }).catch(() => {});
+          pages.push(`${label}: ${p.url()} (${file})`);
+        } catch {}
+      }
+      reject(new Error(`${name} stalled: no progress for ${IDLE_MS / 1000}s after "${lastLine}".\nOpen pages:\n  ${pages.join("\n  ")}`));
+    }, 5000);
+  });
+  try {
+    return await Promise.race([run(), stalled]);
+  } finally {
+    clearInterval(timer);
+    console.log = log;
+  }
+}
+// And the whole run is bounded, whatever happens.
+const overall = setTimeout(() => {
+  console.error(`test:browser: gave up after ${process.env.CLUTCH_BROWSER_MAX_MIN ?? 30} minutes`);
+  process.exit(1);
+}, Number(process.env.CLUTCH_BROWSER_MAX_MIN ?? 30) * 60000);
+overall.unref();
 
 let code = 1;
 try {
@@ -121,24 +193,27 @@ try {
   if (build.status !== 0) throw new Error("build failed");
   await startApp();
   const { run: flow } = await import("../tests-browser/real-accounts.mjs");
-  const fails = await flow({
+  const shots = process.env.CLUTCH_BROWSER_SHOTS ?? path.join(dir, "shots");
+  const fails = await watched("real-accounts", () => flow({
     base: `http://localhost:${appPort}`,
     auth: `http://127.0.0.1:${authPort}`,
     db: DB,
     chrome,
     store: appEnv.CLUTCH_LIVE_STORE === "normalized" ? "normalized" : "snapshot",
-    out: path.join(dir, "shots"),
+    out: shots,
     restart: async () => {
       await stopApp();
       await startApp();
     },
-  });
-  code = fails ? 1 : 0;
+  }), shots);
+  const { run: uploads } = await import("../tests-browser/uploads.mjs");
+  const uploadFails = await watched("uploads", () => uploads({ base: `http://localhost:${appPort}`, auth: `http://127.0.0.1:${authPort}`, db: DB, chrome, out: shots, profile: appEnv.CLUTCH_UPLOAD_PROFILE === "hosted" ? "hosted" : "full" }), shots);
+  code = fails || uploadFails ? 1 : 0;
 } catch (e) {
   console.error(e);
   for (const p of procs) console.error(`--- ${p.label} log (tail) ---\n${p.log().slice(-3000)}`);
 } finally {
-  for (const p of procs) p.kill("SIGTERM");
+  for (const p of procs) killGroup(p, "SIGKILL");
   spawnSync(path.join(bin, "pg_ctl"), ["-D", path.join(dir, "data"), "-m", "immediate", "stop"], { env: baseEnv });
   rmSync(dir, { recursive: true, force: true });
 }

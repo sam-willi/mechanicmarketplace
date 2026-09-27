@@ -288,7 +288,7 @@ export default async function RequestDetail({ params, searchParams }: { params: 
             ))}
             {canRespond ? (
               <form action={askQuestion.bind(null, r.id)} className="space-y-2">
-                <textarea name="question" required rows={2} className="input" placeholder="e.g. Can you send a video of what happens when you press Start?" aria-label={`Ask ${first} a question`} />
+                <textarea name="question" required rows={2} className="input" placeholder="e.g. When you press Start, is there a click, a whir, or nothing at all?" aria-label={`Ask ${first} a question`} />
                 <button className="btn btn-line min-h-11 text-sm">Ask {first}</button>
               </form>
             ) : null}

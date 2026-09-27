@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Camera, Loader2 } from "lucide-react";
+import { uploadMedia } from "@/lib/media/upload-client";
 
 /** Add or replace the car's photo. Uploads, then sets it on the vehicle. */
 export function VehiclePhotoButton({ setPhoto, hasPhoto }: { setPhoto: (mediaId: string) => Promise<void>; hasPhoto: boolean }) {
@@ -15,15 +16,9 @@ export function VehiclePhotoButton({ setPhoto, hasPhoto }: { setPhoto: (mediaId:
     setBusy(true);
     setError(null);
     try {
-      const body = new FormData();
-      body.append("file", file);
-      body.append("tag", "vehicle");
-      const res = await fetch("/api/media", { method: "POST", body });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Upload failed");
-      start(() => setPhoto(json.id));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed");
+      const r = await uploadMedia(file, "vehicle");
+      if (!r.ok) return setError(r.error);
+      start(() => setPhoto(r.media.id));
     } finally {
       setBusy(false);
     }

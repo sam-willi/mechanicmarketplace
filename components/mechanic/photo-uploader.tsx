@@ -2,6 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { Camera, Loader2 } from "lucide-react";
+import { acceptFor, uploadMedia } from "@/lib/media/upload-client";
+import { uploadLimits } from "@/lib/media/limits";
+import type { MediaTag } from "@/lib/domain/types";
 
 const KINDS = [
   ["before", "Before"],
@@ -20,32 +23,32 @@ export function RepairPhotoUploader({ attach, note }: { attach: (items: { id: st
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(0);
+  const [sizeNote, setSizeNote] = useState<string | null>(null);
+  const video = uploadLimits().video;
   const [, start] = useTransition();
 
   async function upload(files: FileList | null) {
     if (!files?.length) return;
     setBusy(true);
     setError(null);
+    setSizeNote(null);
     const items: { id: string; kind: string }[] = [];
     try {
       for (const file of Array.from(files)) {
-        if (!/^(image|video)\//.test(file.type)) continue;
-        const body = new FormData();
-        body.append("file", file);
-        body.append("tag", kind);
-        const res = await fetch("/api/media", { method: "POST", body });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error ?? "Upload failed");
-        items.push({ id: json.id, kind });
+        const r = await uploadMedia(file, kind as MediaTag);
+        if (!r.ok) {
+          setError(r.error);
+          continue;
+        }
+        if (r.note) setSizeNote(r.note);
+        items.push({ id: r.media.id, kind });
       }
       if (items.length) {
         start(async () => {
           await attach(items);
           setDone((n) => n + items.length);
         });
-      } else setError("Choose a photo or video.");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed. Try again.");
+      }
     } finally {
       setBusy(false);
     }
@@ -69,14 +72,20 @@ export function RepairPhotoUploader({ attach, note }: { attach: (items: { id: st
       </fieldset>
       <label className={`btn btn-line min-h-11 cursor-pointer ${busy ? "pointer-events-none opacity-60" : ""}`}>
         {busy ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Camera size={16} aria-hidden />}
-        {busy ? "Uploading…" : "Add photos or a short video"}
-        <input type="file" accept="image/*,video/*" multiple className="sr-only" onChange={(e) => upload(e.target.files)} />
+        {busy ? "Uploading…" : video ? "Add photos or a short video" : "Add photos"}
+        <input type="file" accept={acceptFor(["photo", "video"])} multiple className="sr-only" onChange={(e) => upload(e.target.files)} />
       </label>
       {done > 0 && (
         <p className="text-[0.8125rem] font-semibold" role="status">
           {done} photo{done === 1 ? "" : "s"} added.
         </p>
       )}
+      {sizeNote && (
+        <p className="text-[0.8125rem] text-ink-2" role="status">
+          {sizeNote}
+        </p>
+      )}
+      {!video && <p className="text-[0.8125rem] text-ink-3">Video can&apos;t be uploaded on this version of Clutch yet; photos can.</p>}
       {error && (
         <p className="text-[0.8125rem] text-alert" role="alert">
           {error}

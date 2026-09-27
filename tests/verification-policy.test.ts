@@ -270,3 +270,20 @@ test("no verification check is marked as required for work; the basic profile is
   assert.ok(checks.every((s) => /Not required to be booked/.test(s.why)));
   assert.ok(!steps.some((s) => /^Required before/.test(s.why)));
 });
+
+test("an estimate can't be sent until the basic profile is complete (a draft can be saved); verification still isn't required", async () => {
+  const c = await customer();
+  const u = await provisionUser({ id: "vp-noarea", email: "vp-noarea@example.test", meta: { name: "Nia", role: "mechanic" } });
+  // No service area: not a launch area.
+  const m = await live.upsertMechanicProfile({ userId: u!.id, displayName: "Nia Noarea", city: "Los Angeles", serviceRadiusMi: 15, bio: "", workModel: "mobile", declaredRepairCategories: ["brakes"], declaredMakes: ["BMW"], hourlyRateCents: 9000, diagnosticFeeCents: 5000, availabilityNote: "Weekdays" });
+  const r = await request(c.id, [m.id]);
+  await assert.rejects(live.submitQuote(quote(r.id, m.id)), (e: unknown) => e instanceof LifecycleError && e.code === "forbidden" && /Finish your profile before sending estimates: service area/.test(e.message));
+  const draft = await live.submitQuote(quote(r.id, m.id), { draft: true });
+  assert.equal(draft.status, "draft");
+  assert.equal(live.listQuotesForRequest(r.id).filter((q) => q.status === "submitted").length, 0, "the customer is sent nothing");
+  // Once the area is set, the same mechanic (still with no checks verified) can send it.
+  await live.upsertMechanicProfile({ id: m.id, userId: u!.id, displayName: "Nia Noarea", city: "Los Angeles", neighborhood: "mid-city", serviceRadiusMi: 15, bio: "", workModel: "mobile", declaredRepairCategories: ["brakes"], declaredMakes: ["BMW"], hourlyRateCents: 9000, diagnosticFeeCents: 5000, availabilityNote: "Weekdays" });
+  const sent = await live.submitQuote(quote(r.id, m.id));
+  assert.equal(sent.status, "submitted");
+  assert.equal(eligibility(profileOf(m.id)).fullyVerified, false);
+});

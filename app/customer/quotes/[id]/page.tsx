@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { StarRating } from "@/components/visual/stars";
 import Link from "next/link";
-import { ArrowLeft, CalendarClock, Check, MessageCircleQuestion, Minus } from "lucide-react";
+import { ChevronDown, ArrowLeft, CalendarClock, Check, MessageCircleQuestion, Minus } from "lucide-react";
 import { notFound } from "next/navigation";
 import { getRepo } from "@/lib/data";
 import { getSession, needs } from "@/lib/session";
@@ -256,9 +256,25 @@ export default async function EstimatePage({ params, searchParams }: { params: P
             </section>
           )}
 
-          <section aria-label="Before you choose" className="border-t border-rule px-5 py-4 sm:px-7">
-            <p className="field-label mb-3">Before you choose</p>
-            <Policies firstName={p.firstName} guarantee={p.guarantee} />
+          {/* The policies in full: open on larger screens; on phones one labelled disclosure, so the
+              mechanic, appointment, scope, total, checks and the action stay in view. Nothing is removed. */}
+          <section aria-label="Before you book" className="border-t border-rule px-5 py-4 sm:px-7">
+            <div className="hidden sm:block">
+              <p className="field-label mb-3">Before you book</p>
+              <Policies firstName={p.firstName} guarantee={p.guarantee} />
+            </div>
+            <details className="group sm:hidden">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 font-semibold [&::-webkit-details-marker]:hidden">
+                <span>
+                  Before you book
+                  <span className="block text-[0.8125rem] font-normal text-ink-2">Payment, cancelling, rescheduling, problems and workmanship</span>
+                </span>
+                <ChevronDown size={18} className="shrink-0 transition-transform group-open:rotate-180" aria-hidden />
+              </summary>
+              <div className="pt-3">
+                <Policies firstName={p.firstName} guarantee={p.guarantee} />
+              </div>
+            </details>
             {q.expiresOn ? <p className="mt-3 text-[0.8125rem] text-ink-3">This estimate is valid until {dayMonth(q.expiresOn)}.</p> : null}
           </section>
 
