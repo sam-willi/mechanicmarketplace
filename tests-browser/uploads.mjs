@@ -37,6 +37,7 @@ export async function run({ base, auth, db, chrome, out, profile = "full" }) {
   await set('form select[name="year"]', "2016");
   await set('form select[name="make"]', "BMW");
   await set('form input[name="model"]', "328i");
+  await set('form input[name="mileage"]', "71000"); // the request form requires mileage
   await Promise.all([p.waitForNavigation({ waitUntil: "networkidle0" }).catch(() => {}), click(/^Create account$/, "button")]);
   const box = await (await fetch(`${auth}/__local/mailbox?email=${encodeURIComponent(email)}`)).json();
   await p.goto(box[0].link, { waitUntil: "networkidle0" });
