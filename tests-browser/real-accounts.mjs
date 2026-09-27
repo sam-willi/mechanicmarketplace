@@ -119,6 +119,26 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
     ok(`${email}: one confirmation link in the local mailbox (nothing sent)`, box.length === 1 && box[0].kind === "signup", JSON.stringify(box));
     await p.goto(box[0].link, { waitUntil: "networkidle0" });
   }
+  /** The structured vehicle picker, driven like a person: type into the labelled combobox, click the option. */
+  async function combo(p, label, text) {
+    const input = await p.evaluateHandle((l) => {
+      const lab = [...document.querySelectorAll("label")].find((x) => x.innerText.trim().replace(/\s*\(required\)$/, "") === l && x.htmlFor);
+      return lab ? document.getElementById(lab.htmlFor) : null;
+    }, label);
+    if (!(await input.evaluate((x) => Boolean(x)))) throw new Error(`no ${label} picker on ${p.url()}`);
+    await p.waitForFunction((el) => !el.disabled, { timeout: 20000 }, input);
+    await input.click({ clickCount: 3 });
+    await input.type(text);
+    await p.waitForFunction((t) => [...document.querySelectorAll('[role="option"]')].some((o) => o.innerText.trim() === t), { timeout: 20000 }, text);
+    const opt = await p.evaluateHandle((t) => [...document.querySelectorAll('[role="option"]')].find((o) => o.innerText.trim() === t), text);
+    await opt.click();
+    await sleep(500);
+  }
+  async function chip(p, group, text) {
+    await p.waitForFunction((g, t) => [...document.querySelectorAll(`[role="radiogroup"][aria-label="${g}"] [role="radio"]`)].some((b) => b.innerText.trim() === t), { timeout: 20000 }, group, text);
+    await p.evaluate((g, t) => [...document.querySelectorAll(`[role="radiogroup"][aria-label="${g}"] [role="radio"]`)].find((b) => b.innerText.trim() === t).click(), group, text);
+    await sleep(300);
+  }
   async function login(p, who) {
     await go(p, "/login");
     await set(p, 'form input[name="email"]', who.email);
@@ -188,9 +208,11 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
   await set(C.p, 'form input[name="email"]', CUST.email);
   await set(C.p, 'form input[name="password"]', CUST.password);
   await C.p.evaluate(() => { const d = document.querySelector("form details"); if (d) d.open = true; });
-  await set(C.p, 'form select[name="year"]', "2016");
-  await set(C.p, 'form select[name="make"]', "BMW");
-  await set(C.p, 'form input[name="model"]', "328i");
+  // Year first, then make, then only models that existed for it, then the configuration.
+  await combo(C.p, "Year", "2016");
+  await combo(C.p, "Make", "BMW");
+  await combo(C.p, "Model", "328i");
+  await chip(C.p, "Transmission", "8-speed automatic");
   await set(C.p, 'form input[name="mileage"]', "71000");
   await act(C.p, /^Create account$/, "button");
   ok(`customer → check your email (${path(C.p)})`, path(C.p).startsWith("/signup/check-email"), await main(C.p));
@@ -204,6 +226,10 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
   t = await main(C.p);
   ok(`customer confirmed → customer home (${path(C.p)})`, path(C.p).startsWith("/customer") && !errPage(t), t);
   ok("the car from sign-up is saved", /2016 BMW 328i/.test(t), t);
+  {
+    const spec = JSON.parse((await psql(`select data->'spec' from ${T('vehicles')} data->>'model'='328i' and data->>'mileage'='71000'`)) || "null");
+    ok(`sign-up car stored with a structured spec: engine ${spec?.engine?.code} (${spec?.engine?.status}), transmission ${spec?.transmission?.id} (${spec?.transmission?.status})`, spec?.engine?.code === "N20" && spec.engine.status === "likely" && spec.transmission?.id === "8AT" && spec.transmission.status === "selected", JSON.stringify(spec));
+  }
   await phone(C.p, "customer home", "06-cust-home");
   await headerCheck(C.p, "customer home", "Customer");
 
@@ -249,6 +275,10 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
   t = await main(M.p);
   ok("mechanic sees the request", /2016 BMW 328i/.test(t) && /Grinding/.test(t), t);
   await go(M.p, `/mechanic/requests/${reqId}`);
+  {
+    const b = await M.p.evaluate(() => document.querySelector('section[aria-label="Vehicle"]')?.innerText ?? "");
+    ok("mechanic request: the vehicle brief first; the likely engine says so, with how to confirm and a warning before pricing parts", /Likely N20 2\.0L turbo four/.test(b) && /LIKELY \(INFERRED\)|Likely \(inferred\)/i.test(b) && /To confirm:/.test(b) && /Confirm the engine( and drivetrain)? before pricing parts/.test(b) && /8-speed automatic/.test(b), b.slice(0, 600));
+  }
   await phone(M.p, "mechanic request", "09-mech-request");
   await act(M.p, /^I.m interested/, "button");
   await set(M.p, 'textarea[name="question"]', "Does the grinding happen when you first pull away, or only when braking?");
@@ -313,7 +343,9 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
   }
   await C.p.setViewport({ width: 1280, height: 900 });
   await go(C.p, `/customer/quotes/${quoteId}`);
+  ok("estimate: the car's details and what isn't confirmed, before booking (not a block)", /Your car's engine( and drivetrain)? (isn't|aren't) confirmed/.test(await main(C.p)) && /Add your VIN to confirm/.test(await main(C.p)), (await main(C.p)).slice(0, 800));
   await act(C.p, /^Review verification and book/, "a");
+  ok("booking step repeats the vehicle warning", /Your car's engine( and drivetrain)? (isn't|aren't) confirmed/.test(await main(C.p)));
   ok(`booking step (${path(C.p)})`, path(C.p) === `/customer/quotes/${quoteId}/book`);
   ok("acknowledgement unticked", await C.p.$eval('input[name="acknowledge"]', (x) => !x.checked));
   {
@@ -616,6 +648,65 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
     ok("revoked: the profile no longer claims insurance", ins?.status === "revoked" && /Insurance not verified by Clutch|hasn't verified/.test(t), `${ins?.status} ${t.slice(0, 300)}`);
     await go(V.p, "/mechanic/notifications");
     ok("the mechanic was told, with the reason", /Insurance: verification withdrawn/.test(await main(V.p)) && /cancelled/i.test(await main(V.p)));
+  }
+
+  // ============================================================ 12. vehicles: 2008 BMW 135i, 6-speed manual; VIN conflict; VIN-decoded; persistence
+  {
+    const P = C2.p;
+    const vehRow = async () => JSON.parse((await psql(`select data from ${T('vehicles')} data->>'model'='135i'`)) || "null");
+    await P.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+    await go(P, "/customer/vehicles?add=1");
+    await combo(P, "Year", "2008");
+    await combo(P, "Make", "BMW");
+    // Only models that existed for a 2008 BMW are offered.
+    const offered = await P.evaluate(async () => (await (await fetch("/api/vehicles?step=models&year=2008&make=BMW")).json()).models);
+    ok(`models are limited to the year and make (${offered.length}: ${offered.slice(0, 6).join(", ")}…)`, offered.includes("135i") && !offered.includes("330i") && !offered.includes("M2"), JSON.stringify(offered));
+    await combo(P, "Model", "135i");
+    await chip(P, "Body style", "Coupe");
+    await chip(P, "Transmission", "6-speed manual");
+    await set(P, 'form input[name="mileage"]', "94000");
+    await act(P, /^(Save|Add) (vehicle|car)/i, "button");
+    let v = await vehRow();
+    ok(`2008 135i saved: engine ${v?.spec?.engine?.code} ${v?.spec?.engine?.status}, ${v?.spec?.transmission?.label} ${v?.spec?.transmission?.status}`, v?.spec?.engine?.code === "N54" && v.spec.engine.status === "likely" && v.spec.transmission?.id === "6MT" && v.spec.transmission.status === "selected" && v.spec.body?.status === "selected", JSON.stringify(v?.spec));
+    t = await P.evaluate(() => document.querySelector('section[aria-label="Vehicle"]')?.innerText ?? "");
+    ok("vehicle page @390: N54 shown as likely with how to confirm; manual as the customer's choice; no VIN yet", /Likely N54 3\.0L twin-turbo inline-six/.test(t) && /To confirm:/.test(t) && /6-speed manual/.test(t) && /No VIN yet/.test(t) && (await P.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 0, t.slice(0, 500));
+    await P.screenshot({ path: `${OUT}30-vehicle-135i-390.png`, fullPage: true });
+    // A VIN that disagrees (it's a 128i): flagged in the picker; saved, both are kept and shown.
+    await go(P, `/customer/vehicles/${v.id}?edit=1#edit`);
+    await P.evaluate(() => document.querySelectorAll("form details").forEach((d) => (d.open = true)));
+    await P.type('input[aria-label="VIN"]', "WBAUP93558VF00128");
+    await click(P, /Look up VIN/, "button");
+    await P.waitForFunction(() => /This VIN is a/.test(document.body.innerText), { timeout: 20000 });
+    ok("a disagreeing VIN is flagged before saving", /doesn't match what you picked \(2008 BMW 135i\)/.test(await main(P)), (await main(P)).slice(0, 400));
+    await act(P, /^Save/, "button");
+    v = await vehRow();
+    ok("saved with the conflict recorded; the selections and the likely engine are kept, not overwritten", v?.model === "135i" && v.spec?.vin?.conflicts?.some((c) => /VIN says 128i/.test(c)) && v.spec.engine?.status === "likely", JSON.stringify(v?.spec?.vin));
+    ok("the conflict is shown", /The VIN and the selections disagree/.test(await main(P)));
+    // The right VIN: confirmed, VIN-decoded, the correction history kept.
+    await go(P, `/customer/vehicles/${v.id}?edit=1#edit`);
+    await P.evaluate(() => document.querySelectorAll("form details").forEach((d) => (d.open = true)));
+    await P.$eval('input[aria-label="VIN"]', (el) => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, ""); el.dispatchEvent(new Event("input", { bubbles: true })); });
+    await P.type('input[aria-label="VIN"]', "WBAUC73508VF00135");
+    await click(P, /Look up VIN/, "button");
+    await P.waitForFunction(() => /This VIN is a 2008 BMW 135i/.test(document.body.innerText), { timeout: 20000 });
+    await click(P, /Yes, that.s my car/, "button");
+    await act(P, /^Save/, "button");
+    v = await vehRow();
+    ok(`VIN-decoded: engine ${v?.spec?.engine?.status}, drive ${v?.spec?.drivetrain?.status}, no conflicts, corrections kept (${v?.spec?.corrections?.length})`, v?.spec?.engine?.status === "vin_confirmed" && v.spec.vin.status === "decoded" && v.spec.vin.conflicts.length === 0 && v.spec.corrections?.some((c) => c.field === "engine" && c.from.status === "likely" && c.to.status === "vin_confirmed"), JSON.stringify(v?.spec?.corrections));
+    ok("the full VIN is stored only on the vehicle; the spec keeps the last six", v.vin === "WBAUC73508VF00135" && v.spec.vin.last6 === "F00135" && !JSON.stringify(v.spec).includes("WBAUC73508"));
+    await P.reload({ waitUntil: "networkidle0" });
+    ok("after a refresh: VIN-decoded", /VIN-decoded/.test(await main(P)) && /N54 3\.0L twin-turbo inline-six/.test(await main(P)));
+    await logout(P);
+    const C3 = await ctx("customer-3");
+    await login(C3.p, CUST);
+    for (const w of [1280, 390]) {
+      await C3.p.setViewport(w === 390 ? { width: 390, height: 844, isMobile: true, hasTouch: true } : { width: 1280, height: 900 });
+      await go(C3.p, `/customer/vehicles/${v.id}`);
+      t = await C3.p.evaluate(() => document.querySelector('section[aria-label="Vehicle"]')?.innerText ?? "");
+      ok(`after logging in again @${w}: the same VIN-decoded car`, /VIN-decoded/.test(t) && /N54/.test(t) && !/Likely N54/.test(t) && (await C3.p.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 0, t.slice(0, 300));
+      await C3.p.screenshot({ path: `${OUT}31-vehicle-135i-vin-${w}.png`, fullPage: true });
+    }
+    ok("the car is only in the live marketplace", (await psql(`select count(*) from app_records where scope='demo' and collection='vehicles' and (data->>'vin'='WBAUC73508VF00135' or id='${v.id}')`)) === "0");
   }
 
   ok("nothing reached the demo scope", await psql(`select count(*) from app_records where scope='demo' and (data->>'email' in ('${CUST.email}','${MECH.email}') or id in ('${reqId}','${jobId}'))`) === "0");

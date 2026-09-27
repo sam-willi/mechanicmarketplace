@@ -3,6 +3,7 @@ import { VEHICLE_MAKES } from "@/lib/domain/types";
 import { catalogModels, configsFor, type CatalogConfig } from "./catalog";
 import type { VinDecode } from "./spec";
 import type { BodyStyle, Drivetrain, TransmissionType } from "./types";
+import { fixtureFetch } from "./fixtures";
 
 /**
  * Where vehicle data comes from. Swap the implementation (e.g. a licensed
@@ -18,28 +19,57 @@ export interface VehicleDataProvider {
 }
 
 const DAY = 86_400_000;
-type Entry<T> = { at: number; value: T };
+/** A failed lookup isn't retried for this long (an outage isn't hammered on every keystroke). */
+const FAIL_TTL = 60_000;
+type Entry<T> = { at: number; value?: T; failedAt?: number };
 const g = globalThis as unknown as { __clutchVehicleCache?: Map<string, Entry<unknown>> };
 const cache = (g.__clutchVehicleCache ??= new Map());
 
-async function cached<T>(key: string, ttl: number, load: () => Promise<T>): Promise<T> {
+/**
+ * Fresh from cache, else live, else (on failure) the last good answer even if stale, else throw.
+ * A failure is remembered briefly so an outage costs one timeout, not one per request.
+ */
+async function cached<T>(key: string, ttl: number, load: () => Promise<T>, now = Date.now()): Promise<T> {
   const hit = cache.get(key) as Entry<T> | undefined;
-  if (hit && Date.now() - hit.at < ttl) return hit.value;
-  const value = await load();
-  cache.set(key, { at: Date.now(), value });
-  return value;
+  if (hit?.value !== undefined && now - hit.at < ttl) return hit.value;
+  if (hit?.failedAt && now - hit.failedAt < FAIL_TTL) {
+    if (hit.value !== undefined) return hit.value;
+    throw new Error("recently unavailable");
+  }
+  try {
+    const value = await load();
+    cache.set(key, { at: now, value });
+    return value;
+  } catch (e) {
+    cache.set(key, { ...(hit ?? { at: 0 }), failedAt: now });
+    if (hit?.value !== undefined) return hit.value;
+    throw e;
+  }
 }
 
-async function getJSON(url: string) {
-  const res = await fetch(url, { signal: AbortSignal.timeout(8000), next: { revalidate: 86400 } });
+/** For tests: the cache itself, with an explicit clock. */
+export const cachedForTests = cached;
+
+/** For tests: forget everything cached. */
+export function clearVehicleCache() {
+  cache.clear();
+}
+
+export type Fetcher = (url: string) => Promise<unknown>;
+
+/** The official vPIC API, with a hard timeout. */
+const liveFetch: Fetcher = async (url) => {
+  const res = await fetch(url, { signal: AbortSignal.timeout(4000), next: { revalidate: 86400 } });
   if (!res.ok) throw new Error(`vPIC ${res.status}`);
   return res.json();
-}
+};
 
 const VPIC = "https://vpic.nhtsa.dot.gov/api/vehicles";
 
 /** NHTSA vPIC for model lists and VIN decoding; the curated catalog for factory configurations. */
 export class NhtsaCatalogProvider implements VehicleDataProvider {
+  constructor(private readonly getJSON: Fetcher = liveFetch) {}
+
   years() {
     const now = new Date().getFullYear() + 1;
     return Array.from({ length: now - 1989 }, (_, i) => now - i);
@@ -55,8 +85,8 @@ export class NhtsaCatalogProvider implements VehicleDataProvider {
         const types = ["car", "mpv", "truck"];
         const lists = await Promise.all(
           types.map((t) =>
-            getJSON(`${VPIC}/GetModelsForMakeYear/make/${encodeURIComponent(make)}/modelyear/${year}/vehicletype/${t}?format=json`)
-              .then((j: { Results?: { Model_Name: string }[] }) => (j.Results ?? []).map((r) => r.Model_Name.trim()))
+            this.getJSON(`${VPIC}/GetModelsForMakeYear/make/${encodeURIComponent(make)}/modelyear/${year}/vehicletype/${t}?format=json`)
+              .then((j) => ((j as { Results?: { Model_Name: string }[] }).Results ?? []).map((r) => r.Model_Name.trim()))
               .catch(() => [] as string[]),
           ),
         );
@@ -78,7 +108,7 @@ export class NhtsaCatalogProvider implements VehicleDataProvider {
     const vin = raw.trim().toUpperCase();
     if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) return { ok: false, vin, raw: {}, warnings: ["A VIN is 17 letters and numbers (no I, O or Q)."] };
     try {
-      const j = await cached(`vin:${vin}`, 30 * DAY, () => getJSON(`${VPIC}/DecodeVinValues/${vin}?format=json`));
+      const j = await cached(`vin:${vin}`, 30 * DAY, () => this.getJSON(`${VPIC}/DecodeVinValues/${vin}?format=json`));
       const r = (j as { Results: Record<string, string>[] }).Results[0];
       const pick = (k: string) => (r[k] && r[k] !== "Not Applicable" ? r[k].trim() : undefined);
       const make = pick("Make");
@@ -149,4 +179,8 @@ function transFrom(s?: string): TransmissionType | undefined {
   return undefined;
 }
 
-export const vehicleData: VehicleDataProvider = new NhtsaCatalogProvider();
+/**
+ * CLUTCH_VEHICLE_DATA=fixtures (tests, the isolated browser run): the same adapter over
+ * recorded vPIC responses (lib/vehicles/fixtures.ts), so nothing depends on the network.
+ */
+export const vehicleData: VehicleDataProvider = new NhtsaCatalogProvider(process.env.CLUTCH_VEHICLE_DATA === "fixtures" ? fixtureFetch : liveFetch);

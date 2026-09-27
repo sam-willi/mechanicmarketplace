@@ -34,9 +34,19 @@ export async function run({ base, auth, db, chrome, out, profile = "full" }) {
   await set('form input[name="email"]', email);
   await set('form input[name="password"]', `Fixture-${RUN}-u1`);
   await p.evaluate(() => { const d = document.querySelector("form details"); if (d) d.open = true; });
-  await set('form select[name="year"]', "2016");
-  await set('form select[name="make"]', "BMW");
-  await set('form input[name="model"]', "328i");
+  // The structured vehicle picker: year, make, then a model that existed for them.
+  for (const [label, text] of [["Year", "2016"], ["Make", "BMW"], ["Model", "328i"]]) {
+    const input = await p.evaluateHandle((l) => {
+      const lab = [...document.querySelectorAll("label")].find((x) => x.innerText.trim().replace(/\s*\(required\)$/, "") === l && x.htmlFor);
+      return lab ? document.getElementById(lab.htmlFor) : null;
+    }, label);
+    await p.waitForFunction((el) => el && !el.disabled, { timeout: 20000 }, input);
+    await input.click({ clickCount: 3 });
+    await input.type(text);
+    await p.waitForFunction((t) => [...document.querySelectorAll('[role="option"]')].some((o) => o.innerText.trim() === t), { timeout: 20000 }, text);
+    await (await p.evaluateHandle((t) => [...document.querySelectorAll('[role="option"]')].find((o) => o.innerText.trim() === t), text)).click();
+    await sleep(500);
+  }
   await set('form input[name="mileage"]', "71000"); // the request form requires mileage
   await Promise.all([p.waitForNavigation({ waitUntil: "networkidle0" }).catch(() => {}), click(/^Create account$/, "button")]);
   const box = await (await fetch(`${auth}/__local/mailbox?email=${encodeURIComponent(email)}`)).json();

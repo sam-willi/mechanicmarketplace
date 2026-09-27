@@ -298,6 +298,11 @@ export function VehicleSelector({
                 {decode.displacementL ? `, ${decode.displacementL.toFixed(1)}L${decode.cylinders ? ` ${decode.cylinders}-cylinder` : ""}` : ""}
               </p>
               {decode.warnings.length ? <p className="text-[0.8125rem] text-ink-3">Decoder note: {decode.warnings[0]}</p> : null}
+              {!value.vinConfirmed && value.model && ((decode.year && String(decode.year) !== value.year) || (decode.make && decode.make.toLowerCase() !== value.make.toLowerCase()) || (decode.model && !sameModel(decode.model, value.model))) ? (
+                <p role="alert" className="mt-1 flex items-start gap-1.5 text-[0.875rem] font-semibold text-amber">
+                  <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden /> That doesn&apos;t match what you picked ({value.year} {value.make} {value.model.replace(/^custom:/, "")}). If the VIN is right, use it; if not, check it. Saved as is, both are kept and the difference is shown to mechanics.
+                </p>
+              ) : null}
               {value.vinConfirmed ? (
                 <p className="mt-1 flex items-center gap-1.5 text-[0.875rem] font-semibold">
                   <Check size={15} aria-hidden /> Confirmed as your car

@@ -34,7 +34,7 @@ try {
   const files = readdirSync("tests-db")
     .filter((f) => f.endsWith(".test.ts") && (!only.length || only.some((o) => f.startsWith(o))))
     .map((f) => `tests-db/${f}`);
-  const testEnv = { ...env, NODE_ENV: "test", DATABASE_URL: `postgres://clutch@127.0.0.1:${port}/clutch_test`, CLUTCH_LIVE_STORE: "normalized", CLUTCH_ADMIN_EMAILS: "staff@example.test" };
+  const testEnv = { ...env, NODE_ENV: "test", DATABASE_URL: `postgres://clutch@127.0.0.1:${port}/clutch_test`, CLUTCH_LIVE_STORE: "normalized", CLUTCH_ADMIN_EMAILS: "staff@example.test", CLUTCH_VEHICLE_DATA: "fixtures" };
   for (const k of ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"]) delete testEnv[k];
   const r = spawnSync("npx", ["tsx", "--conditions", "react-server", "--test", "--test-concurrency=1", ...files], { stdio: "inherit", env: testEnv });
   code = r.status ?? 1;

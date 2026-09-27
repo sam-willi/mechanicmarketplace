@@ -1,3 +1,5 @@
+import { VehicleBrief } from "@/components/vehicle/vehicle-brief";
+import { vehicleSpecOf } from "@/lib/vehicles/effective";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -63,7 +65,7 @@ export default async function MechanicJob({ params, searchParams }: { params: Pr
   // The customer sent it back: their words, shown until it's marked complete again.
   const sentBack = j.status === "in_progress" ? [...(j.history ?? [])].reverse().find((h) => h.by === "customer" && h.action === "said it isn't finished") : undefined;
   // Open configuration items the mechanic can settle at completion (options from the factory data).
-  const js = j.vehicleSpec ?? v.spec;
+  const js = vehicleSpecOf(v, j.vehicleSpec);
   const cfgs = configsFor(v.year, v.make, v.model);
   const confirmables = [
     js?.engine?.status === "needs_confirmation" || js?.engine?.status === "likely"
@@ -223,6 +225,7 @@ export default async function MechanicJob({ params, searchParams }: { params: Pr
         </p>
       </div>
       <JourneyStatus j={journey({ request: r, quotes: q ? [q] : [], job: j, audience: "mechanic", mechanicId: m.id, names: { customer: first, mechanic: m.firstName } })} audience="mechanic" names={{ customer: first, mechanic: m.firstName }} />
+      <VehicleBrief v={v} spec={js} audience="mechanic" showVinTail />
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="min-w-0 space-y-6">
@@ -259,7 +262,7 @@ export default async function MechanicJob({ params, searchParams }: { params: Pr
             </section>
           ) : null}
           <div className="sheet p-4">
-            <VehicleSpecCard v={v} spec={j.vehicleSpec ?? v.spec} category={j.repairCategory} audience="mechanic" revealVin />
+            <VehicleSpecCard v={v} spec={vehicleSpecOf(v, j.vehicleSpec)} category={j.repairCategory} audience="mechanic" revealVin />
           </div>
           {!current && j.status === "completed" ? <p className="border border-ink bg-sheet px-4 py-3">Done. This repair is on your verified record.</p> : null}
           {scopePending ? null : j.diagnosis ? (

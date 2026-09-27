@@ -1,3 +1,5 @@
+import { vehicleSpecOf } from "@/lib/vehicles/effective";
+import { VehicleBrief } from "@/components/vehicle/vehicle-brief";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, Check } from "lucide-react";
@@ -140,6 +142,7 @@ export default async function RequestDetail({ params, searchParams }: { params: 
       {sp.sent ? <Notice tone="ok">Estimate sent. {first} gets a notification and sees it next to your verified record.</Notice> : null}
 
       <JourneyStatus j={j} audience="mechanic" names={{ customer: first, mechanic: m.firstName }} />
+      <VehicleBrief v={v} spec={vehicleSpecOf(v, r.vehicleSpec)} audience="mechanic" warn={canRespond ? "quote" : undefined} showVinTail={booked} />
       <JobBrief r={r} distanceMi={area ? milesBetween(m, area) : undefined} match={match} />
 
       {/* Your response: decide, then the estimate, as one connected step. */}

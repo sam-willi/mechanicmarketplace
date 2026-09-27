@@ -1,3 +1,5 @@
+import { VehicleBrief } from "@/components/vehicle/vehicle-brief";
+import { vehicleSpecOf } from "@/lib/vehicles/effective";
 import type { Metadata } from "next";
 import { StarRating } from "@/components/visual/stars";
 import Link from "next/link";
@@ -99,11 +101,15 @@ export default async function EstimatePage({ params, searchParams }: { params: P
                   <RepairIcon category={r.repairCategory} size={22} />
                   {REPAIR_LABEL[r.repairCategory]}
                 </h1>
-                <p className="mt-0.5 text-[0.9375rem] text-ink-2">{customerSummary(v, r.vehicleSpec ?? v.spec)}</p>
+                <p className="mt-0.5 text-[0.9375rem] text-ink-2">{customerSummary(v, vehicleSpecOf(v, r.vehicleSpec))}</p>
               </div>
             </div>
             <p className="text-[0.8125rem] text-ink-3">Issued {dayMonth(q.createdAt)}</p>
           </header>
+
+          <div className="border-b border-rule px-5 py-4 sm:px-7">
+            <VehicleBrief v={v} spec={vehicleSpecOf(v, r.vehicleSpec)} audience="customer" warn="book" editHref={`/customer/vehicles/${v.id}?edit=1#edit`} />
+          </div>
 
           {/* Who */}
           <section aria-label="Your mechanic" className="border-b border-rule px-5 py-5 sm:px-7">

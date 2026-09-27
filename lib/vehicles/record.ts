@@ -1,4 +1,5 @@
 import { ENGINES, TRANSMISSIONS } from "./catalog";
+import { withCorrections } from "./corrections";
 import type { Drivetrain, RecordedSpec, SpecStatus, VehicleSpec } from "./types";
 
 const FIRM: SpecStatus[] = ["vin_confirmed", "selected", "mechanic_confirmed"];
@@ -37,5 +38,6 @@ export function confirmSpec(spec: VehicleSpec, confirm: { engine?: string; trans
     next.drivetrain = { id: confirm.drivetrain, label, status: "mechanic_confirmed" };
   }
   next.open = next.open.filter((q) => !(confirm.engine && q.startsWith("Which engine")) && !(confirm.transmission && q.startsWith("Which transmission")) && !(confirm.drivetrain && q.startsWith("Which drivetrain")));
-  return next;
+  // The mechanic's confirmation is added to the history; what it replaced stays visible.
+  return withCorrections(spec, next, "mechanic");
 }

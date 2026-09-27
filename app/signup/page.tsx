@@ -1,3 +1,4 @@
+import { VehicleFields } from "@/components/app/vehicle-form";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SubmitButton } from "@/components/auth/submit-button";
@@ -7,8 +8,6 @@ import { redirect } from "next/navigation";
 import { ArrowLeft, ArrowRight, Car, Wrench } from "lucide-react";
 import { exitDemoToSignup, signUpWithPassword } from "@/app/actions/account";
 import { requestScope } from "@/lib/data";
-import { VEHICLE_MAKES } from "@/lib/domain/types";
-import { MODEL_YEARS } from "@/lib/domain/intake";
 import { Wordmark } from "@/components/brand/wordmark";
 import { GoogleButton, OrDivider } from "@/components/auth/google-button";
 import { authConfigured, demoLoginsEnabled } from "@/lib/supabase/config";
@@ -132,21 +131,9 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
               {role === "customer" && (
                 <details className="sheet p-4">
                   <summary className="cursor-pointer font-semibold">Add your car now (optional)</summary>
-                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    <select name="year" className="input tnum" aria-label="Year" defaultValue="">
-                      <option value="">Year</option>
-                      {MODEL_YEARS.map((y) => (
-                        <option key={y}>{y}</option>
-                      ))}
-                    </select>
-                    <select name="make" className="input" aria-label="Make" defaultValue="">
-                      <option value="">Make</option>
-                      {VEHICLE_MAKES.map((m) => (
-                        <option key={m}>{m}</option>
-                      ))}
-                    </select>
-                    <input name="model" className="input" placeholder="Model" aria-label="Model" />
-                    <input name="mileage" inputMode="numeric" className="input tnum" placeholder="Mileage" aria-label="Mileage" />
+                  <p className="mt-2 text-[0.875rem] text-ink-2">Year first, then make and model; the engine and transmission options narrow to what your car could have. After you sign in, adding your VIN confirms it exactly.</p>
+                  <div className="mt-3">
+                    <VehicleFields showVin={false} />
                   </div>
                 </details>
               )}

@@ -72,6 +72,8 @@ const appEnv = {
   // One fixture reviewer; the hosted identity flow runs against the deterministic test provider.
   CLUTCH_ADMIN_EMAILS: "reviewer@example.test",
   CLUTCH_TEST_PROVIDERS: "on",
+  // Recorded vPIC responses (lib/vehicles/fixtures.ts): the run never depends on NHTSA being up.
+  CLUTCH_VEHICLE_DATA: "fixtures",
   CLUTCH_IDENTITY_PROVIDER: "test",
   CLUTCH_TEST_IDENTITY_SECRET: randomBytes(16).toString("hex"),
   STRIPE_IDENTITY_SECRET_KEY: "",

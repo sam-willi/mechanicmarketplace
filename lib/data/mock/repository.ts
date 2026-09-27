@@ -1,6 +1,8 @@
 import { toPublicProfile, type ProfileSources } from "@/lib/domain/public-profile";
 import { eligibility } from "@/lib/domain/eligibility";
 import { confirmSpec, toRecorded } from "@/lib/vehicles/record";
+import { withCorrections } from "@/lib/vehicles/corrections";
+import { vehicleSpecOf } from "@/lib/vehicles/effective";
 import { CATEGORY_LABEL, REPAIR_LABEL } from "@/lib/domain/provenance";
 import type { IntakeDraft } from "@/lib/domain/intake-draft";
 import { customerRelationships, relevanceKey } from "@/lib/domain/reputation";
@@ -1965,7 +1967,10 @@ export class MockRepository implements RepositoryCore {
   }
   updateVehicle(vehicleId: ID, patch: Partial<Omit<Vehicle, "id" | "customerId">>) {
     const v = this.getVehicle(vehicleId);
-    if (v) Object.assign(v, patch);
+    if (!v) return;
+    // A customer's edit records what each changed field was and where it came from.
+    if (patch.spec) patch = { ...patch, spec: withCorrections(vehicleSpecOf(v), patch.spec, "customer") };
+    Object.assign(v, patch);
   }
   /** Maintenance record: every Clutch repair on this vehicle, newest first. */
   listVehicleHistory(vehicleId: ID) {

@@ -1,5 +1,6 @@
 "use server";
 
+import { parseChoice } from "@/lib/vehicles/fields";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -65,10 +66,12 @@ export async function signUpWithPassword(formData: FormData) {
   if (role === "mechanic" && !phone) err("missing_phone");
 
   const supabase = await requireAuth();
-  const make = str(formData, "make");
-  const car = VEHICLE_MAKES.includes(make as VehicleMake) && str(formData, "model")
-    ? { year: Number(str(formData, "year")) || undefined, make, model: str(formData, "model"), mileage: Number(str(formData, "mileage").replace(/[^0-9]/g, "")) || undefined }
-    : undefined;
+  // The structured vehicle picker's choice; the spec is rebuilt on the server when the account is set up.
+  const choice = parseChoice(String(formData.get("choice") ?? "{}"));
+  const car =
+    VEHICLE_MAKES.includes(choice.make as VehicleMake) && choice.model && choice.year
+      ? { choice, year: Number(choice.year), make: choice.make, model: choice.model.replace(/^custom:/, ""), mileage: Number(str(formData, "mileage").replace(/[^0-9]/g, "")) || undefined }
+      : undefined;
   const { data, error } = await supabase.auth.signUp({
     email,
     password,

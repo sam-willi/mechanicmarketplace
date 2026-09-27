@@ -1,3 +1,5 @@
+import { vehicleSpecOf } from "@/lib/vehicles/effective";
+import { VehicleBrief } from "@/components/vehicle/vehicle-brief";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -51,6 +53,9 @@ export default async function BookWithDisclosure({ params, searchParams }: { par
       <p className="mt-1 text-ink-2">
         {vehicleLine(v)} · {q.availableOn} · {t.planFor}
       </p>
+      <div className="mt-4">
+        <VehicleBrief v={v} spec={vehicleSpecOf(v, r.vehicleSpec)} audience="customer" warn="book" editHref={`/customer/vehicles/${v.id}?edit=1#edit`} />
+      </div>
 
       {sp.error ? (
         <p role="alert" className="mt-4 flex gap-2 border-2 border-alert bg-alert-wash px-4 py-3 font-semibold text-alert">

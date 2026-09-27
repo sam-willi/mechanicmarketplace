@@ -231,14 +231,15 @@ export function sameModel(a: string, b: string) {
 
 // ---------------------------------------------------------------- display
 
+/** One vocabulary for how sure each field is: VIN-decoded, customer-selected, customer-entered, inferred, unknown. */
 export const STATUS_LABEL: Record<SpecStatus, string> = {
-  vin_confirmed: "From VIN",
+  vin_confirmed: "VIN-decoded",
   selected: "Customer selected",
-  likely: "Likely, not confirmed",
-  needs_confirmation: "Needs confirmation",
-  customer_text: "Customer's description",
+  likely: "Likely (inferred)",
+  needs_confirmation: "Unknown",
+  customer_text: "Customer entered",
   mechanic_confirmed: "Mechanic confirmed",
-  not_recorded: "Not recorded",
+  not_recorded: "Unknown",
 };
 
 const known = (f?: SpecField) => Boolean(f && f.status !== "needs_confirmation" && f.status !== "not_recorded");
