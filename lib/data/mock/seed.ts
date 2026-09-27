@@ -2,6 +2,7 @@
  * Demo seed. Every person, shop, review and repair here is fictional.
  * Employer and dealership names carry "(demo)" in the admin view and are invented.
  */
+import { reconstructedHistory } from "@/lib/verification/model";
 import { configsFor } from "@/lib/vehicles/catalog";
 import { buildSpec, type Selection } from "@/lib/vehicles/spec";
 import type { RecordedSpec } from "@/lib/vehicles/types";
@@ -237,7 +238,7 @@ const SPECS: MechSpec[] = [
     ],
     employment: [
       { employer: "Wilshire Motorwerks BMW (demo)", position: "BMW Service Technician", startedOn: "2019-06-01", endedOn: "2025-08-31", status: "verified", method: "employer_check" },
-      { employer: "Valley Auto Care (demo)", position: "Lube Tech → Technician", startedOn: "2015-02-01", endedOn: "2019-05-01", status: "not_submitted" },
+      { employer: "Valley Auto Care (demo)", position: "Lube Tech → Technician", startedOn: "2015-02-01", endedOn: "2019-05-01", status: "not_started" },
     ],
     repairs: DEREK_REPAIRS,
     selfRepairs: [
@@ -340,12 +341,12 @@ const SPECS: MechSpec[] = [
       lat: 33.96,
       lng: -118.35,
     },
-    safety: { identity: "verified", background: "pending" },
+    safety: { identity: "verified", background: "in_progress" },
     credentials: [
-      { issuer: "ASE", name: "Brakes", code: "A5", issuedOn: "2019-01-10", expiresOn: "2024-01-31", status: "pending", method: "document_review" },
+      { issuer: "ASE", name: "Brakes", code: "A5", issuedOn: "2019-01-10", expiresOn: "2024-01-31", status: "under_review", method: "document_review" },
     ],
     employment: [
-      { employer: "South Bay Ford (demo)", position: "Line Technician", startedOn: "2015-03-01", endedOn: "2026-07-15", status: "pending", method: "employer_check" },
+      { employer: "South Bay Ford (demo)", position: "Line Technician", startedOn: "2015-03-01", endedOn: "2026-07-15", status: "under_review", method: "employer_check" },
     ],
     repairs: [
       ["brakes", "Ford", 2017, "F-150", "Front brake pads + rotors", "platform", "2026-09-12"],
@@ -565,10 +566,10 @@ const SPECS: MechSpec[] = [
     },
     safety: { identity: "verified", background: "verified" },
     credentials: [
-      { issuer: "ASE", name: "Electrical/Electronic Systems", code: "A6", issuedOn: "2014-06-01", status: "needs_info", method: "document_review", notes: "Certificate photo is cropped — please upload the full ASE transcript or certificate showing your ID number." },
+      { issuer: "ASE", name: "Electrical/Electronic Systems", code: "A6", issuedOn: "2014-06-01", status: "needs_more_info", method: "document_review", notes: "Certificate photo is cropped — please upload the full ASE transcript or certificate showing your ID number." },
     ],
     employment: [
-      { employer: "Eastside Auto Electric (demo)", position: "Auto Electrician", startedOn: "2008-01-01", endedOn: "2016-12-31", status: "pending", method: "employer_check" },
+      { employer: "Eastside Auto Electric (demo)", position: "Auto Electrician", startedOn: "2008-01-01", endedOn: "2016-12-31", status: "under_review", method: "employer_check" },
     ],
     gen: {
       platform: 4,
@@ -747,8 +748,10 @@ export function buildSeed(): DB {
         subjectType: "screening_check",
         subjectId: sc.id,
         category: kind,
-        method: "vendor_screening",
+        method: kind === "identity" ? "hosted_identity" : "vendor_screening",
         provider: "mock",
+        providerRef: sc.providerRef,
+        accountId: uid,
         status,
         submittedAt: addDays(spec.profile.joinedAt, -8),
         verifiedAt: completed,
@@ -832,7 +835,7 @@ export function buildSeed(): DB {
         position: e.position,
         startedOn: e.startedOn,
         endedOn: e.endedOn,
-        documentName: e.status === "not_submitted" ? undefined : "employment-verification-letter.pdf",
+        documentName: e.status === "not_started" ? undefined : "employment-verification-letter.pdf",
       };
       db.employment.push(emp);
       db.verifications.push({
@@ -843,11 +846,11 @@ export function buildSeed(): DB {
         category: "employment",
         method: e.method ?? "employer_check",
         status: e.status,
-        submittedAt: e.status === "not_submitted" ? undefined : addDays(spec.profile.joinedAt, 3),
+        submittedAt: e.status === "not_started" ? undefined : addDays(spec.profile.joinedAt, 3),
         verifiedAt: e.status === "verified" ? addDays(spec.profile.joinedAt, 9) : undefined,
         reviewerId: e.status === "verified" ? ADMIN_ID : undefined,
         notes: e.status === "verified" ? "Service manager confirmed dates and role by phone." : e.notes,
-        evidenceSummary: e.status === "not_submitted" ? undefined : `Employment letter + service manager contact at ${e.employer}`,
+        evidenceSummary: e.status === "not_started" ? undefined : `Employment letter + service manager contact at ${e.employer}`,
       });
     }
 
@@ -1057,7 +1060,7 @@ export function buildSeed(): DB {
     subjectId: derekSelf.id,
     category: "past_repair",
     method: "customer_confirmation",
-    status: "pending",
+    status: "submitted",
     submittedAt: "2026-09-22",
     notes: "Confirmation link sent to prior customer.",
     evidenceSummary: "2014 Mercedes-Benz C300 — Front brake pads + rotors (invoice photo attached)",
@@ -1071,7 +1074,7 @@ export function buildSeed(): DB {
     subjectId: marcusSelf.id,
     category: "past_repair",
     method: "document_review",
-    status: "pending",
+    status: "under_review",
     submittedAt: "2026-09-19",
     notes: "Mechanic uploaded a work photo; no invoice or customer contact yet.",
     evidenceSummary: "2012 BMW 328i — Front brake pads + rotors (1 photo)",
@@ -1444,6 +1447,8 @@ export function buildSeed(): DB {
       { id: "demo-derek-135i-2", url: "/repairs/derek-135i-engine-bay.webp", kind: "on_site", source: "mechanic", media: "image", demo: true, caption: "Working under the hood", uploadedAt: "2026-07-02" },
     ];
 
+  // Every demo record carries a history like a real one, built from its own dates.
+  for (const v of db.verifications) v.events ??= reconstructedHistory(v, { actor: { kind: "system", id: "demo-seed" }, note: "Fictional demo record." });
   return db;
 }
 

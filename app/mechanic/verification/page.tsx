@@ -1,27 +1,42 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ArrowRight, Clock, ShieldCheck } from "lucide-react";
 import { getRepo } from "@/lib/data";
 import { getSession, needs } from "@/lib/session";
 import { toPublicProfile } from "@/lib/domain/public-profile";
-import { METHOD_LABEL, PROVENANCE, SAFETY } from "@/lib/domain/provenance";
-import { methodToProvenance } from "@/lib/domain/provenance";
+import { METHOD_LABEL, PROVENANCE, STATUS_LABEL, methodToProvenance } from "@/lib/domain/provenance";
+import { screeningItems } from "@/lib/domain/eligibility";
 import { effectiveStatus } from "@/lib/verification/lifecycle";
-import type { ScreeningKind, VerificationRecord } from "@/lib/domain/types";
+import type { EffectiveStatus, VerificationEvent } from "@/lib/verification/model";
+import { CHECK_INFO, type CheckKey } from "@/lib/verification/claims";
+import { mechanicMessage } from "@/lib/verification/reasons";
+import { identityConfig } from "@/lib/verification/identity/config";
+import type { VerificationRecord } from "@/lib/domain/types";
 import { monthYear } from "@/lib/format";
-import { screeningOpen } from "@/lib/verification/providers/registry";
-import {
-  refreshScreening,
-  resubmitVerification,
-  startScreening,
-  submitCredential,
-  submitEmployment,
-  submitInsurance,
-} from "@/app/actions/mechanic";
+import { screeningOpen, screeningProblems } from "@/lib/verification/providers/registry";
+import { refreshScreening, resubmitVerification, startIdentity, startScreening, submitCredential, submitEmployment, submitInsurance } from "@/app/actions/mechanic";
 import { Field, NeedsPersona, Notice, PageTitle, StatusPill } from "@/components/workspace/ui";
+import { EvidenceUpload } from "@/components/mechanic/evidence-upload";
 
 export const metadata: Metadata = { title: "Verification Center" };
 
-export default async function VerificationCenter({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
+type SP = { welcome?: string; identity?: string; error?: string; sent?: string };
+
+const fmt = (d?: string) => (d ? new Date(`${d.slice(0, 10)}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : "");
+
+/** What returning from the identity provider means, in plain words. */
+const IDENTITY_RETURN: Record<string, { tone: "ok" | "warn" | "error" | "info"; text: string }> = {
+  verified: { tone: "ok", text: "Your identity is verified. Customers now see it on your profile." },
+  under_review: { tone: "info", text: "The provider is still checking. This usually takes under a minute; refresh this page shortly." },
+  in_progress: { tone: "info", text: "You haven't finished the identity check yet. Continue when you're ready." },
+  needs_more_info: { tone: "warn", text: "The provider needs you to try again. See what to change below." },
+  not_started: { tone: "info", text: "You left before finishing, so nothing was checked. You can start again any time." },
+  failed: { tone: "error", text: "The identity check didn't pass. Contact support if you think this is wrong." },
+  unavailable: { tone: "info", text: "Identity verification isn't available yet. Nothing is needed from you for now." },
+  outage: { tone: "warn", text: "The identity provider didn't respond. Nothing was lost; try again in a few minutes." },
+};
+
+export default async function VerificationCenter({ searchParams }: { searchParams: Promise<SP> }) {
   const repo = await getRepo();
   const s = await getSession();
   if (s.role !== "mechanic") return <NeedsPersona role="mechanic" />;
@@ -29,153 +44,110 @@ export default async function VerificationCenter({ searchParams }: { searchParam
   const sp = await searchParams;
   const src = repo.getMechanicSources(s.mechanicId);
   const pub = toPublicProfile(src);
+  const items = screeningItems(pub);
   const vers = repo.listVerifications({ mechanicId: s.mechanicId });
-  const latestFor = (cat: VerificationRecord["category"]) =>
-    vers.filter((v) => v.category === cat).sort((a, b) => ((a.submittedAt ?? "") < (b.submittedAt ?? "") ? 1 : -1))[0];
-  const ver = (subjectId: string) => vers.find((v) => v.subjectId === subjectId);
-  const eff = (v?: VerificationRecord) => (v ? effectiveStatus(v.status, v.expiresAt) : "not_submitted");
-
-  const safetyRows: { kind: ScreeningKind | "insurance"; v?: VerificationRecord; applies: boolean }[] = [
-    { kind: "identity", v: latestFor("identity"), applies: true },
-    { kind: "background", v: latestFor("background"), applies: true },
-    { kind: "driving_record", v: latestFor("driving_record"), applies: true },
-    { kind: "insurance", v: latestFor("insurance"), applies: true },
-  ];
-
-  const tracked = vers.filter((v) => v.category !== "past_repair");
-  const totalItems = tracked.length + (safetyRows.filter((r) => r.applies && !r.v).length);
-  const verifiedCount = tracked.filter((v) => ["verified", "reverification_required"].includes(effectiveStatus(v.status, v.expiresAt))).length;
-  const skillVerified =
-    pub.credentials.filter((c) => c.provenance !== "self").length + pub.employment.filter((e) => e.provenance !== "self").length + pub.reputation.verifiedRepairs;
+  const current = (cat: VerificationRecord["category"]) =>
+    vers.filter((v) => v.category === cat && !v.supersededBy).sort((a, b) => ((a.events?.[0]?.at ?? a.submittedAt ?? "") < (b.events?.[0]?.at ?? b.submittedAt ?? "") ? 1 : -1))[0];
+  const eff = (v?: VerificationRecord): EffectiveStatus => (v ? effectiveStatus(v.status, v.expiresAt, new Date(), v.method) : "not_started");
+  const ver = (subjectId: string) => vers.filter((v) => v.subjectId === subjectId && !v.supersededBy).at(-1);
+  const email = current("email");
+  const idCfg = identityConfig(repo.scope);
+  const screenProblems = repo.scope === "demo" ? [] : screeningProblems();
+  const verifiedChecks = items.filter((i) => i.verified).length;
+  const identityNote = sp.identity ? IDENTITY_RETURN[sp.identity] : undefined;
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-10">
       <PageTitle
-        title="Verification Center"
-        note="Verification checks aren't required to be booked: customers see each one's status, and verified checks improve your ranking. Proven experience makes you stand out."
+        title="Verification"
+        note="Optional. Each check shows separately on your profile; none is required to receive requests or be booked. Verified checks build trust and rank you higher at equal experience."
         action={
           <Link href={`/mechanics/${src.mechanic.slug}`} className="btn btn-quiet min-h-11 text-sm">
             See your public profile
           </Link>
         }
       />
-      <section className="grid gap-5 border border-ink p-5 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
-        <div>
-          <p className="num text-[2.5rem]">{verifiedCount}/{totalItems}</p>
-          <p className="text-[0.875rem] text-ink-2">items verified</p>
-        </div>
-        <div>
-          <p className="font-bold">Complete verification to build customer trust.</p>
-          <p className="mt-1 text-[0.9375rem] text-ink-2">
-            Customers see a check for each thing you prove, and nothing else: never your documents or screening reports.{" "}
-            None of these checks is required to send estimates or be booked. Customers see each one&apos;s status, and fully verified mechanics rank higher at equal experience.
-          </p>
-        </div>
-      </section>
-      {sp.welcome ? (
-        <Notice tone="ok">
-          Your profile is live at <span className="tnum font-semibold">/mechanics/{src.mechanic.slug}</span>. Everything you entered shows as self-reported until
-          it&apos;s verified. Start with identity and background below, then add proof of your work.
-        </Notice>
-      ) : null}
+      {sp.error ? <Notice tone="error">{sp.error}</Notice> : null}
+      {identityNote ? <Notice tone={identityNote.tone}>{identityNote.text}</Notice> : null}
+      {sp.sent === "insurance" ? <Notice tone="ok">Insurance submitted. Clutch staff usually review it within 2 business days; you&apos;ll get a notification.</Notice> : null}
+      {sp.welcome ? <Notice tone="ok">Your profile is live. Everything you entered shows as self-reported until it&apos;s verified.</Notice> : null}
 
-      {/* SAFETY TRACK */}
-      <section className="space-y-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="heading text-[1.375rem]">Verification checks</h2>
-          <p className="text-[0.8125rem] text-ink-3">Customers see only the outcome, never your documents or reports.</p>
-        </div>
-        <ul className="border-t border-rule">
-          {safetyRows
-            .filter((r) => r.applies)
-            .map(({ kind, v }) => {
-              const status = eff(v);
-              const info = SAFETY[kind];
-              const canStart = kind !== "insurance" && (status === "not_submitted" || status === "expired" || status === "reverification_required" || status === "rejected");
-              const pendingMock = kind !== "insurance" && v?.status === "pending" && v.method === "vendor_screening";
-              // Real mechanics: only when a real screening provider is connected for this kind.
-              const closed = kind !== "insurance" && !screeningOpen(kind, repo.scope) && status !== "verified";
-              return (
-                <li key={kind} className="grid gap-3 border-b border-rule-soft py-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] md:gap-8">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <p className="font-semibold text-ink">{kind === "identity" || kind === "insurance" ? info.shortLabel : `${info.shortLabel} check`}</p>
-                      {status !== "verified" && status !== "reverification_required" ? <span className="border border-ink px-1 text-[0.6875rem] font-bold uppercase">Required for work</span> : null}
-                      <StatusPill status={status} />
-                    </div>
-                    <p className="mt-1 text-[0.875rem] text-ink-2">
-                      {v?.verifiedAt ? `Verified ${monthYear(v.verifiedAt)}` : v?.submittedAt ? `Submitted ${monthYear(v.submittedAt)}` : "Not started"}
-                      {v?.expiresAt ? ` · ${status === "expired" ? "expired" : kind === "insurance" ? "policy valid to" : "rescreen due"} ${monthYear(v.expiresAt)}` : ""}
-                    </p>
-                    {v?.provider ? <p className="mt-0.5 text-[0.8125rem] text-ink-3">Screening provider: {v.provider === "mock" ? "Mock provider (demo)" : v.provider}</p> : null}
-                    {v?.notes && (status === "needs_info" || status === "rejected") ? <p className="mt-2 text-[0.875rem] text-amber">Reviewer: {v.notes}</p> : null}
-                  </div>
-                  <div>
-                    {kind === "insurance" ? (
-                      status === "verified" ? (
-                        <p className="text-[0.875rem] text-ink-3">Upload your renewed certificate before it expires to stay verified.</p>
-                      ) : status === "pending" ? (
-                        <p className="text-[0.875rem] text-ink-3">A Clutch reviewer is checking your certificate.</p>
-                      ) : (
-                        <form action={submitInsurance} className="grid gap-2 sm:grid-cols-2">
-                          <Field label="Insurance carrier">
-                            <input name="carrier" required className="input" placeholder="Carrier name" />
-                          </Field>
-                          <Field label="Policy expires">
-                            <input name="expiresOn" type="date" required className="input" />
-                          </Field>
-                          <Field label="Certificate of insurance" className="sm:col-span-2">
-                            <input name="document" type="file" accept=".pdf,image/*" className="block w-full text-[0.875rem]" />
-                          </Field>
-                          <button className="btn btn-ink sm:col-span-2 sm:justify-self-start">
-                            {status === "expired" || status === "reverification_required" ? "Upload renewal" : "Submit for review"}
-                          </button>
-                        </form>
-                      )
-                    ) : closed ? (
-                      <p className="border-l border-rule pl-3 text-[0.875rem] text-ink-2">
-                        <span className="font-semibold text-ink">Opens soon.</span> Clutch is connecting an independent screening company. Until then no one can complete
-                        this check. Customers see it as {v?.status === "pending" ? "could not be verified" : "not completed"}, and you can still be booked once your profile is complete.{" "}
-                        {v?.status === "pending" ? "The check you started earlier will need to be run again then." : ""}
-                      </p>
-                    ) : pendingMock ? (
-                      <form action={refreshScreening.bind(null, kind)} className="flex flex-wrap items-center gap-3">
-                        <p className="text-[0.875rem] text-ink-2">Waiting on the screening provider.</p>
-                        <button className="btn btn-quiet min-h-11 text-sm">Check for result (demo)</button>
-                      </form>
-                    ) : canStart ? (
-                      <form action={startScreening.bind(null, kind)} className="space-y-2">
-                        {kind === "identity" ? (
-                          <p className="text-[0.875rem] text-ink-2">You&apos;ll photograph a government ID and take a live selfie with our identity provider.</p>
-                        ) : (
-                          <label className="flex items-start gap-2 text-[0.875rem] text-ink-2">
-                            <input type="checkbox" name="consent" required className="mt-1 accent-[var(--carbon)]" />
-                            <span>
-                              I&apos;ve read the disclosure and authorize a {kind === "background" ? "background" : "motor vehicle record"} check by a consumer reporting agency.
-                            </span>
-                          </label>
-                        )}
-                        <button className="btn btn-ink min-h-11 text-sm">
-                          {status === "not_submitted" ? `Start ${kind === "identity" ? "identity verification" : "check"}` : "Re-run check"}
-                        </button>
-                      </form>
-                    ) : status === "verified" ? (
-                      <p className="text-[0.875rem] text-ink-3">Nothing to do. Clutch will ask you to rescreen before it expires.</p>
-                    ) : null}
-                  </div>
-                </li>
-              );
-            })}
+      <p className="flex items-center gap-2 text-[0.9375rem]">
+        <ShieldCheck size={18} className="text-ink-3" aria-hidden />
+        <span>
+          <span className="font-bold">{verifiedChecks} of {items.length}</span> checks verified. Customers see exactly which, and never your documents or reports.
+        </span>
+      </p>
+
+      {/* Account */}
+      <section aria-labelledby="account-title" className="space-y-2">
+        <h2 id="account-title" className="heading text-[1.25rem]">
+          Account
+        </h2>
+        <ul className="sheet divide-y divide-rule-soft">
+          <li className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+            <div>
+              <p className="font-semibold">Email</p>
+              <p className="text-[0.875rem] text-ink-2">{email && eff(email) === "verified" ? `Confirmed at sign-in on ${fmt(email.verifiedAt)}` : "Confirmed when you created your account"}</p>
+            </div>
+            <StatusPill status={email ? eff(email) : "verified"} />
+          </li>
+          <li className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+            <div>
+              <p className="font-semibold">Phone</p>
+              <p className="text-[0.875rem] text-ink-2">Not available yet: Clutch hasn&apos;t connected a text-message provider. Your number isn&apos;t shown as verified anywhere.</p>
+            </div>
+            <StatusPill status="not_started" />
+          </li>
         </ul>
       </section>
 
-      {/* SKILL TRACK */}
-      <section className="space-y-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="heading text-[1.375rem]">Proven experience</h2>
-          <p className="text-[0.8125rem] text-ink-3">{skillVerified} verified items on your profile</p>
-        </div>
+      {/* The four checks */}
+      <section aria-labelledby="checks-title" className="space-y-4">
+        <h2 id="checks-title" className="heading text-[1.25rem]">
+          Checks customers see
+        </h2>
+        <CheckCard
+          k="identity"
+          v={current("identity")}
+          statement={items.find((i) => i.key === "identity")!.statement}
+          status={eff(current("identity"))}
+          action={<IdentityAction v={current("identity")} status={eff(current("identity"))} available={Boolean(idCfg.provider)} />}
+          unavailable={idCfg.provider ? undefined : "Identity verification isn't available yet: Clutch hasn't connected its identity provider. Nothing is needed from you, and your profile says identity isn't verified."}
+        />
+        <CheckCard
+          k="insurance"
+          v={current("insurance")}
+          statement={items.find((i) => i.key === "insurance")!.statement}
+          status={eff(current("insurance"))}
+          action={<InsuranceAction v={current("insurance")} status={eff(current("insurance"))} />}
+          extra={pendingRenewal(vers, current("insurance"))}
+        />
+        {(["background", "driving_record"] as const).map((k) => (
+          <CheckCard
+            key={k}
+            k={k}
+            v={current(k)}
+            statement={items.find((i) => i.key === k)?.statement ?? `${CHECK_INFO[k].name} not verified by Clutch`}
+            status={eff(current(k))}
+            unavailable={
+              screeningOpen(k, repo.scope)
+                ? undefined
+                : `Not available yet: Clutch hasn't connected a screening company${screenProblems.some((p) => p.includes("policy")) ? " or approved its screening policy" : ""}. Nothing is needed from you; your profile says it isn't verified.`
+            }
+            action={screeningOpen(k, repo.scope) ? <ScreeningAction k={k} v={current(k)} status={eff(current(k))} /> : null}
+          />
+        ))}
+      </section>
 
+      {/* Skill evidence */}
+      <section aria-labelledby="skill-title" className="space-y-6">
+        <div>
+          <h2 id="skill-title" className="heading text-[1.25rem]">
+            Proof of your skill
+          </h2>
+          <p className="text-[0.9375rem] text-ink-2">Separate from the checks above. Each item shows who confirmed it; unconfirmed items show as self-reported.</p>
+        </div>
         <div className="space-y-3">
           <h3 className="field-label">Certifications</h3>
           <ul className="border-t border-rule">
@@ -185,24 +157,22 @@ export default async function VerificationCenter({ searchParams }: { searchParam
               return (
                 <li key={c.id} className="grid gap-2 border-b border-rule-soft py-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
                   <div>
-                    <p className="font-semibold text-ink">
+                    <p className="font-semibold">
                       {c.issuer} {c.code} <span className="font-normal text-ink-2">· {c.name}</span>
                     </p>
                     <p className="text-[0.8125rem] text-ink-3">
-                      {v ? `${METHOD_LABEL[v.method]}` : ""}
-                      {status === "verified" && v ? ` → shows as ${PROVENANCE[methodToProvenance(v.method)].label}` : ""}
+                      {v ? METHOD_LABEL[v.method] : "Self-reported"}
+                      {status === "verified" && v ? `, shows as ${PROVENANCE[methodToProvenance(v.method)].label}` : ""}
                       {c.expiresOn ? ` · expires ${monthYear(c.expiresOn)}` : ""}
+                      {v && !v.documentIds?.length && status !== "verified" ? " · no document attached yet" : ""}
                     </p>
-                    {v?.notes && status === "needs_info" ? <p className="mt-1 text-[0.875rem] text-amber">Reviewer: {v.notes}</p> : null}
+                    {v && (status === "needs_more_info" || status === "failed") ? <p className="mt-1 text-[0.875rem] text-amber">{mechanicMessage(v.reasonCodes, v.notes)}</p> : null}
                   </div>
-                  <div className="flex flex-wrap items-center gap-3">
+                  <div className="space-y-2">
                     <StatusPill status={status} />
-                    {v && (status === "needs_info" || status === "rejected" || status === "expired") && (
-                      <form action={resubmitVerification.bind(null, v.id)} className="flex gap-2">
-                        <input name="note" placeholder="What changed?" className="input min-h-11 w-44 py-1 text-sm" />
-                        <button className="btn btn-quiet min-h-11 text-sm">Resubmit</button>
-                      </form>
-                    )}
+                    {v && (status === "needs_more_info" || status === "failed" || status === "expired" || status === "renewal_due" || (status === "submitted" && !v.documentIds?.length)) ? (
+                      <ResubmitForm id={v.id} doc />
+                    ) : null}
                   </div>
                 </li>
               );
@@ -230,16 +200,16 @@ export default async function VerificationCenter({ searchParams }: { searchParam
               <Field label="Expires">
                 <input name="expiresOn" type="date" className="input" />
               </Field>
-              <Field label="Certificate or transcript" className="sm:col-span-2">
-                <input name="document" type="file" accept=".pdf,image/*" className="block w-full py-2 text-[0.875rem]" />
-              </Field>
-              <button className="btn btn-ink sm:col-span-4 sm:justify-self-start">Submit for verification</button>
+              <div className="sm:col-span-4">
+                <EvidenceUpload label="Certificate or transcript" hint="A PDF, or a clear photo of the paper. Stored privately; only you and the reviewer can open it." />
+              </div>
+              <button className="btn btn-ink sm:col-span-4 sm:justify-self-start">Submit for review</button>
             </form>
           </details>
         </div>
 
-        <div className="space-y-3 pt-4">
-          <h3 className="field-label">Employment history</h3>
+        <div className="space-y-3">
+          <h3 className="field-label">Where you&apos;ve worked</h3>
           <ul className="border-t border-rule">
             {src.employment.map((e) => {
               const v = ver(e.id);
@@ -247,22 +217,18 @@ export default async function VerificationCenter({ searchParams }: { searchParam
               return (
                 <li key={e.id} className="grid gap-2 border-b border-rule-soft py-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
                   <div>
-                    <p className="font-semibold text-ink">
+                    <p className="font-semibold">
                       {e.position} <span className="font-normal text-ink-2">· {e.employer}</span>
                     </p>
                     <p className="text-[0.8125rem] text-ink-3">
-                      {monthYear(e.startedOn)} – {e.endedOn ? monthYear(e.endedOn) : "present"}
-                      {status === "not_submitted" ? " · shows as self-reported until verified" : ""}
+                      {monthYear(e.startedOn)} to {e.endedOn ? monthYear(e.endedOn) : "present"}
+                      {status === "not_started" ? " · shows as self-reported until confirmed" : ""}
                     </p>
+                    {v && (status === "needs_more_info" || status === "failed") ? <p className="mt-1 text-[0.875rem] text-amber">{mechanicMessage(v.reasonCodes, v.notes)}</p> : null}
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="space-y-2">
                     <StatusPill status={status} />
-                    {status === "not_submitted" && v ? (
-                      <form action={resubmitVerification.bind(null, v.id)}>
-                        <input type="hidden" name="note" value="Requesting employer verification" />
-                        <button className="btn btn-quiet min-h-11 text-sm">Request verification</button>
-                      </form>
-                    ) : null}
+                    {v && (status === "needs_more_info" || status === "failed") ? <ResubmitForm id={v.id} doc /> : null}
                   </div>
                 </li>
               );
@@ -283,28 +249,219 @@ export default async function VerificationCenter({ searchParams }: { searchParam
               <Field label="Ended">
                 <input name="endedOn" type="date" className="input" />
               </Field>
-              <Field label="Letter or pay stub (optional)" className="sm:col-span-2" hint="Or we contact the service manager directly.">
-                <input name="document" type="file" accept=".pdf,image/*" className="block w-full py-2 text-[0.875rem]" />
-              </Field>
-              <button className="btn btn-ink sm:col-span-4 sm:justify-self-start">Submit for verification</button>
+              <div className="sm:col-span-4">
+                <EvidenceUpload label="Letter or pay stub (optional)" hint="Or Clutch contacts the service manager directly." />
+              </div>
+              <button className="btn btn-ink sm:col-span-4 sm:justify-self-start">Submit for review</button>
             </form>
           </details>
         </div>
 
-        <div className="space-y-3 pt-4">
-          <h3 className="field-label">Previous repairs</h3>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-y border-rule py-3">
-            <p className="text-[0.9375rem] text-ink-2">
-              <span className="tnum font-semibold text-ink">{pub.reputation.platformRepairs}</span> completed on Clutch ·{" "}
-              <span className="tnum font-semibold text-ink">{pub.reputation.customerRepairs}</span> confirmed by customers ·{" "}
-              <span className="tnum font-semibold text-pencil">{pub.selfReported.repairs.length}</span> self-reported
-            </p>
-            <Link href="/mechanic/repairs" className="btn btn-line min-h-11 text-sm">
-              Manage repair record
-            </Link>
-          </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-y border-rule py-3">
+          <p className="text-[0.9375rem] text-ink-2">
+            <span className="tnum font-semibold text-ink">{pub.reputation.platformRepairs}</span> completed on Clutch ·{" "}
+            <span className="tnum font-semibold text-ink">{pub.reputation.customerRepairs}</span> confirmed by customers ·{" "}
+            <span className="tnum font-semibold text-pencil">{pub.selfReported.repairs.length}</span> self-reported
+          </p>
+          <Link href="/mechanic/repairs" className="btn btn-line min-h-11 text-sm">
+            Previous repairs
+          </Link>
         </div>
       </section>
+
+      <p className="text-[0.875rem] text-ink-2">
+        Something wrong or stuck?{" "}
+        <Link href="/help" className="font-semibold underline decoration-rule underline-offset-2">
+          Contact support
+        </Link>
+        . Tell us which check; never send ID numbers or documents by message.
+      </p>
     </div>
+  );
+}
+
+/** A renewal waiting for review while the current record is still valid. */
+function pendingRenewal(vers: VerificationRecord[], cur?: VerificationRecord) {
+  if (!cur) return null;
+  const next = vers.find((v) => v.supersedes === cur.id && !v.supersededBy && cur.supersededBy !== v.id);
+  if (!next) return null;
+  return <p className="text-[0.875rem] text-ink-2">Your renewal (submitted {fmt(next.submittedAt)}) is {STATUS_LABEL[effectiveStatus(next.status, next.expiresAt)].toLowerCase()}. The current policy stays on your profile until it&apos;s approved or expires.</p>;
+}
+
+function CheckCard({
+  k,
+  v,
+  status,
+  statement,
+  action,
+  unavailable,
+  extra,
+}: {
+  k: CheckKey;
+  v?: VerificationRecord;
+  status: EffectiveStatus;
+  statement: string;
+  action?: React.ReactNode;
+  unavailable?: string;
+  extra?: React.ReactNode;
+}) {
+  const info = CHECK_INFO[k];
+  const message = v && (status === "needs_more_info" || status === "failed" || status === "revoked") ? mechanicMessage(v.reasonCodes, v.notes) : "";
+  return (
+    <article id={k === "driving_record" ? "driving" : k} aria-labelledby={`${k}-title`} className="sheet scroll-mt-24">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-rule-soft px-4 py-3 sm:px-5">
+        <div className="min-w-0">
+          <h3 id={`${k}-title`} className="heading text-[1.125rem]">
+            {info.name}
+          </h3>
+          <p className="text-[0.9375rem] text-ink-2">{statement}</p>
+        </div>
+        <StatusPill status={status} />
+      </div>
+      <div className="space-y-3 px-4 py-3 sm:px-5">
+        {message ? <Notice tone={status === "needs_more_info" ? "warn" : "error"}>{message}</Notice> : null}
+        {status === "renewal_due" && v?.expiresAt ? <Notice tone="warn">Expires {fmt(v.expiresAt)}. Renew it to keep it on your profile.</Notice> : null}
+        {status === "expired" ? <Notice tone="warn">This expired, so customers no longer see it as verified. Renew it below.</Notice> : null}
+        {extra}
+        {unavailable ? <p className="text-[0.9375rem] text-ink-2">{unavailable}</p> : action}
+        <details className="group">
+          <summary className="min-h-11 cursor-pointer content-center text-[0.875rem] font-semibold underline decoration-rule underline-offset-2">About this check</summary>
+          <dl className="mt-2 grid gap-2 text-[0.875rem] sm:grid-cols-[9rem_minmax(0,1fr)]">
+            <dt className="field-label pt-0.5">Why it helps</dt>
+            <dd>{info.why}</dd>
+            <dt className="field-label pt-0.5">You&apos;ll need</dt>
+            <dd>{info.needs}</dd>
+            <dt className="field-label pt-0.5">What leaves Clutch</dt>
+            <dd>{info.dataLeaves}</dd>
+            <dt className="field-label pt-0.5">Time</dt>
+            <dd>{info.time}</dd>
+            <dt className="field-label pt-0.5">How long it lasts</dt>
+            <dd>{info.validMonths ? `${info.validMonths} months, then renew` : "Until the policy's expiry date"}</dd>
+          </dl>
+          {v?.events?.length ? <History events={v.events} /> : null}
+        </details>
+      </div>
+    </article>
+  );
+}
+
+function History({ events }: { events: VerificationEvent[] }) {
+  const word: Record<string, string> = {
+    created: "Created",
+    started: "Started",
+    submitted: "Submitted",
+    provider_update: "Provider update",
+    approved: "Approved",
+    rejected: "Not approved",
+    requested_info: "More information requested",
+    revoked: "Withdrawn",
+    expired: "Expired",
+    cancelled: "Cancelled",
+    superseded: "Replaced by a newer submission",
+    reminded: "Renewal reminder sent",
+    migrated: "Recorded before this history existed",
+  };
+  return (
+    <div className="mt-3">
+      <p className="field-label">History</p>
+      <ol className="mt-1 space-y-1 text-[0.8125rem] text-ink-2">
+        {events.map((e, i) => (
+          <li key={i} className="flex gap-2">
+            <Clock size={13} className="mt-0.5 shrink-0" aria-hidden />
+            <span>
+              {fmt(e.at)}: {word[e.action] ?? e.action}
+              {e.to !== e.from && e.action !== "created" ? ` (${STATUS_LABEL[e.to].toLowerCase()})` : ""}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function IdentityAction({ v, status, available }: { v?: VerificationRecord; status: EffectiveStatus; available: boolean }) {
+  if (!available) return null;
+  if (status === "verified") return <p className="text-[0.875rem] text-ink-2">Nothing to do. You&apos;ll be reminded before it needs renewing.</p>;
+  if (status === "under_review" || status === "submitted") return <p className="text-[0.875rem] text-ink-2">The provider is checking. Results usually arrive within a minute; you&apos;ll get a notification.</p>;
+  const label = status === "in_progress" ? "Continue identity check" : status === "needs_more_info" ? "Try again" : status === "renewal_due" || status === "expired" ? "Renew identity" : v && (status === "failed" || status === "revoked") ? "Start a new check" : "Verify your identity";
+  return (
+    <form action={startIdentity} className="space-y-2">
+      <p className="text-[0.875rem] text-ink-2">You&apos;ll go to Stripe Identity&apos;s secure page to photograph your ID and take a selfie with your phone&apos;s camera, then come back here.</p>
+      <button className="btn btn-ink min-h-12">
+        {label} <ArrowRight size={16} aria-hidden />
+      </button>
+    </form>
+  );
+}
+
+function InsuranceAction({ v, status }: { v?: VerificationRecord; status: EffectiveStatus }) {
+  if (status === "submitted" || status === "under_review") return <p className="text-[0.875rem] text-ink-2">With Clutch staff for review, usually within 2 business days.</p>;
+  if (status === "needs_more_info" && v) return <ResubmitForm id={v.id} doc />;
+  const renewing = status === "verified" || status === "renewal_due" || status === "expired";
+  if (status === "verified") return <details><summary className="btn btn-quiet min-h-11 cursor-pointer list-none text-sm [&::-webkit-details-marker]:hidden">Upload a renewed policy</summary><InsuranceForm renewing /></details>;
+  return <InsuranceForm renewing={renewing} />;
+}
+
+function InsuranceForm({ renewing }: { renewing: boolean }) {
+  return (
+    <form action={submitInsurance} className="mt-2 grid gap-3 sm:grid-cols-2">
+      <Field label="Policy type">
+        <select name="policyType" className="input" defaultValue="general_liability" required>
+          <option value="general_liability">General liability</option>
+          <option value="garage_liability">Garage liability</option>
+          <option value="garagekeepers">Garagekeepers</option>
+          <option value="commercial_auto">Commercial auto</option>
+          <option value="other">Other</option>
+        </select>
+      </Field>
+      <Field label="Insurance company">
+        <input name="carrier" required className="input" autoComplete="off" />
+      </Field>
+      <Field label="Named insured" hint="You, or your business, as written on the certificate." className="sm:col-span-2">
+        <input name="namedInsured" required className="input" autoComplete="off" />
+      </Field>
+      <Field label="Effective">
+        <input name="effectiveOn" type="date" required className="input" />
+      </Field>
+      <Field label="Expires">
+        <input name="expiresOn" type="date" required className="input" />
+      </Field>
+      <div className="sm:col-span-2">
+        <EvidenceUpload label="Certificate of insurance" required hint="A PDF, or a clear photo. Stored privately; only you and the Clutch reviewer can open it." />
+      </div>
+      <button className="btn btn-ink min-h-12 sm:col-span-2 sm:justify-self-start">{renewing ? "Submit renewal" : "Submit for review"}</button>
+    </form>
+  );
+}
+
+function ScreeningAction({ k, v, status }: { k: "background" | "driving_record"; v?: VerificationRecord; status: EffectiveStatus }) {
+  if (status === "in_progress" || status === "under_review")
+    return (
+      <form action={refreshScreening.bind(null, k)}>
+        <p className="text-[0.875rem] text-ink-2">With the screening company. Results usually take {k === "background" ? "1 to 3" : "1 to 2"} business days.</p>
+        <button className="btn btn-quiet mt-2 min-h-11 text-sm">Check for a result</button>
+      </form>
+    );
+  if (status === "verified") return <p className="text-[0.875rem] text-ink-2">Nothing to do. You&apos;ll be reminded before it needs renewing.</p>;
+  return (
+    <form action={startScreening.bind(null, k)} className="space-y-2">
+      <label className="flex items-start gap-2 text-[0.875rem]">
+        <input type="checkbox" name="consent" required className="mt-1" />
+        <span>I consent to a {k === "background" ? "background check" : "motor vehicle record check"} by the screening company named in the disclosure, and to Clutch receiving only the outcome.</span>
+      </label>
+      <button className="btn btn-ink min-h-11">{v ? "Run again" : "Start"}</button>
+    </form>
+  );
+}
+
+function ResubmitForm({ id, doc }: { id: string; doc?: boolean }) {
+  return (
+    <form action={resubmitVerification.bind(null, id)} className="grid gap-2">
+      {doc ? <EvidenceUpload label="Updated document" /> : null}
+      <Field label="What changed? (optional)">
+        <input name="note" className="input" />
+      </Field>
+      <button className="btn btn-line min-h-11 justify-self-start text-sm">Resubmit</button>
+    </form>
   );
 }

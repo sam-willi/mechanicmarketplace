@@ -1,4 +1,5 @@
-import type { ProvenanceSource, VerificationStatus } from "@/lib/domain/types";
+import type { ProvenanceSource } from "@/lib/domain/types";
+import type { EffectiveStatus } from "@/lib/verification/model";
 
 /**
  * The form's tick box, drawn once and reused everywhere. Filled carbon = proven.
@@ -59,18 +60,21 @@ export function Tick({ state = "verified", size = 16, className = "" }: { state?
 /** inferred: worked out by Clutch from other facts (dotted, with a centre dot), never shown as confirmed. */
 export type TickState = "verified" | "self" | "pending" | "lapsed" | "renewing" | "inferred" | "blank";
 
-export function tickForStatus(status: VerificationStatus, provenance?: ProvenanceSource): TickState {
-  if (provenance === "self" && (status === "not_submitted" || status === "verified")) return "self";
+export function tickForStatus(status: EffectiveStatus, provenance?: ProvenanceSource): TickState {
+  if (provenance === "self" && (status === "not_started" || status === "verified")) return "self";
   switch (status) {
     case "verified":
       return "verified";
-    case "reverification_required":
+    case "renewal_due":
       return "renewing";
-    case "pending":
-    case "needs_info":
+    case "in_progress":
+    case "submitted":
+    case "under_review":
+    case "needs_more_info":
       return provenance === "self" ? "self" : "pending";
     case "expired":
-    case "rejected":
+    case "failed":
+    case "revoked":
       return "lapsed";
     default:
       return "blank";

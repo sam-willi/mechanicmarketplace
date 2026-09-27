@@ -9,7 +9,7 @@ import { memoryQueries } from "@/lib/data/normalized/queries";
 import { rankSearch, explainSearch, type SearchInput } from "@/lib/domain/search";
 import { findArea } from "@/lib/domain/areas";
 import { effectiveStatus, today } from "@/lib/verification/lifecycle";
-import { inQueue } from "@/lib/admin-queue";
+import { inQueue, STAFF_SKIP } from "@/lib/admin-queue";
 import { unmatchedDemand, DEMAND_LIMIT } from "@/lib/demand";
 import { runDeliveryOnce, recipientLoader, deliveryHealth } from "@/lib/notify/worker";
 import { toPublicProfile } from "@/lib/domain/public-profile";
@@ -133,7 +133,8 @@ test("search reads bookable (profile-complete) candidates, verified or not, and 
   for (const c of SOURCE_COLLECTIONS) for (const row of d[c] as { mechanicId: string }[]) assert.ok(read.has(row.mechanicId), `${c} row of an unread mechanic`);
   assert.ok(d.users.length === 0 && d.requests.length === 0 && d.customers.length === 0, "search reads no accounts, requests or customers");
   assert.ok(d.pastRepairs.length === 0 && d.reviews.length === 0 && d.credentials.length === 0, "ranking uses the database's counts: no repair, review or credential documents are read");
-  assert.ok(d.verifications.every((v) => v.subjectType === "insurance_record"), "only the verification behind each insurance status");
+  assert.ok(d.verifications.every((v) => ["identity", "background", "driving_record", "insurance"].includes(v.category)), "only the records behind the four checks customers see");
+  assert.ok(d.verifications.every((v) => v.events === undefined && v.documentIds === undefined && v.reasonCodes === undefined && v.providerRef === undefined && v.decidedBy === undefined), "never their history, documents, reasons or provider references");
   report.searchPool = { bookable: bookable.length, fullyVerified: bookable.length - unverified.length, sampleNotBookable: others.length, mechanicsRead: d.mechanics.length, rows: p.rows, queries: p.queries };
   // A fixed number of queries whatever the number of mechanics: candidates, rows, check records, counts, the sample.
   assert.ok(p.queries <= 20, `search queries: ${p.queries} for ${d.mechanics.length} mechanics`);
@@ -192,7 +193,8 @@ test("cursor pagination is stable, complete and duplicate-free; stale and malfor
   }
   assert.deepEqual(nSeen, nExpected);
   const now = new Date().toISOString();
-  const qExpected = (await db<{ id: string }[]>`select id from lv_verifications where status = 'pending' order by coalesce(data->>'submittedAt', '') collate "C", id collate "C"`).map((r) => r.id);
+  // Waiting for staff: submitted or under review, by a method staff decide (never a provider's).
+  const qExpected = (await db<{ id: string }[]>`select id from lv_verifications where status in ('submitted', 'under_review') and coalesce(data->>'method', '') not in ${db(STAFF_SKIP)} order by coalesce(data->>'submittedAt', '') collate "C", id collate "C"`).map((r) => r.id);
   const qSeen: string[] = [];
   let qa: string | undefined;
   for (let i = 0; i < 50; i++) {

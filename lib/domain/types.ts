@@ -1,3 +1,4 @@
+import type { Actor, CheckStatus, VerificationEvent } from "@/lib/verification/model";
 import type { AuditEntry } from "./transitions";
 export type { AuditEntry } from "./transitions";
 
@@ -66,19 +67,15 @@ export type ProvenanceSource =
   | "document"
   | "self";
 
-export type VerificationStatus =
-  | "not_submitted"
-  | "pending"
-  | "verified"
-  | "rejected"
-  | "needs_info"
-  | "expired"
-  | "reverification_required";
+/** The canonical statuses (lib/verification/model.ts). Expiry and "renewal due" are derived at read time. */
+export type VerificationStatus = CheckStatus;
 
 /** Safety = baseline screening. Skill = competence evidence. Never mixed. */
 export type VerificationTrack = "safety" | "skill";
 
 export type VerificationCategory =
+  | "email"
+  | "phone"
   | "identity"
   | "background"
   | "driving_record"
@@ -88,7 +85,10 @@ export type VerificationCategory =
   | "past_repair";
 
 export type VerificationMethod =
-  | "vendor_screening" // third-party identity / background / MVR vendor
+  | "hosted_identity" // hosted government ID + live selfie + face match (Stripe Identity)
+  | "email_link" // the sign-in provider confirmed the address (email link or Google)
+  | "sms_code" // one-time code by text
+  | "vendor_screening" // third-party background / MVR vendor
   | "document_review" // Clutch staff reviewed an uploaded document
   | "institution_check" // confirmed with issuing body
   | "employer_check" // confirmed with employer
@@ -96,29 +96,58 @@ export type VerificationMethod =
   | "platform_job"; // completed through Clutch
 
 export type SubjectType =
+  | "account"
   | "screening_check"
   | "insurance_record"
   | "credential"
   | "employment"
   | "past_repair";
 
+/**
+ * One canonical record per check (docs/verification.md). Changed only through
+ * lib/verification/model.ts `transition`, which appends to `events`; nothing is overwritten.
+ */
 export interface VerificationRecord {
   id: ID;
   mechanicId: ID;
+  /** The login behind the mechanic profile (the subject account). */
+  accountId?: ID;
   subjectType: SubjectType;
   subjectId: ID;
   category: VerificationCategory;
   method: VerificationMethod;
-  /** Vendor key for screening (e.g. "mock", "persona", "checkr"). Never on the mechanic. */
+  /** "stripe_identity", "test", "mock" (fictional demo only), "clutch_staff". Never shown to customers except by display name. */
   provider?: string;
+  /** The provider's session or report id. Private. */
+  providerRef?: string;
   status: VerificationStatus;
   submittedAt?: ISODate;
+  reviewedAt?: ISODate;
   verifiedAt?: ISODate;
   expiresAt?: ISODate;
+  /** Staff reviewer (legacy field; decidedBy is canonical). */
   reviewerId?: ID;
+  /** Who made the latest decision: a staff user, a provider webhook event, or the system. */
+  decidedBy?: Actor;
+  /** Canonical reason codes for the latest decision (lib/verification/reasons.ts). */
+  reasonCodes?: string[];
+  /** The latest note to the mechanic. History keeps every one. */
   notes?: string;
   /** What the mechanic submitted, described for the admin queue. Private. */
   evidenceSummary?: string;
+  /** Private uploads that back this record (insurance certificate, credential), served only through signed links. */
+  documentIds?: ID[];
+  /** A resubmission or renewal: the record this one replaces, and the one that replaced it. */
+  supersedes?: ID;
+  supersededBy?: ID;
+  /** Backfilled from before this model: what is and isn't known. */
+  legacy?: { note: string; unbacked?: boolean };
+  /** Append-only history. */
+  events?: VerificationEvent[];
+  /** Identity: whether the name on the ID matched the account name (provider's yes/no only). */
+  nameMatches?: boolean;
+  /** Background/MVR: when the mechanic gave disclosure consent. */
+  consentAt?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -317,9 +346,15 @@ export interface ScreeningCheck {
   expiresAt?: ISODate;
 }
 
+export type InsurancePolicyType = "general_liability" | "garage_liability" | "garagekeepers" | "commercial_auto" | "other";
+
 export interface InsuranceRecord {
   id: ID;
   mechanicId: ID;
+  /** Missing on records from before 2026-09-27. */
+  policyType?: InsurancePolicyType;
+  /** The person or business the policy names. */
+  namedInsured?: string;
   carrier: string;
   policyLast4: string;
   coverageCents: number;
@@ -426,6 +461,7 @@ export type WorkSpace = "yes" | "limited" | "unsure";
 
 export type MediaKind = "photo" | "video" | "audio" | "document";
 export type MediaTag =
+  | "verification_doc"
   | "portrait"
   | "before"
   | "after"
@@ -695,6 +731,8 @@ export interface CheckSnapshot {
   /** The words the customer saw, e.g. "Not completed", "Expired Sep 2026". */
   status: string;
   verified: boolean;
+  /** The full statement shown ("Identity verified by Stripe Identity on Sep 26, 2026"). Missing on bookings before 2026-09-27. */
+  statement?: string;
 }
 
 /** The mechanic's verification when the customer booked, and what they acknowledged if it wasn't complete. */

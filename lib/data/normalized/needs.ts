@@ -1,3 +1,4 @@
+import { STAFF_SKIP } from "@/lib/admin-queue";
 import { Reader, OWNER_MAX, textArray, type Cursor } from "./reader";
 import type { Slice } from "./slice";
 import { needsNewMechanic } from "@/lib/domain/status";
@@ -452,12 +453,12 @@ export class LiveNeeds {
     const eff = () => s`lv_effective_status(status, data->>'expiresAt', ${nowIso}::timestamptz)`;
     const cond =
       filterKey === "expiring"
-        ? s`status = 'verified' and ${eff()} in ('expired', 'reverification_required')`
+        ? s`status = 'verified' and ${eff()} in ('expired', 'renewal_due')`
         : filterKey === "done"
-          ? s`status in ('verified', 'rejected') and ${eff()} in ('verified', 'rejected') and coalesce(data->>'method', '') not in ('platform_job', 'customer_confirmation')`
+          ? s`status in ('verified', 'failed', 'revoked') and ${eff()} in ('verified', 'failed', 'revoked') and coalesce(data->>'method', '') not in ('platform_job', 'customer_confirmation')`
           : filterKey === "waiting"
-            ? s`status = 'needs_info'`
-            : s`status = 'pending'`;
+            ? s`status = 'needs_more_info'`
+            : s`status in ('submitted', 'under_review') and coalesce(data->>'method', '') not in ${s(STAFF_SKIP)}`;
     const rows = await this.r.load(
       "verifications",
       s`${cond} ${category ? s`and category = ${category}` : s``}

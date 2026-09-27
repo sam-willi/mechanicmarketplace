@@ -41,9 +41,9 @@ async function mechanic() {
   for (const kind of ["identity", "background", "driving_record"] as const) {
     current("live").screenings.push({ id: `scr-${id}-${kind}`, mechanicId: m.id, kind, provider: "provider-under-test", providerRef: `ref-${id}-${kind}`, status: "verified", result: "clear", completedAt: "2026-09-20", expiresAt: "2027-09-20" });
   }
-  await live.submitInsurance(m.id, { carrier: "Test Mutual", expiresOn: "2027-12-31", documentName: "coi.pdf" });
-  const ins = live.listVerifications({ mechanicId: m.id, statuses: ["pending"] }).find((v) => v.category === "insurance")!;
-  await live.decideVerification(ins.id, "verified", await staff(), "Checked", "2027-12-31");
+  await live.submitInsurance(m.id, { carrier: "Test Mutual", expiresOn: "2027-12-31", documentIds: ["doc-test"] });
+  const ins = live.listVerifications({ mechanicId: m.id, statuses: ["submitted"] }).find((v) => v.category === "insurance")!;
+  await live.decideVerification(ins.id, "approve", await staff(), { reasonCode: "evidence_matches", expiresAt: "2027-12-31" });
   return live.getMechanic(m.id)!;
 }
 

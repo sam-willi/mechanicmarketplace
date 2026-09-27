@@ -1,12 +1,14 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getRepo } from "@/lib/data";
 import { orBack } from "@/lib/lifecycle-action";
 import { LifecycleError } from "@/lib/domain/transitions";
 import { getMedia } from "@/lib/data/mock/media-store";
+import { identityConfig } from "@/lib/verification/identity/config";
+import { ProviderUnavailable } from "@/lib/verification/identity/types";
 import { getAccount, getSession, MODE_COOKIE, needs, PERSONA_COOKIE } from "@/lib/session";
 import { toPublicProfile } from "@/lib/domain/public-profile";
 import { eligibility } from "@/lib/domain/eligibility";
@@ -18,6 +20,7 @@ import {
   type DeclineReason,
   type RepairCategory,
   type ScreeningKind,
+  type InsurancePolicyType,
   type VehicleMake,
 } from "@/lib/domain/types";
 
@@ -84,7 +87,7 @@ export async function saveOnboarding(formData: FormData) {
       name: str(formData, "credName"),
       code: str(formData, "credCode") || undefined,
       expiresOn: str(formData, "credExpires") || undefined,
-      documentName: fileName(formData, "credDoc") || undefined,
+
     });
   }
   if (str(formData, "employer") && str(formData, "position")) {
@@ -93,12 +96,8 @@ export async function saveOnboarding(formData: FormData) {
       position: str(formData, "position"),
       startedOn: str(formData, "empStart") || "2015-01-01",
       endedOn: str(formData, "empEnd") || undefined,
-      documentName: fileName(formData, "empDoc") || undefined,
+
     });
-  }
-  const insDoc = fileName(formData, "insDoc");
-  if (str(formData, "insCarrier") && str(formData, "insExpires")) {
-    await repo.submitInsurance(m.id, { carrier: str(formData, "insCarrier"), expiresOn: str(formData, "insExpires"), documentName: insDoc || "certificate-of-insurance.pdf" });
   }
   const jar = await cookies();
   jar.set(MODE_COOKIE, "mechanic", { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
@@ -107,10 +106,63 @@ export async function saveOnboarding(formData: FormData) {
 }
 
 // -------------------------------------------------------------- verification
+/**
+ * Documents attached to a submission: each must be a verification document this account uploaded,
+ * in this marketplace. Anything else (someone else's upload, a repair photo) is refused.
+ */
+async function ownDocuments(formData: FormData, userId: string, scope: "live" | "demo") {
+  const ids = [...new Set(formData.getAll("documentIds").map(String).filter(Boolean))].slice(0, 5);
+  for (const id of ids) {
+    const m = await getMedia(scope, id);
+    if (!m || m.ownerId !== userId || m.meta.tag !== "verification_doc") throw new LifecycleError("That document isn't one you uploaded here. Upload it again.", "forbidden");
+  }
+  return ids;
+}
+
+function origin(h: Headers) {
+  const app = (process.env.APP_URL ?? "").replace(/\/$/, "");
+  if (app) return app;
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  return `${h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https")}://${host}`;
+}
+
+/**
+ * Identity: start (or resume) a hosted session with the configured provider, bound to this
+ * signed-in mechanic and record, then hand over to the provider's short-lived URL. The result
+ * only ever comes from the provider (signed webhook, or a server-side fetch on return).
+ */
+export async function startIdentity() {
+  const repo = await getRepo();
+  const s = await getSession();
+  if (s.role !== "mechanic") redirect("/login?next=/mechanic/verification");
+  const cfg = identityConfig(repo.scope);
+  if (!cfg.provider) redirect("/mechanic/verification?identity=unavailable#identity");
+  await (await needs(s)).ownSources();
+  let url: string;
+  try {
+    const rec = await repo.prepareIdentityCheck(s.mechanicId);
+    const session = await cfg.provider.createSession({
+      recordId: rec.id,
+      accountId: s.userId,
+      scope: repo.scope,
+      returnUrl: `${origin(await headers())}/mechanic/verification/identity/return?r=${rec.id}`,
+      idempotencyKey: `identity:${rec.id}:${(rec.events ?? []).filter((e) => e.action === "cancelled" || e.action === "started").length}`,
+    });
+    await repo.recordIdentityStart(s.mechanicId, { provider: cfg.provider.key, providerRef: session.providerRef, recordId: rec.id });
+    url = session.url;
+  } catch (e) {
+    if (e instanceof ProviderUnavailable) redirect("/mechanic/verification?identity=outage#identity");
+    if (e instanceof LifecycleError) redirect(`/mechanic/verification?error=${encodeURIComponent(e.message)}#identity`);
+    throw e;
+  }
+  redirect(url);
+}
+
 export async function startScreening(kind: ScreeningKind, formData: FormData) {
   const repo = await getRepo();
   const id = await mechanicId();
-  await repo.startScreening(id, kind, str(formData, "consent") === "on" || kind === "identity");
+  if (kind === "identity") return startIdentity();
+  await repo.startScreening(id, kind, str(formData, "consent") === "on");
   refresh();
 }
 
@@ -123,40 +175,61 @@ export async function refreshScreening(kind: ScreeningKind) {
 
 export async function submitCredential(formData: FormData) {
   const repo = await getRepo();
-  const id = await mechanicId();
-  await repo.submitCredential(id, {
+  const s = await getSession();
+  if (s.role !== "mechanic") return;
+  await (await needs(s)).ownSources();
+  const documentIds = await ownDocuments(formData, s.userId, repo.scope);
+  await repo.submitCredential(s.mechanicId, {
     issuer: str(formData, "issuer"),
     name: str(formData, "name"),
     code: str(formData, "code") || undefined,
     issuedOn: str(formData, "issuedOn") || undefined,
     expiresOn: str(formData, "expiresOn") || undefined,
-    documentName: fileName(formData, "document") || "certificate.pdf",
-  });
+    documentIds,
+  } as never);
   refresh();
 }
 
 export async function submitEmployment(formData: FormData) {
   const repo = await getRepo();
-  const id = await mechanicId();
-  await repo.submitEmployment(id, {
+  const s = await getSession();
+  if (s.role !== "mechanic") return;
+  await (await needs(s)).ownSources();
+  const documentIds = await ownDocuments(formData, s.userId, repo.scope);
+  await repo.submitEmployment(s.mechanicId, {
     employer: str(formData, "employer"),
     position: str(formData, "position"),
     startedOn: str(formData, "startedOn") || "2015-01-01",
     endedOn: str(formData, "endedOn") || undefined,
-    documentName: fileName(formData, "document") || undefined,
-  });
+    documentIds,
+  } as never);
   refresh();
 }
 
+const POLICY_TYPES: InsurancePolicyType[] = ["general_liability", "garage_liability", "garagekeepers", "commercial_auto", "other"];
+
 export async function submitInsurance(formData: FormData) {
   const repo = await getRepo();
-  const id = await mechanicId();
-  await repo.submitInsurance(id, {
-    carrier: str(formData, "carrier"),
-    expiresOn: str(formData, "expiresOn"),
-    documentName: fileName(formData, "document") || "certificate-of-insurance.pdf",
-  });
+  const s = await getSession();
+  if (s.role !== "mechanic") return;
+  await (await needs(s)).ownSources();
+  const policyType = str(formData, "policyType") as InsurancePolicyType;
+  try {
+    const documentIds = await ownDocuments(formData, s.userId, repo.scope);
+    await repo.submitInsurance(s.mechanicId, {
+      policyType: POLICY_TYPES.includes(policyType) ? policyType : undefined,
+      namedInsured: str(formData, "namedInsured") || undefined,
+      carrier: str(formData, "carrier"),
+      effectiveOn: str(formData, "effectiveOn") || undefined,
+      expiresOn: str(formData, "expiresOn"),
+      documentIds,
+    });
+  } catch (e) {
+    if (e instanceof LifecycleError) redirect(`/mechanic/verification?error=${encodeURIComponent(e.message)}#insurance`);
+    throw e;
+  }
   refresh();
+  redirect("/mechanic/verification?sent=insurance#insurance");
 }
 
 export async function resubmitVerification(verificationId: string, formData: FormData) {
@@ -165,7 +238,14 @@ export async function resubmitVerification(verificationId: string, formData: For
   await n.ownSources();
   const v = repo.getVerification(verificationId);
   if (!v || v.mechanicId !== id) return;
-  await repo.resubmit(verificationId, str(formData, "note"));
+  const s = await getSession();
+  const documentIds = s.role === "mechanic" ? await ownDocuments(formData, s.userId, repo.scope) : [];
+  try {
+    await repo.resubmit(verificationId, str(formData, "note"), documentIds);
+  } catch (e) {
+    if (e instanceof LifecycleError) redirect(`/mechanic/verification?error=${encodeURIComponent(e.message)}`);
+    throw e;
+  }
   refresh();
 }
 

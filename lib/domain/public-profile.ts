@@ -1,5 +1,7 @@
 import { effectiveStatus, isPubliclyValid } from "@/lib/verification/lifecycle";
+import type { EffectiveStatus } from "@/lib/verification/model";
 import { screeningOpen } from "@/lib/verification/providers/registry";
+import { verifierName } from "@/lib/verification/display";
 import { platformFor } from "@/lib/vehicles/catalog";
 import { methodToProvenance, repairSourceToProvenance } from "./provenance";
 import {
@@ -25,7 +27,6 @@ import type {
   InsuranceRecord,
   VehicleMake,
   VerificationRecord,
-  VerificationStatus,
   WorkModel,
   FixedPrice,
 } from "./types";
@@ -36,9 +37,11 @@ import type {
  * reference, no adjudication, no documents, no policy numbers.
  */
 export interface PublicStatus {
-  status: VerificationStatus;
+  status: EffectiveStatus;
   verifiedAt?: ISODate;
   expiresAt?: ISODate;
+  /** Who checked it, for "verified by … on …" (lib/verification/display.ts). Never a report reference. */
+  by?: string;
   /** Started, but no screening provider can run it in this marketplace: "Could not be verified". */
   unavailable?: true;
 }
@@ -46,7 +49,7 @@ export interface PublicStatus {
 export interface PublicClaim {
   id: string;
   provenance: ProvenanceSource;
-  status: VerificationStatus;
+  status: EffectiveStatus;
   verifiedAt?: ISODate;
   expiresAt?: ISODate;
 }
@@ -187,31 +190,53 @@ export interface ProfileSources {
   scope?: "live" | "demo";
 }
 
-const NONE: PublicStatus = { status: "not_submitted" };
+const NONE: PublicStatus = { status: "not_started" };
 
 export function toPublicProfile(src: ProfileSources, now = new Date()): PublicMechanicProfile {
   const m = src.mechanic;
   const ver = (subjectId: string) => src.verifications.find((v) => v.subjectId === subjectId);
 
+  // The current record for a check: one that's valid right now (a renewal under review doesn't hide
+  // a still-valid policy), else the newest one nothing has superseded.
+  const current = (category: VerificationRecord["category"]) => {
+    const open = src.verifications.filter((v) => v.category === category && !v.supersededBy).sort((a, b) => (startedAt(a) < startedAt(b) ? 1 : -1));
+    return open.find((v) => !v.legacy?.unbacked && isPubliclyValid(effectiveStatus(v.status, v.category === "insurance" ? (src.insurance.find((x) => x.id === v.subjectId)?.expiresOn ?? v.expiresAt) : v.expiresAt, now, v.method))) ?? open[0];
+  };
+  const toPublic = (v: VerificationRecord, expiresAt: ISODate | undefined, verifiedAt: ISODate | undefined): PublicStatus => {
+    let status = effectiveStatus(v.status, expiresAt, now, v.method);
+    // Approved before evidence was kept (a file name only): not a verification customers can rely on.
+    if (v.legacy?.unbacked && isPubliclyValid(status)) status = "not_started";
+    // Started, but nothing can run it in this marketplace (no provider connected): it was never run.
+    const running = status === "in_progress" || status === "under_review" || status === "submitted";
+    // (Independent of private fields, so public and staff reads agree.)
+    const unavailable = running && src.scope === "live" && v.method === "vendor_screening" && !screeningOpen(v.category as ScreeningCheck["kind"], "live");
+    return { status, verifiedAt, expiresAt, by: verifierName(v.provider, v.method), ...(unavailable ? { unavailable: true as const } : {}) };
+  };
   const screening = (kind: ScreeningCheck["kind"]): PublicStatus => {
-    const sc = src.screenings.filter((s) => s.kind === kind).sort((a, b) => ((a.completedAt ?? "") < (b.completedAt ?? "") ? 1 : -1))[0];
-    if (!sc) return NONE;
-    const status = effectiveStatus(sc.status, sc.expiresAt, now);
-    // No provider can run this check here (the real marketplace has none connected yet): it was never run.
-    const unavailable = status === "pending" && src.scope !== undefined && !screeningOpen(kind, src.scope);
-    return { status, verifiedAt: sc.completedAt, expiresAt: sc.expiresAt, ...(unavailable ? { unavailable: true as const } : {}) };
+    const v = current(kind);
+    // A screening with no verification record (older data): read as the provider left it. The
+    // latest check wins, so a newer one of these outranks an older record.
+    const linked = new Set(src.verifications.map((x) => x.subjectId));
+    const orphan = src.screenings.filter((x) => x.kind === kind && !linked.has(x.id)).sort((a, b) => ((a.completedAt ?? "") < (b.completedAt ?? "") ? 1 : -1))[0];
+    const vAt = v ? (v.verifiedAt ?? v.reviewedAt ?? v.submittedAt ?? startedAt(v)).slice(0, 10) : "";
+    if (orphan && (!v || (orphan.completedAt ?? "") > vAt)) {
+      return toPublic({ id: orphan.id, mechanicId: orphan.mechanicId, subjectType: "screening_check", subjectId: orphan.id, category: kind, method: "vendor_screening", provider: orphan.provider, status: orphan.status } as VerificationRecord, orphan.expiresAt, orphan.completedAt);
+    }
+    if (!v) return NONE;
+    const sc = v.subjectType === "screening_check" ? src.screenings.find((x) => x.id === v.subjectId) : undefined;
+    return toPublic(v, v.expiresAt ?? sc?.expiresAt, v.verifiedAt ?? sc?.completedAt);
   };
   const insurance = (): PublicStatus => {
-    const ins = [...src.insurance].sort((a, b) => (a.expiresOn < b.expiresOn ? 1 : -1))[0];
-    if (!ins) return NONE;
-    const v = ver(ins.id);
-    if (!v) return { status: "pending" };
-    return { status: effectiveStatus(v.status, ins.expiresOn, now), verifiedAt: v.verifiedAt, expiresAt: ins.expiresOn };
+    const v = current("insurance");
+    if (!v) return NONE;
+    const ins = src.insurance.find((x) => x.id === v.subjectId);
+    return toPublic(v, ins?.expiresOn ?? v.expiresAt, v.verifiedAt);
   };
 
   const claim = (subjectId: string, expiresOn?: ISODate): Omit<PublicClaim, "id"> => {
     const v = ver(subjectId);
-    const status = v ? effectiveStatus(v.status, expiresOn ?? v.expiresAt, now) : "not_submitted";
+    let status: EffectiveStatus = v ? effectiveStatus(v.status, expiresOn ?? v.expiresAt, now, v.method) : "not_started";
+    if (v?.legacy?.unbacked && isPubliclyValid(status)) status = "not_started";
     return {
       provenance: v && isPubliclyValid(status) ? methodToProvenance(v.method) : "self",
       status,
@@ -362,4 +387,9 @@ function priceRanges(repairs: PastRepair[]) {
       return { category, lowCents: Math.round(at(0.1) / 500) * 500, highCents: Math.round(at(0.9) / 500) * 500, jobs: v.length };
     })
     .sort((a, b) => b.jobs - a.jobs);
+}
+
+/** When a record began: its first history event, else its submitted date. */
+function startedAt(v: VerificationRecord) {
+  return v.events?.[0]?.at ?? v.submittedAt ?? v.verifiedAt ?? "";
 }

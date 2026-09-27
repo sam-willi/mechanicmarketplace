@@ -5,18 +5,21 @@ import { SiteFooter, SiteHeader } from "@/components/site/site-header";
 import { EvidenceProvider } from "@/components/trust/evidence-sheet";
 import { ProvenanceMark } from "@/components/trust/provenance-mark";
 import { Tick } from "@/components/trust/marks";
-import type { VerificationStatus } from "@/lib/domain/types";
+import type { EffectiveStatus } from "@/lib/verification/model";
 
 export const metadata: Metadata = { title: "How verification works" };
 
-const STATUS_NOTES: Record<VerificationStatus, string> = {
-  not_submitted: "The mechanic hasn't provided this. Profiles show the blank instead of hiding it.",
-  pending: "Submitted and waiting on a reviewer, the issuer, the employer, a past customer or a screening provider.",
-  verified: "Confirmed. The profile shows the source and the date.",
-  rejected: "The evidence didn't hold up. The claim isn't shown as verified.",
-  needs_info: "The reviewer asked the mechanic for a clearer or more complete document.",
-  expired: "Was verified, but the certificate, policy or screening has lapsed. It no longer counts.",
-  reverification_required: "Still valid, but expires within 30 days. The mechanic has been asked to renew.",
+const STATUS_NOTES: Record<EffectiveStatus, string> = {
+  not_started: "The mechanic hasn't provided this. Profiles show the blank instead of hiding it.",
+  in_progress: "The mechanic has started, usually with an outside provider. Not verified yet.",
+  submitted: "Submitted and waiting for review. Not verified yet.",
+  under_review: "Being reviewed by Clutch staff or checked by a provider. Not verified yet.",
+  needs_more_info: "The reviewer or provider asked the mechanic for something clearer or more complete.",
+  verified: "Confirmed. The profile says who checked it and when.",
+  renewal_due: "Still valid, but expires within 30 days. The mechanic has been asked to renew.",
+  failed: "The evidence didn't hold up. The claim isn't shown as verified.",
+  expired: "Was verified, but the certificate, policy or check has lapsed. It no longer counts.",
+  revoked: "Clutch withdrew a verification (for example, a cancelled policy). It no longer counts.",
 };
 
 export default function VerificationPage() {
@@ -94,7 +97,7 @@ export default function VerificationPage() {
             </p>
           </div>
           <dl className="border-t border-rule">
-            {(Object.keys(STATUS_NOTES) as VerificationStatus[]).map((k) => (
+            {(Object.keys(STATUS_NOTES) as EffectiveStatus[]).map((k) => (
               <div key={k} className="grid gap-1 border-b border-rule-soft py-3 sm:grid-cols-[15rem_minmax(0,1fr)] sm:gap-8">
                 <dt className="font-semibold text-ink">{STATUS_LABEL[k]}</dt>
                 <dd className="text-[0.9375rem] text-ink-2">{STATUS_NOTES[k]}</dd>

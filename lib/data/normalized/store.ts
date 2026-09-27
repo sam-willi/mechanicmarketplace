@@ -71,6 +71,11 @@ let policySql: string | undefined;
 export function policySchema() {
   return (policySql ??= readFileSync(path.join(process.cwd(), "supabase/migrations/0007_booking_verification.sql"), "utf8"));
 }
+let canonSql: string | undefined;
+/** Canonical verification statuses (0009_verification_canonical.sql). */
+export function canonicalVerificationSchema() {
+  return (canonSql ??= readFileSync(path.join(process.cwd(), "supabase/migrations/0009_verification_canonical.sql"), "utf8"));
+}
 let readsSql: string | undefined;
 /** Indexes and helpers for targeted reads (0006_live_reads.sql). */
 export function readsSchema() {
@@ -124,7 +129,7 @@ export class NormalizedLiveStore {
   /** The normalized schema (0004 + 0005 + 0006 + 0007 + 0008), applied once per version, never on an ordinary start. */
   ensureSchema() {
     return (this.schemaReady ??= (async () => {
-      const text = `${schema()}\n${deliverySchemaSql()}\n${readsSchema()}\n${policySchema()}\n${statsSchema()}`;
+      const text = `${schema()}\n${deliverySchemaSql()}\n${readsSchema()}\n${policySchema()}\n${statsSchema()}\n${canonicalVerificationSchema()}`;
       await applySqlOnce(this.sql, "live_normalized", text);
     })().catch((e) => {
       this.schemaReady = undefined;

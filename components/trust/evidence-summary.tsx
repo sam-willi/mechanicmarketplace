@@ -28,7 +28,7 @@ export function EvidenceSummary({
   const mdl = model ? w.filter((x) => (!make || x.make === make) && x.model.toLowerCase().includes(model.toLowerCase())).length : 0;
   const cross = repair && make ? w.filter((x) => x.category === repair && x.make === make).length : 0;
   const r = p.reputation;
-  const verifiedCreds = p.credentials.filter((c) => c.provenance !== "self" && (c.status === "verified" || c.status === "reverification_required"));
+  const verifiedCreds = p.credentials.filter((c) => c.provenance !== "self" && (c.status === "verified" || c.status === "renewal_due"));
   const selfCount = p.selfReported.repairs.length + p.selfReported.claims.length;
 
   return (

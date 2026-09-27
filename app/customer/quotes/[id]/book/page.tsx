@@ -68,9 +68,7 @@ export default async function BookWithDisclosure({ params, searchParams }: { par
             return (
               <li key={c.key} className="flex items-start gap-2">
                 <S.icon size={18} className="mt-0.5 shrink-0 text-amber" aria-hidden />
-                <span>
-                  <span className="font-bold">{c.name}:</span> {c.status}
-                </span>
+                <span>{c.statement ?? `${c.name}: ${c.status}`}</span>
               </li>
             );
           })}
@@ -85,9 +83,7 @@ export default async function BookWithDisclosure({ params, searchParams }: { par
           </h2>
           <ul className="mt-2 space-y-1">
             {verified.map((c) => (
-              <li key={c.key}>
-                <span className="font-bold">{c.name}:</span> {c.status}
-              </li>
+              <li key={c.key}>{c.statement ?? `${c.name}: ${c.status}`}</li>
             ))}
           </ul>
         </section>

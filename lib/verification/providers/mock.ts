@@ -3,7 +3,8 @@ import { addMonths, today } from "../lifecycle";
 import type { CheckResult, ScreeningProvider, StartCheckInput, StartCheckResult } from "./types";
 
 /**
- * Deterministic stand-in for a real screening vendor. A check "completes" the
+ * Deterministic stand-in for a real screening vendor, for the FICTIONAL DEMO ONLY (background and
+ * driving record). Real mechanics never reach it: see screeningOpen. A check "completes" the
  * first time its result is read after starting, which lets the demo show the
  * Pending → Verified transition without a real webhook.
  */
@@ -25,7 +26,7 @@ export class MockScreeningProvider implements ScreeningProvider {
       provider: this.key,
       providerRef,
       hostedUrl: undefined,
-      status: "pending",
+      status: "in_progress",
     };
   }
 
@@ -47,7 +48,7 @@ export class MockScreeningProvider implements ScreeningProvider {
     if (!p.ref) return null;
     return {
       providerRef: p.ref,
-      status: p.outcome === "clear" ? "verified" : p.outcome === "consider" ? "pending" : "rejected",
+      status: p.outcome === "clear" ? "verified" : p.outcome === "consider" ? "under_review" : "failed",
       result: p.outcome,
       completedAt: today(),
     };

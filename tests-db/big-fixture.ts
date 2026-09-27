@@ -94,20 +94,20 @@ export async function loadBigFixture(sql: postgres.Sql, today: string): Promise<
     if (isBookable || insuranceLapsed || lookAlike || pending) {
       for (const kind of kinds) {
         const sid = `big-scr-${pad(i)}-${kind}`;
-        push("screenings", { id: sid, mechanicId: id, kind, provider: "provider-under-test", providerRef: `ref-${i}-${kind}`, status: pending ? "pending" : "verified", result: pending ? undefined : "clear", completedAt: pending ? undefined : "2026-01-10", expiresAt: pending ? undefined : far });
-        push("verifications", { id: `big-ver-${pad(i)}-${kind}`, mechanicId: id, subjectType: "screening_check", subjectId: sid, category: kind, method: "vendor_screening", provider: "provider-under-test", status: pending ? "pending" : "verified", submittedAt: day("2026-01-01", i % 200), verifiedAt: pending ? undefined : "2026-01-10", expiresAt: pending ? undefined : far, notes: "Fixture." });
+        push("screenings", { id: sid, mechanicId: id, kind, provider: "provider-under-test", providerRef: `ref-${i}-${kind}`, status: pending ? "in_progress" : "verified", result: pending ? undefined : "clear", completedAt: pending ? undefined : "2026-01-10", expiresAt: pending ? undefined : far });
+        push("verifications", { id: `big-ver-${pad(i)}-${kind}`, mechanicId: id, subjectType: "screening_check", subjectId: sid, category: kind, method: "vendor_screening", provider: "provider-under-test", status: pending ? "in_progress" : "verified", submittedAt: day("2026-01-01", i % 200), verifiedAt: pending ? undefined : "2026-01-10", expiresAt: pending ? undefined : far, notes: "Fixture." });
       }
-      if (lookAlike) push("screenings", { id: `big-scr-${pad(i)}-identity-2`, mechanicId: id, kind: "identity", provider: "provider-under-test", providerRef: `ref-${i}-again`, status: "rejected", result: "consider", completedAt: "2026-06-01" });
+      if (lookAlike) push("screenings", { id: `big-scr-${pad(i)}-identity-2`, mechanicId: id, kind: "identity", provider: "provider-under-test", providerRef: `ref-${i}-again`, status: "failed", result: "consider", completedAt: "2026-06-01" });
       const insId = `big-ins-${pad(i)}`;
       const expiresOn = insuranceLapsed ? day(today, -3) : far;
       push("insurance", { id: insId, mechanicId: id, carrier: "Fixture Mutual", policyLast4: "0000", coverageCents: 100_000_000, documentName: "coi.pdf", effectiveOn: "2026-01-01", expiresOn });
-      push("verifications", { id: `big-ver-${pad(i)}-ins`, mechanicId: id, subjectType: "insurance_record", subjectId: insId, category: "insurance", method: "document_review", status: pending ? "pending" : "verified", submittedAt: day("2026-02-01", i % 200), verifiedAt: pending ? undefined : "2026-02-02", expiresAt: expiresOn, notes: "Fixture." });
+      push("verifications", { id: `big-ver-${pad(i)}-ins`, mechanicId: id, subjectType: "insurance_record", subjectId: insId, category: "insurance", method: "document_review", status: pending ? "under_review" : "verified", submittedAt: day("2026-02-01", i % 200), verifiedAt: pending ? undefined : "2026-02-02", expiresAt: expiresOn, notes: "Fixture." });
     }
     // Staff-review work: credentials pending / needs info / verified and expiring soon.
     if (i % 7 === 0) {
       const cid = `big-cred-${pad(i)}`;
       push("credentials", { id: cid, mechanicId: id, issuer: "ASE", name: "A5 Brakes", code: "A5", issuedOn: "2024-01-01", expiresOn: i % 14 === 0 ? day(today, 12) : "2028-01-01", documentName: "a5.pdf" });
-      const st = (["pending", "needs_info", "verified", "rejected"] as const)[i % 4];
+      const st = (["under_review", "needs_more_info", "verified", "failed"] as const)[i % 4];
       push("verifications", { id: `big-ver-${pad(i)}-cred`, mechanicId: id, subjectType: "credential", subjectId: cid, category: "credential", method: "institution_check", status: st, submittedAt: day("2026-03-01", i % 150), verifiedAt: st === "verified" ? day(today, -(i % 10)) : undefined, expiresAt: i % 14 === 0 ? day(today, 12) : "2028-01-01", evidenceSummary: "ASE A5 fixture" });
     }
   }

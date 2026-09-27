@@ -151,23 +151,24 @@ test("a new real mechanic gets an honest, empty dashboard with a path to become 
 
 test("without a real screening provider, real checks can't be started or approved by hand; the demo still works", async () => {
   const m = live.getMechanicByUser("zero-mech-1")!;
-  await assert.rejects(live.startScreening(m.id, "identity", true), /isn't open yet/);
+  await assert.rejects(live.startScreening(m.id, "identity", true), /hosted identity flow/);
+  await assert.rejects(live.startScreening(m.id, "background", true), /aren't open yet/);
   assert.equal(live.getMechanicSources(m.id).screenings.length, 0, "nothing was started");
   assert.ok(matchReadiness(live, m).waitingOnProvider);
   // A check started before this rule (as in databases from earlier builds) can't be approved.
   const d = current("live");
-  d.screenings.push({ id: "scr-legacy", mechanicId: m.id, kind: "identity", provider: "mock", providerRef: "mock_identity_legacy", status: "pending" });
-  d.verifications.push({ id: "ver-legacy", mechanicId: m.id, subjectType: "screening_check", subjectId: "scr-legacy", category: "identity", method: "vendor_screening", provider: "mock", status: "pending", submittedAt: "2026-09-20", notes: "" } as never);
+  d.screenings.push({ id: "scr-legacy", mechanicId: m.id, kind: "identity", provider: "mock", providerRef: "mock_identity_legacy", status: "in_progress" });
+  d.verifications.push({ id: "ver-legacy", mechanicId: m.id, subjectType: "screening_check", subjectId: "scr-legacy", category: "identity", method: "vendor_screening", provider: "mock", status: "in_progress", submittedAt: "2026-09-20", notes: "" } as never);
   const staff = await provisionUser({ id: "zero-staff", email: "staff@example.test", meta: { name: "Sky Staff", role: "customer" } });
   assert.ok(live.unrunScreening(live.getVerification("ver-legacy")!));
-  await assert.rejects(live.decideVerification("ver-legacy", "verified", staff!.id, "Looks fine"), /never run/);
+  await assert.rejects(live.decideVerification("ver-legacy", "approve", staff!.id, { reasonCode: "evidence_matches" }), /provider decides/);
   await live.refreshScreening(m.id, "identity");
-  assert.equal(live.getMechanicSources(m.id).screenings.find((s) => s.id === "scr-legacy")!.status, "pending", "the stand-in never clears a real check");
-  await live.decideVerification("ver-legacy", "rejected", staff!.id, "Run again once screening opens");
+  assert.equal(live.getMechanicSources(m.id).screenings.find((s) => s.id === "scr-legacy")!.status, "in_progress", "the stand-in never clears a real check");
+  await assert.rejects(live.decideVerification("ver-legacy", "reject", staff!.id, { reasonCode: "other", note: "Run again" }), /provider decides/, "a provider-run check is never rejected by hand either");
   const dm = current("demo").mechanics.find((x) => x.slug === "marcus-webb") ?? current("demo").mechanics[0];
-  await demo.startScreening(dm.id, "identity", true);
-  await demo.refreshScreening(dm.id, "identity");
-  const dsc = demo.getMechanicSources(dm.id).screenings.filter((s) => s.kind === "identity").at(-1)!;
+  await demo.startScreening(dm.id, "background", true);
+  await demo.refreshScreening(dm.id, "background");
+  const dsc = demo.getMechanicSources(dm.id).screenings.filter((s) => s.kind === "background").at(-1)!;
   assert.equal(dsc.status, "verified", "the demo still shows the full flow");
 });
 

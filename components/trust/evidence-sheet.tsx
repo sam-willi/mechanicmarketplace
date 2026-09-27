@@ -69,7 +69,7 @@ export function EvidenceProvider({
               <button
                 type="button"
                 onClick={() => ref.current?.close()}
-                className="-mt-1 -mr-2 grid size-9 place-items-center text-ink-3 hover:text-ink"
+                className="-mt-2 -mr-2 grid size-11 place-items-center text-ink-3 hover:text-ink"
                 aria-label="Close"
               >
                 <X size={18} strokeWidth={1.75} />
@@ -84,7 +84,25 @@ export function EvidenceProvider({
                 {detail.label}
               </span>
             </div>
-            <p className="mt-3 text-[0.9375rem] leading-relaxed text-ink-2">{detail.explanation}</p>
+            {detail.statement ? <p className="mt-3 text-[1rem] font-semibold text-ink">{detail.statement}</p> : null}
+            <p className="mt-2 text-[0.9375rem] leading-relaxed text-ink-2">
+              {detail.statement ? <span className="font-semibold text-ink">What this means: </span> : null}
+              {detail.explanation}
+            </p>
+            {detail.checked?.length ? (
+              <div className="mt-3">
+                <p className="field-label">What Clutch checked</p>
+                <ul className="mt-1 space-y-1 text-[0.9375rem]">
+                  {detail.checked.map((c) => (
+                    <li key={c} className="flex gap-2">
+                      <Tick state="verified" size={14} className="mt-1" />
+                      <span>{c}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {detail.notChecked ? <p className="mt-2 text-[0.875rem] text-ink-2">{detail.notChecked}</p> : null}
             {detail.facts.length > 0 && (
               <dl className="mt-5 grid grid-cols-2 border-t border-rule">
                 {detail.facts.map((f) => (

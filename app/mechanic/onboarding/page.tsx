@@ -181,10 +181,8 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
                     <Field label="Expires">
                       <input name="credExpires" type="date" className="input" />
                     </Field>
-                    <Field label="Certificate" className="sm:col-span-3">
-                      <input name="credDoc" type="file" accept=".pdf,image/*" className="block w-full py-2 text-[0.875rem]" />
-                    </Field>
                   </div>
+                  <p className="mt-1.5 text-[0.8125rem] text-ink-2">Upload the certificate itself in the Verification Center after you publish; until it&apos;s reviewed it shows as self-reported.</p>
                 </fieldset>
                 <fieldset>
                   <legend className="heading text-[1.0625rem]">Where you&apos;ve worked (optional)</legend>
@@ -202,9 +200,6 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
                     <Field label="Ended">
                       <input name="empEnd" type="date" className="input" />
                     </Field>
-                    <Field label="Letter or pay stub" className="sm:col-span-2">
-                      <input name="empDoc" type="file" accept=".pdf,image/*" className="block w-full py-2 text-[0.875rem]" />
-                    </Field>
                   </div>
                 </fieldset>
                 <p className="text-[0.875rem] text-ink-2">After you publish, you can add past repairs and ask those customers to confirm them. Each confirmation adds a verified job.</p>
@@ -216,21 +211,9 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
           <div className="space-y-5">
             <Requirements />
             {!m ? (
-              <fieldset>
-                <legend className="heading text-[1.0625rem]">Insurance (you can also add it later)</legend>
-                <p className="text-[0.8125rem] text-ink-2">The document is reviewed by Clutch and never shown publicly. Customers see &ldquo;Insurance verified&rdquo; and the expiry month.</p>
-                <div className="mt-2 grid gap-3 sm:grid-cols-3">
-                  <Field label="Carrier">
-                    <input name="insCarrier" className="input" />
-                  </Field>
-                  <Field label="Policy expires">
-                    <input name="insExpires" type="date" className="input" />
-                  </Field>
-                  <Field label="Certificate of insurance">
-                    <input name="insDoc" type="file" accept=".pdf,image/*" className="block w-full py-2 text-[0.875rem]" />
-                  </Field>
-                </div>
-              </fieldset>
+              <p className="text-[0.875rem] text-ink-2">
+                Insurance and identity are optional and done after you publish, in the Verification Center: your certificate is stored privately for review, and identity is checked by an ID and selfie with Stripe Identity.
+              </p>
             ) : (
               <Link href="/mechanic/verification" target="_blank" className="btn btn-line min-h-11">
                 Open the Verification Center <span className="text-[0.8125rem] font-normal">(new tab)</span>

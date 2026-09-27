@@ -147,6 +147,7 @@ function CaptureButton({ mode, onFiles }: { mode: Mode; onFiles: (f: FileList | 
 }
 
 const TAG_LABEL: Record<MediaTag, string> = {
+  verification_doc: "Verification document",
   portrait: "Portrait",
   before: "Before",
   after: "After",

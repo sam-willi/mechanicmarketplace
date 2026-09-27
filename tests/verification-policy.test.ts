@@ -51,9 +51,9 @@ async function verify(mechanicId: string, insuranceExpires = "2027-12-31") {
       current("live").screenings.push({ id: `scr-${mechanicId}-${kind}`, mechanicId, kind, provider: "provider-under-test", providerRef: `ref-${kind}`, status: "verified", result: "clear", completedAt: "2026-09-20", expiresAt: "2027-09-20" });
     }
   });
-  await live.submitInsurance(mechanicId, { carrier: "Test Mutual", expiresOn: insuranceExpires, documentName: "coi.pdf" });
-  const ins = live.listVerifications({ mechanicId, statuses: ["pending"] }).find((v) => v.category === "insurance")!;
-  await live.decideVerification(ins.id, "verified", await staff(), "Checked", insuranceExpires);
+  await live.submitInsurance(mechanicId, { carrier: "Test Mutual", expiresOn: insuranceExpires, documentIds: ["doc-test"] });
+  const ins = live.listVerifications({ mechanicId, statuses: ["submitted"] }).find((v) => v.category === "insurance")!;
+  await live.decideVerification(ins.id, "approve", await staff(), { reasonCode: "evidence_matches", expiresAt: insuranceExpires });
 }
 
 async function request(customerId: string, mechanicIds: string[]) {
@@ -140,7 +140,7 @@ test("after the acknowledgement: one booking, with the exact disclosure, version
   assert.equal(at.acknowledgement!.userId, c.userId);
   assert.ok(Date.parse(at.acknowledgement!.at) > 0);
   assert.equal(at.acknowledgement!.disclosure, disclosureText(m.firstName, at.checks), "the text the confirmation step showed");
-  for (const line of ["- Identity: Not completed", "- Background check: Not completed", "- Driving record: Not completed", "- Insurance: Not completed", INSURANCE_UNVERIFIED_NOTE, ACK_TEXT]) assert.ok(at.acknowledgement!.disclosure.includes(line), line);
+  for (const line of ["- Identity not verified by Clutch", "- Background check not verified by Clutch", "- Driving record not verified by Clutch", "- Insurance not verified by Clutch", INSURANCE_UNVERIFIED_NOTE, ACK_TEXT]) assert.ok(at.acknowledgement!.disclosure.includes(line), line);
   const h = job.history!.find((x) => x.action === "acknowledged unverified checks")!;
   assert.equal(h.by, "customer");
   assert.ok(h.detail!.startsWith(DISCLOSURE_VERSION) && h.detail!.includes("Insurance not completed"), h.detail);
@@ -172,7 +172,7 @@ test("expired or unverified insurance: Clutch says only that it hasn't verified 
   assert.equal(e.eligible, true);
   assert.deepEqual(e.unverified.map((x) => x.label), ["Insurance: Expired Jan 2026"]);
   const text = disclosureText(m.firstName, checksNow(profileOf(m.id)));
-  assert.ok(text.includes("- Insurance: Expired Jan 2026") && text.includes(INSURANCE_UNVERIFIED_NOTE));
+  assert.ok(text.includes("- Insurance expired Jan 2026, so it's no longer verified") && text.includes(INSURANCE_UNVERIFIED_NOTE), text);
   assert.ok(!/liab|responsib|fault|at your own risk|waive/i.test(text), "no legal conclusions, no waiver language");
   assert.ok(!/liab|responsib|fault|waive/i.test(INSURANCE_UNVERIFIED_NOTE));
 });

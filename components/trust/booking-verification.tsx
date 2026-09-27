@@ -35,7 +35,7 @@ export function BookingVerification({ at, current, firstName }: { at?: Verificat
             return (
               <tr key={c.key} className="border-b border-rule-soft">
                 <td className="py-1.5 pr-3 font-semibold">{c.name}</td>
-                <td className={`py-1.5 pr-3 ${c.verified ? "" : "font-semibold text-amber"}`}>{c.status}</td>
+                <td className={`py-1.5 pr-3 ${c.verified ? "" : "font-semibold text-amber"}`}>{c.statement ?? c.status}</td>
                 {changed ? <td className="py-1.5">{n ? (n.state === "expiring" ? `Verified, renews ${n.when}` : n.state === "expired" && n.when ? `Expired ${n.when}` : STATUS_WORD[n.state]) : "Not applicable"}</td> : null}
               </tr>
             );

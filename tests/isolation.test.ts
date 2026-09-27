@@ -183,9 +183,9 @@ test("verification and admin: real reviewers see only real submissions; demo rev
   assert.ok(demo.listVerifications().every((v) => v.mechanicId !== mech.id), "real submissions aren't in the demo queue");
   // The demo reviewer account doesn't exist in live, so it can't approve anything real.
   const demoAdmin = seed.users.find((u) => u.roles.includes("admin"))!;
-  await assert.rejects(live.decideVerification(liveQueue[0].id, "verified", demoAdmin.id, "ok"), ScopeError);
+  await assert.rejects(live.decideVerification(liveQueue[0].id, "approve", demoAdmin.id, { reasonCode: "evidence_matches" }), ScopeError);
   // A real, non-staff account can't either.
-  await assert.rejects(live.decideVerification(liveQueue[0].id, "verified", realCustomer.id, "ok"), /staff/);
+  await assert.rejects(live.decideVerification(liveQueue[0].id, "approve", realCustomer.id, { reasonCode: "evidence_matches" }), /staff/);
   assert.notEqual(live.getVerification(liveQueue[0].id)?.status, "verified");
 });
 
@@ -224,7 +224,7 @@ test("migration: a mixed pre-scope database splits deterministically, without lo
   mixed.customers.push({ id: "real-cust", userId: "real-user", displayName: "Real Person", city: "Los Angeles" });
   mixed.vehicles.push({ id: "real-veh", customerId: "real-cust", year: 2015, make: "Honda", model: "Civic" } as never);
   mixed.mechanics.push({ ...structuredClone(s0.mechanics[0]), id: "real-mech", userId: "real-user", slug: "real-person" });
-  mixed.verifications.push({ ...structuredClone(s0.verifications[0]), id: "real-ver", mechanicId: "real-mech", status: "pending" });
+  mixed.verifications.push({ ...structuredClone(s0.verifications[0]), id: "real-ver", mechanicId: "real-mech", status: "under_review" });
   // ...whose request was matched to demo mechanics, one of which quoted, got booked and reviewed.
   const req = { ...structuredClone(s0.requests[0]), id: "real-req", customerId: "real-cust", vehicleId: "real-veh", matchedMechanicIds: [demoMech, "real-mech"], interested: [{ mechanicId: demoMech2, at: "2026-09-02" }], requestedMechanicId: demoMech };
   mixed.requests.push(req);

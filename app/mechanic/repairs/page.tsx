@@ -125,7 +125,7 @@ export default async function RepairsPage() {
                         </Link>
                       </p>
                     </div>
-                  ) : v?.status === "pending" ? (
+                  ) : v?.status === "submitted" || v?.status === "under_review" ? (
                     <p className="text-[0.875rem] text-ink-2">A Clutch reviewer is checking the files you attached.</p>
                   ) : (
                     <form action={requestConfirmation.bind(null, r.id)} className="grid gap-2 sm:grid-cols-[8rem_minmax(0,1fr)_auto]">

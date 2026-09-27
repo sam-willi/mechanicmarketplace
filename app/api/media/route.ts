@@ -7,7 +7,7 @@ import { uploadLimits } from "@/lib/media/limits";
 import { PREPARE_COPY } from "@/lib/media/prepare";
 import type { MediaTag } from "@/lib/domain/types";
 
-const TAGS: MediaTag[] = ["portrait", "before", "after", "parts", "completed", "diagnostic", "vehicle", "dashboard", "damage", "leak", "engine_bay", "wheel", "part", "issue", "sound", "vin", "prior_estimate", "customer_part", "answer", "other"];
+const TAGS: MediaTag[] = ["verification_doc", "portrait", "before", "after", "parts", "completed", "diagnostic", "vehicle", "dashboard", "damage", "leak", "engine_bay", "wheel", "part", "issue", "sound", "vin", "prior_estimate", "customer_part", "answer", "other"];
 
 /**
  * Upload one file as soon as it's chosen. Customers: request media and car photos. Mechanics:

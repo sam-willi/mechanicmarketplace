@@ -25,10 +25,16 @@ import type {
   ScreeningKind,
   Vehicle,
   VerificationRecord,
+  VerificationStatus,
   DeclineReason,
 } from "@/lib/domain/types";
 import { getProviderByKey, getScreeningProvider, screeningOpen } from "@/lib/verification/providers/registry";
-import { effectiveStatus, today } from "@/lib/verification/lifecycle";
+import { addMonths, effectiveStatus, isPubliclyValid, today } from "@/lib/verification/lifecycle";
+import { inQueue } from "@/lib/admin-queue";
+import { canMove, transition, type Actor as VActor, type VerificationEvent } from "@/lib/verification/model";
+import { mechanicMessage, reason } from "@/lib/verification/reasons";
+import { verifierName } from "@/lib/verification/display";
+import type { ReviewAction } from "../repository";
 import { AREAS, findArea, serves } from "@/lib/domain/areas";
 import { parseSlotText } from "@/lib/domain/schedule";
 import { quoteTotals } from "@/lib/domain/quote";
@@ -193,23 +199,32 @@ export class MockRepository implements RepositoryCore {
   describeSubject(v: VerificationRecord) {
     const d = this.db();
     switch (v.subjectType) {
+      // Staff see who ran it and a short support reference, never report contents or provider internals.
+      case "account":
       case "screening_check": {
         const s = d.screenings.find((x) => x.id === v.subjectId);
+        const ref = v.providerRef ?? s?.providerRef;
         return {
           title: CATEGORY_LABEL[v.category],
           detail: [
-            `Provider: ${s?.provider ?? "—"} (ref ${s?.providerRef ?? "—"})`,
-            s?.consentAt ? `FCRA consent recorded ${s.consentAt}` : "",
-            s?.result ? `Provider result: ${s.result}` : "Result not yet returned",
+            v.provider || s?.provider ? `Provider: ${verifierName(v.provider ?? s?.provider, v.method)}` : "",
+            ref ? `Support reference: …${ref.slice(-6)}` : "",
+            v.consentAt || s?.consentAt ? `Disclosure consent recorded ${(v.consentAt ?? s?.consentAt ?? "").slice(0, 10)}` : "",
+            v.nameMatches === true ? "Name on the ID matches the account" : v.nameMatches === false ? "Name on the ID does NOT match the account" : "",
           ].filter(Boolean),
         };
       }
       case "insurance_record": {
         const i = d.insurance.find((x) => x.id === v.subjectId);
         return {
-          title: `Insurance — ${i?.carrier ?? ""}`,
+          title: `Insurance: ${i?.carrier ?? ""}`,
           detail: i
-            ? [`Policy ending ${i.policyLast4}`, `Effective ${i.effectiveOn} → ${i.expiresOn}`, `Document: ${i.documentName}`]
+            ? [
+                i.policyType ? `Policy type: ${i.policyType.replace(/_/g, " ")}` : "Policy type: not recorded (older submission)",
+                i.namedInsured ? `Named insured: ${i.namedInsured}` : "Named insured: not recorded (older submission)",
+                `Effective ${i.effectiveOn} to ${i.expiresOn}`,
+                v.documentIds?.length ? `${v.documentIds.length} document${v.documentIds.length > 1 ? "s" : ""} stored` : "No document stored (only a file name was recorded)",
+              ]
             : [],
         };
       }
@@ -338,7 +353,7 @@ export class MockRepository implements RepositoryCore {
   }
   nextPendingVerification(excludeId: ID, mechanicId: ID, nowIso: string) {
     const now = new Date(nowIso);
-    const pending = this.listVerifications().filter((x) => x.id !== excludeId && effectiveStatus(x.status, x.expiresAt, now) === "pending");
+    const pending = this.listVerifications().filter((x) => x.id !== excludeId && inQueue("queue", effectiveStatus(x.status, x.expiresAt, now), x.method));
     const mine = pending.find((x) => x.mechanicId === mechanicId);
     if (mine) return mine.id;
     const key = (x: VerificationRecord) => `${x.submittedAt ?? ""}\u0000${x.id}`;
@@ -456,6 +471,7 @@ export class MockRepository implements RepositoryCore {
       ...baseOf(input.neighborhood),
     };
     d.mechanics.push(m);
+    this.ensureEmailCheck(m);
     // Onboarding publishes the whole profile at once: requests waiting for someone like them go to them now.
     this.matchWaiting();
     return m;
@@ -472,49 +488,175 @@ export class MockRepository implements RepositoryCore {
     this.matchWaiting();
   }
 
-  async startScreening(mechanicId: ID, kind: ScreeningKind, consent: boolean) {
-    if (!screeningOpen(kind, this.scope)) throw new Error("Screening isn't open yet: Clutch hasn't connected its screening provider. You don't need to do anything for now.");
-    if (kind !== "identity" && !consent) throw new Error("FCRA disclosure consent is required before a background or driving record check.");
+  // ---------------------------------------------------------- verification (docs/verification.md)
+  // Every record changes only through `transition` (lib/verification/model.ts): each change is an
+  // appended event, nothing is overwritten, and the mechanic is told about each status change.
+
+  /** A new canonical record, with its first event. */
+  private newCheck(
+    base: Omit<VerificationRecord, "id" | "status" | "events"> & { id?: ID },
+    to: VerificationStatus,
+    actor: VActor,
+    action: VerificationEvent["action"] = "submitted",
+    note?: string,
+  ): VerificationRecord {
+    const v: VerificationRecord = { ...base, id: base.id ?? newId("ver"), status: "not_started", events: [] };
+    v.events!.push({ at: nowISO(), actor, action: "created", to: "not_started" });
+    if (to !== "not_started") transition(v, to, { actor, action, note });
+    this.db().verifications.push(v);
+    return v;
+  }
+
+  /** Apply one change to a record and tell the mechanic about status changes. */
+  private move(v: VerificationRecord, to: VerificationStatus, e: Parameters<typeof transition>[2]) {
+    const before = v.status;
+    const applied = transition(v, to, e);
+    if (applied && e.note !== undefined) v.notes = e.note;
+    if (applied && before !== to) this.notifyCheck(v);
+    return applied;
+  }
+
+  private notifyCheck(v: VerificationRecord) {
+    const name = CATEGORY_LABEL[v.category];
+    const msg = mechanicMessage(v.reasonCodes, v.status === "verified" ? undefined : v.notes);
+    const title =
+      v.status === "verified"
+        ? `${name}: verified`
+        : v.status === "needs_more_info"
+          ? `${name}: more information needed`
+          : v.status === "failed"
+            ? `${name}: not verified`
+            : v.status === "revoked"
+              ? `${name}: verification withdrawn`
+              : v.status === "expired"
+                ? `${name}: expired`
+                : v.status === "under_review" || v.status === "submitted"
+                  ? `${name}: submitted for review`
+                  : `${name}: ${v.status.replace(/_/g, " ")}`;
+    this.notifyMechanic(v.mechanicId, "verification_update", title, "/mechanic/verification", msg || undefined);
+  }
+
+  /** The record a check currently stands on: nothing has superseded it. */
+  currentCheck(mechanicId: ID, category: VerificationRecord["category"]) {
+    return this.db()
+      .verifications.filter((v) => v.mechanicId === mechanicId && v.category === category && !v.supersededBy)
+      .sort((a, b) => ((a.events?.[0]?.at ?? a.submittedAt ?? "") < (b.events?.[0]?.at ?? b.submittedAt ?? "") ? 1 : -1))[0];
+  }
+
+  /** A retry or renewal: a new record linked to the one it replaces (which keeps its history). */
+  private supersede(old: VerificationRecord | undefined, next: VerificationRecord, actor: VActor) {
+    if (!old || old.id === next.id) return;
+    next.supersedes = old.id;
+    old.supersededBy = next.id;
+    old.events = [...(old.events ?? []), { at: nowISO(), actor, action: "superseded", from: old.status, to: old.status, note: `Replaced by ${next.id}.` }];
+  }
+
+  /** Email: the sign-in provider confirmed it (accounts can't be created otherwise). */
+  private ensureEmailCheck(m: MechanicProfile) {
+    if (this.db().verifications.some((v) => v.mechanicId === m.id && v.category === "email")) return;
+    this.newCheck(
+      { mechanicId: m.id, accountId: m.userId, subjectType: "account", subjectId: m.userId, category: "email", method: "email_link", provider: "sign_in", evidenceSummary: "Email confirmed when the account was created" },
+      "verified",
+      { kind: "system", id: "sign_in" },
+      "approved",
+      "Confirmed at sign-in.",
+    );
+  }
+
+  /** Identity: record a hosted session the server just created (the provider call happens before this write). */
+  recordIdentityStart(mechanicId: ID, input: { provider: string; providerRef: string; recordId: ID }) {
+    const m = this.mustMechanic(mechanicId);
+    const v = this.getVerification(input.recordId);
+    if (!v || v.mechanicId !== m.id || v.category !== "identity") throw new LifecycleError("That identity check wasn't found.", "not_found");
+    if (v.providerRef && v.providerRef !== input.providerRef) v.events!.push({ at: nowISO(), actor: { kind: "mechanic", id: m.userId }, action: "started", from: v.status, to: v.status, note: "New provider session." });
+    v.provider = input.provider;
+    v.providerRef = input.providerRef;
+    if (v.status !== "in_progress") this.move(v, "in_progress", { actor: { kind: "mechanic", id: m.userId }, action: "started" });
+  }
+
+  /**
+   * The identity record a new session belongs to: the current one if it can still take a session
+   * (not started, in progress, more information needed), else a new record superseding it.
+   */
+  prepareIdentityCheck(mechanicId: ID) {
+    const m = this.mustMechanic(mechanicId);
+    const cur = this.currentCheck(m.id, "identity");
+    const eff = cur ? effectiveStatus(cur.status, cur.expiresAt, new Date(), cur.method) : undefined;
+    if (cur && (eff === "not_started" || eff === "in_progress" || eff === "needs_more_info") && cur.method === "hosted_identity") return cur;
+    if (cur && (eff === "verified" || eff === "under_review" || eff === "submitted")) throw new LifecycleError(eff === "verified" ? "Your identity is already verified." : "Your identity check is being processed.", "stale");
+    const next = this.newCheck(
+      { mechanicId: m.id, accountId: m.userId, subjectType: "account", subjectId: m.userId, category: "identity", method: "hosted_identity", evidenceSummary: "Government ID + live selfie, captured by the identity provider" },
+      "not_started",
+      { kind: "mechanic", id: m.userId },
+    );
+    this.supersede(cur, next, { kind: "mechanic", id: m.userId });
+    return next;
+  }
+
+  /**
+   * A provider's result (fetched server-side after a signed webhook, or on return). Idempotent on
+   * the provider event id: a duplicate delivery changes nothing. A result for a record that has
+   * moved on (a newer session, or already decided) is recorded in its history but can't regress it.
+   */
+  applyProviderResult(input: { providerRef: string; recordId?: ID; status: VerificationStatus; reasonCodes: string[]; eventId: string; provider: string; nameMatches?: boolean; validMonths?: number }) {
     const d = this.db();
-    const provider = getScreeningProvider(kind);
-    const started = await provider.startCheck({ mechanicId, kind, consentAt: consent ? nowISO() : undefined });
-    const sc = {
-      id: newId("scr"),
-      mechanicId,
-      kind,
-      provider: started.provider,
-      providerRef: started.providerRef,
-      status: started.status,
-      consentAt: consent ? today() : undefined,
-    };
+    const v = d.verifications.find((x) => x.providerRef === input.providerRef && x.provider === input.provider);
+    if (!v) throw new LifecycleError("No check for that provider session.", "not_found");
+    if (input.recordId && input.recordId !== v.id) throw new LifecycleError("The provider session doesn't belong to that check.", "forbidden");
+    if (v.events?.some((e) => e.idempotencyKey === input.eventId)) return { applied: false, status: v.status };
+    const actor: VActor = { kind: "provider", id: `${input.provider}:${input.eventId}` };
+    if (input.nameMatches !== undefined) v.nameMatches = input.nameMatches;
+    const to = input.status;
+    if (to === v.status || !canMove(v.status, to)) {
+      // Recorded, not applied (e.g. a late "processing" after "verified").
+      v.events!.push({ at: nowISO(), actor, action: "provider_update", from: v.status, to: v.status, note: `Provider reported ${to.replace(/_/g, " ")}; no change.`, idempotencyKey: input.eventId, ...(input.reasonCodes.length ? { reasonCodes: input.reasonCodes } : {}) });
+      return { applied: false, status: v.status };
+    }
+    const expiresAt = to === "verified" ? addMonths(today(), input.validMonths ?? 36) : undefined;
+    this.move(v, to, { actor, action: to === "not_started" ? "cancelled" : "provider_update", reasonCodes: input.reasonCodes, idempotencyKey: input.eventId, expiresAt });
+    if (to === "verified") this.matchWaiting();
+    return { applied: true, status: v.status };
+  }
+
+  async startScreening(mechanicId: ID, kind: ScreeningKind, consent: boolean) {
+    if (kind === "identity") throw new LifecycleError("Identity is verified through the hosted identity flow.", "forbidden");
+    if (!screeningOpen(kind, this.scope)) throw new Error("Background and driving record checks aren't open yet: Clutch hasn't connected a screening company. You don't need to do anything for now.");
+    if (!consent) throw new Error("Your consent to the disclosure is required before a background or driving record check.");
+    const d = this.db();
+    const m = this.mustMechanic(mechanicId);
+    const provider = getScreeningProvider(kind, this.scope);
+    const started = await provider.startCheck({ mechanicId, kind, consentAt: nowISO() });
+    const sc = { id: newId("scr"), mechanicId, kind, provider: started.provider, providerRef: started.providerRef, status: "in_progress" as const, consentAt: today() };
     d.screenings.push(sc);
-    d.verifications.push({
-      id: newId("ver"),
-      mechanicId,
-      subjectType: "screening_check",
-      subjectId: sc.id,
-      category: kind,
-      method: "vendor_screening",
-      provider: started.provider,
-      status: "pending",
-      submittedAt: today(),
-      notes: "Submitted to screening provider.",
-      evidenceSummary:
-        kind === "identity"
-          ? "Government ID + live selfie captured by screening provider"
-          : kind === "background"
-            ? "FCRA disclosure signed; criminal + sex offender registry search"
-            : "Motor vehicle record request",
-    });
+    const prev = this.currentCheck(mechanicId, kind);
+    const v = this.newCheck(
+      {
+        mechanicId,
+        accountId: m.userId,
+        subjectType: "screening_check",
+        subjectId: sc.id,
+        category: kind,
+        method: "vendor_screening",
+        provider: started.provider,
+        providerRef: started.providerRef,
+        consentAt: nowISO(),
+        evidenceSummary: kind === "background" ? "Disclosure consent given; criminal and sex offender registry search" : "Motor vehicle record request",
+      },
+      "in_progress",
+      { kind: "mechanic", id: m.userId },
+      "started",
+      "Consent given; sent to the screening company.",
+    );
+    this.supersede(prev, v, { kind: "mechanic", id: m.userId });
   }
 
   async refreshScreening(mechanicId: ID, kind: ScreeningKind) {
     const d = this.db();
-    const sc = d.screenings.filter((s) => s.mechanicId === mechanicId && s.kind === kind && s.status === "pending").at(-1);
+    const sc = d.screenings.filter((s) => s.mechanicId === mechanicId && s.kind === kind && s.status === "in_progress").at(-1);
     if (!sc) return;
     const provider = getProviderByKey(sc.provider);
     // The stand-in provider clears checks instantly, which is only acceptable with fictional
-    // people. A real mechanic's check stays pending until a real screening provider is connected.
+    // people. A real mechanic's check stays in progress until a real screening provider is connected.
     if (provider.key === "mock" && this.scope !== "demo") return;
     const res = await provider.getResult(sc.providerRef);
     sc.status = res.status;
@@ -522,83 +664,121 @@ export class MockRepository implements RepositoryCore {
     sc.completedAt = res.completedAt;
     sc.expiresAt = res.expiresAt;
     const v = d.verifications.find((x) => x.subjectId === sc.id);
-    if (v) {
-      v.status = res.status;
-      v.verifiedAt = res.completedAt;
-      v.expiresAt = res.expiresAt;
-      v.notes = res.result === "clear" ? "Provider returned clear." : `Provider returned ${res.result}.`;
-    }
+    if (v && canMove(v.status, res.status))
+      this.move(v, res.status, { actor: { kind: "provider", id: sc.provider }, action: "provider_update", reasonCodes: res.status === "verified" ? ["provider_verified"] : [], expiresAt: res.expiresAt, idempotencyKey: `result:${sc.providerRef}` });
     this.matchWaiting();
   }
 
   submitCredential(mechanicId: ID, input: Parameters<RepositoryCore["submitCredential"]>[1]) {
     const d = this.db();
-    const cred = { ...input, id: newId("cred"), mechanicId };
+    const m = this.mustMechanic(mechanicId);
+    const { documentIds, ...rest } = input as typeof input & { documentIds?: ID[] };
+    const cred = { ...rest, id: newId("cred"), mechanicId };
     d.credentials.push(cred);
-    d.verifications.push({
-      id: newId("ver"),
-      mechanicId,
-      subjectType: "credential",
-      subjectId: cred.id,
-      category: "credential",
-      method: input.issuer === "ASE" || input.issuer === "EPA" ? "institution_check" : "document_review",
-      status: "pending",
-      submittedAt: today(),
-      expiresAt: input.expiresOn,
-      evidenceSummary: `${input.issuer} ${input.code ? input.code + " " : ""}${input.name}${input.documentName ? ` — ${input.documentName}` : ""}`,
-    });
+    this.newCheck(
+      {
+        mechanicId,
+        accountId: m.userId,
+        subjectType: "credential",
+        subjectId: cred.id,
+        category: "credential",
+        method: input.issuer === "ASE" || input.issuer === "EPA" ? "institution_check" : "document_review",
+        provider: "clutch_staff",
+        expiresAt: input.expiresOn,
+        documentIds: documentIds?.length ? documentIds : undefined,
+        evidenceSummary: `${input.issuer} ${input.code ? input.code + " " : ""}${input.name}${documentIds?.length ? " (document attached)" : " (no document attached)"}`,
+      },
+      "submitted",
+      { kind: "mechanic", id: m.userId },
+    );
   }
 
   submitEmployment(mechanicId: ID, input: Parameters<RepositoryCore["submitEmployment"]>[1]) {
     const d = this.db();
-    const emp = { ...input, id: newId("emp"), mechanicId };
+    const m = this.mustMechanic(mechanicId);
+    const { documentIds, ...rest } = input as typeof input & { documentIds?: ID[] };
+    const emp = { ...rest, id: newId("emp"), mechanicId };
     d.employment.push(emp);
-    d.verifications.push({
-      id: newId("ver"),
-      mechanicId,
-      subjectType: "employment",
-      subjectId: emp.id,
-      category: "employment",
-      method: "employer_check",
-      status: "pending",
-      submittedAt: today(),
-      evidenceSummary: `${input.position} at ${input.employer}${input.documentName ? ` — ${input.documentName}` : ""}`,
-    });
+    this.newCheck(
+      {
+        mechanicId,
+        accountId: m.userId,
+        subjectType: "employment",
+        subjectId: emp.id,
+        category: "employment",
+        method: "employer_check",
+        provider: "clutch_staff",
+        documentIds: documentIds?.length ? documentIds : undefined,
+        evidenceSummary: `${input.position} at ${input.employer}${documentIds?.length ? " (letter attached)" : ""}`,
+      },
+      "submitted",
+      { kind: "mechanic", id: m.userId },
+    );
   }
 
-  submitInsurance(mechanicId: ID, input: { carrier: string; expiresOn: string; documentName: string }) {
+  submitInsurance(mechanicId: ID, input: Parameters<RepositoryCore["submitInsurance"]>[1]) {
     const d = this.db();
+    const m = this.mustMechanic(mechanicId);
+    const missing = [!input.carrier && "carrier", !input.expiresOn && "expiry date", !input.documentIds?.length && "certificate"].filter(Boolean);
+    if (missing.length) throw new LifecycleError(`Add the ${missing.join(", ")} to submit your insurance.`, "invalid_input");
+    if (input.effectiveOn && input.expiresOn <= input.effectiveOn) throw new LifecycleError("The expiry date has to be after the effective date.", "invalid_input");
     const rec = {
       id: newId("ins"),
       mechanicId,
+      policyType: input.policyType,
+      namedInsured: input.namedInsured,
       carrier: input.carrier,
       policyLast4: "••••",
       coverageCents: 0,
-      documentName: input.documentName,
-      effectiveOn: today(),
+      documentName: input.documentName ?? "certificate",
+      effectiveOn: input.effectiveOn ?? today(),
       expiresOn: input.expiresOn,
     };
     d.insurance.push(rec);
-    d.verifications.push({
-      id: newId("ver"),
-      mechanicId,
-      subjectType: "insurance_record",
-      subjectId: rec.id,
-      category: "insurance",
-      method: "document_review",
-      status: "pending",
-      submittedAt: today(),
-      expiresAt: input.expiresOn,
-      evidenceSummary: `Certificate of insurance, ${input.carrier} — ${input.documentName}`,
-    });
+    const prev = this.currentCheck(mechanicId, "insurance");
+    const v = this.newCheck(
+      {
+        mechanicId,
+        accountId: m.userId,
+        subjectType: "insurance_record",
+        subjectId: rec.id,
+        category: "insurance",
+        method: "document_review",
+        provider: "clutch_staff",
+        expiresAt: input.expiresOn,
+        documentIds: input.documentIds,
+        evidenceSummary: `Certificate of insurance: ${input.carrier}${input.policyType ? `, ${input.policyType.replace(/_/g, " ")}` : ""}${input.namedInsured ? `, named insured ${input.namedInsured}` : ""}`,
+      },
+      "submitted",
+      { kind: "mechanic", id: m.userId },
+    );
+    // A renewal waits for review before replacing a still-valid policy (see decideVerification).
+    if (prev && !isPubliclyValid(effectiveStatus(prev.status, prev.expiresAt))) this.supersede(prev, v, { kind: "mechanic", id: m.userId });
+    else if (prev) v.supersedes = prev.id;
   }
 
-  resubmit(verificationId: ID, note: string) {
+  /** The mechanic answers a request for more information (same record), or retries a closed one (new record). */
+  resubmit(verificationId: ID, note: string, documentIds: ID[] = []) {
     const v = this.getVerification(verificationId);
     if (!v) return;
-    v.status = "pending";
-    v.submittedAt = today();
-    v.notes = note ? `Mechanic: ${note}` : "Resubmitted by mechanic.";
+    const m = this.mustMechanic(v.mechanicId);
+    const actor: VActor = { kind: "mechanic", id: m.userId };
+    if (documentIds.length) v.documentIds = [...(v.documentIds ?? []), ...documentIds];
+    if (v.status === "needs_more_info") {
+      this.move(v, "submitted", { actor, action: "submitted", note: note ? `Mechanic: ${note}` : "Resubmitted by mechanic." });
+      return;
+    }
+    const eff = effectiveStatus(v.status, v.expiresAt, new Date(), v.method);
+    if (eff !== "failed" && eff !== "expired" && eff !== "revoked" && eff !== "renewal_due") throw new LifecycleError("This check is still being reviewed.", "stale");
+    if (v.method === "hosted_identity" || v.method === "vendor_screening") throw new LifecycleError("Start this check again from the Verification Center.", "invalid_input");
+    const next = this.newCheck(
+      { ...v, id: undefined, supersedes: undefined, supersededBy: undefined, documentIds: documentIds.length ? documentIds : v.documentIds, reviewerId: undefined, decidedBy: undefined, reasonCodes: undefined, notes: undefined, verifiedAt: undefined, reviewedAt: undefined, submittedAt: undefined, legacy: undefined, events: undefined } as never,
+      "submitted",
+      actor,
+      "submitted",
+      note ? `Mechanic: ${note}` : undefined,
+    );
+    this.supersede(v, next, actor);
   }
 
   addPastRepair(mechanicId: ID, input: Parameters<RepositoryCore["addPastRepair"]>[1]) {
@@ -627,24 +807,29 @@ export class MockRepository implements RepositoryCore {
       sentAt: today(),
     };
     d.confirmations.push(conf);
-    const existing = d.verifications.find((v) => v.subjectId === pastRepairId);
-    if (existing) {
-      existing.status = "pending";
-      existing.method = "customer_confirmation";
-      existing.submittedAt = today();
+    const m = this.mustMechanic(repair.mechanicId);
+    const actor: VActor = { kind: "mechanic", id: m.userId };
+    const existing = d.verifications.filter((v) => v.subjectId === pastRepairId && !v.supersededBy).at(-1);
+    const open = existing && (existing.status === "not_started" || existing.status === "submitted" || existing.status === "under_review" || existing.status === "needs_more_info");
+    if (existing && open && existing.method === "customer_confirmation") {
+      existing.events!.push({ at: nowISO(), actor, action: "submitted", from: existing.status, to: existing.status, note: "Confirmation link sent again." });
     } else {
-      d.verifications.push({
-        id: newId("ver"),
-        mechanicId: repair.mechanicId,
-        subjectType: "past_repair",
-        subjectId: pastRepairId,
-        category: "past_repair",
-        method: "customer_confirmation",
-        status: "pending",
-        submittedAt: today(),
-        notes: "Confirmation link sent to prior customer.",
-        evidenceSummary: `${repair.year} ${repair.make} ${repair.model} — ${repair.title}`,
-      });
+      const next = this.newCheck(
+        {
+          mechanicId: repair.mechanicId,
+          accountId: m.userId,
+          subjectType: "past_repair",
+          subjectId: pastRepairId,
+          category: "past_repair",
+          method: "customer_confirmation",
+          evidenceSummary: `${repair.year} ${repair.make} ${repair.model}: ${repair.title}`,
+        },
+        "submitted",
+        actor,
+        "submitted",
+        "Confirmation link sent to the prior customer.",
+      );
+      this.supersede(existing, next, actor);
     }
     return conf;
   }
@@ -656,12 +841,13 @@ export class MockRepository implements RepositoryCore {
     conf.response = response;
     conf.respondedAt = today();
     const repair = d.pastRepairs.find((r) => r.id === conf.pastRepairId)!;
-    const v = d.verifications.find((x) => x.subjectId === repair.id);
+    const v = d.verifications.filter((x) => x.subjectId === repair.id && !x.supersededBy).at(-1);
+    const actor: VActor = { kind: "customer", id: `confirmation:${conf.id}` };
     if (response === "confirmed") {
       repair.source = "customer_confirmed";
-      if (v) Object.assign(v, { status: "verified", verifiedAt: today(), notes: `Confirmed by ${conf.contactName} via private link.` });
-    } else if (v) {
-      Object.assign(v, { status: "rejected", notes: `${conf.contactName} said they did not recognise this repair.` });
+      if (v && canMove(v.status, "verified")) this.move(v, "verified", { actor, action: "approved", note: `Confirmed by ${conf.contactName} through their private link.`, idempotencyKey: `confirmation:${conf.id}` });
+    } else if (v && canMove(v.status, "failed")) {
+      this.move(v, "failed", { actor, action: "rejected", reasonCodes: ["customer_denied"], note: `${conf.contactName} said they did not recognise this repair.`, idempotencyKey: `confirmation:${conf.id}` });
     }
   }
 
@@ -1178,40 +1364,96 @@ export class MockRepository implements RepositoryCore {
   }
 
   // ------------------------------------------------------------- admin writes
-  decideVerification(id: ID, decision: "verified" | "rejected" | "needs_info", reviewerId: ID, notes: string, expiresAt?: string) {
-    const d = this.db();
+  /**
+   * A staff decision: approve, reject, request more information, or revoke. Least privilege: staff
+   * only, never on their own records, never on what a provider decides, always with a reason code
+   * (and a note for anything but approval). Every action is appended to the record's history.
+   */
+  decideVerification(id: ID, action: ReviewAction, reviewerId: ID, input: { reasonCode: string; note?: string; expiresAt?: string }) {
     const v = this.getVerification(id);
-    // Reviewers decide only on verifications in their own marketplace.
     const reviewer = this.mustUser(reviewerId);
-    if (!reviewer.roles.includes("admin")) throw new Error("Only Clutch staff can decide verifications.");
-    if (!v) return;
-    // A screening check that no real provider ran can't be approved by hand.
-    if (decision === "verified" && this.unrunScreening(v)) throw new Error("This check was never run by a screening provider, so it can't be approved.");
-    this.notifyMechanic(
-      v.mechanicId,
-      "verification_update",
-      `${CATEGORY_LABEL[v.category]}: ${decision === "verified" ? "verified" : decision === "rejected" ? "not approved" : "more information needed"}`,
-      "/mechanic/verification",
-      notes || undefined,
-    );
-    v.status = decision;
+    if (!reviewer.roles.includes("admin")) throw new LifecycleError("Only Clutch staff can decide verifications.", "forbidden");
+    if (!v) throw new LifecycleError("That verification wasn't found.", "not_found");
+    const m = this.mustMechanic(v.mechanicId);
+    if (m.userId === reviewerId) throw new LifecycleError("You can't review your own verification.", "forbidden");
+    const r = reason(input.reasonCode);
+    if (!r || !r.for.includes(action)) throw new LifecycleError("Choose a reason for this decision.", "invalid_input");
+    const note = input.note?.trim() ?? "";
+    if (action !== "approve" && !note) throw new LifecycleError("Add a note the mechanic will see.", "invalid_input");
+    if (input.reasonCode === "other" && !note) throw new LifecycleError("Explain the reason in the note.", "invalid_input");
+    const actor: VActor = { kind: "staff", id: reviewerId };
+    const eff = effectiveStatus(v.status, v.expiresAt, new Date(), v.method);
+    if (action === "revoke") {
+      if (!isPubliclyValid(eff) && eff !== "expired") throw new LifecycleError("Only a verified check can be revoked.", "stale");
+      if (v.status === "expired") throw new LifecycleError("This check has already expired.", "stale");
+      this.move(v, "revoked", { actor, action: "revoked", reasonCodes: [input.reasonCode], note });
+      v.reviewerId = reviewerId;
+      if (v.subjectType === "past_repair") {
+        const rep = this.db().pastRepairs.find((x) => x.id === v.subjectId);
+        if (rep && (rep.source === "document" || rep.source === "customer_confirmed")) rep.source = "self";
+      }
+      return;
+    }
+    // Providers decide identity and screening; staff can't approve or reject them by hand.
+    if (v.method === "hosted_identity" || v.method === "vendor_screening") throw new LifecycleError("A provider decides this check; staff can only revoke it.", "forbidden");
+    if (action === "approve" && this.unrunScreening(v)) throw new Error("This check was never run by a screening provider, so it can't be approved.");
+    // A document review needs a stored document: a file name alone proves nothing.
+    const needsDoc = v.category === "insurance" || (v.method === "document_review" && (v.category === "credential" || v.category === "past_repair"));
+    if (action === "approve" && needsDoc && !v.documentIds?.length) throw new LifecycleError("There's no stored document to approve. Request more information instead.", "invalid_input");
+    const to: VerificationStatus = action === "approve" ? "verified" : action === "reject" ? "failed" : "needs_more_info";
+    // Staff take a submitted item into review first, so the history shows who looked.
+    if (v.status === "submitted" && to !== "needs_more_info") transition(v, "under_review", { actor, action: "provider_update", note: "Opened for review." });
+    const expiresAt = input.expiresAt || (v.category === "insurance" ? this.db().insurance.find((x) => x.id === v.subjectId)?.expiresOn : v.expiresAt);
+    this.move(v, to, { actor, action: action === "approve" ? "approved" : action === "reject" ? "rejected" : "requested_info", reasonCodes: [input.reasonCode], note, expiresAt });
     v.reviewerId = reviewerId;
-    v.notes = notes || v.notes;
-    if (decision === "verified") {
-      v.verifiedAt = today();
-      if (expiresAt) v.expiresAt = expiresAt;
+    if (to === "verified") {
+      if (v.supersedes) {
+        const old = this.getVerification(v.supersedes);
+        if (old && !old.supersededBy) {
+          old.supersededBy = v.id;
+          old.events = [...(old.events ?? []), { at: nowISO(), actor, action: "superseded", from: old.status, to: old.status, note: `Replaced by ${v.id}.` }];
+        }
+      }
       if (v.subjectType === "screening_check") {
-        const sc = d.screenings.find((s) => s.id === v.subjectId);
+        const sc = this.db().screenings.find((x) => x.id === v.subjectId);
         if (sc) Object.assign(sc, { status: "verified", completedAt: today(), expiresAt: expiresAt ?? sc.expiresAt });
       }
       if (v.subjectType === "past_repair") {
-        const r = d.pastRepairs.find((x) => x.id === v.subjectId);
+        const rep = this.db().pastRepairs.find((x) => x.id === v.subjectId);
         // Staff review of an invoice makes a prior repair Document verified; only a
         // customer's own confirmation makes it Customer verified.
-        if (r && r.source === "self") r.source = v.method === "customer_confirmation" ? "customer_confirmed" : "document";
+        if (rep && rep.source === "self") rep.source = v.method === "customer_confirmation" ? "customer_confirmed" : "document";
       }
       this.matchWaiting();
     }
+  }
+
+  /**
+   * Renewal reminders (30 and 7 days before expiry) and expiry itself, each recorded once per
+   * record and expiry date (idempotent), so a daily run or every page load is safe.
+   */
+  remindRenewals(nowIso: string, mechanicId?: ID) {
+    const now = new Date(nowIso);
+    let changed = 0;
+    for (const v of this.db().verifications) {
+      if ((mechanicId && v.mechanicId !== mechanicId) || v.status !== "verified" || v.supersededBy || !v.expiresAt) continue;
+      const eff = effectiveStatus(v.status, v.expiresAt, now, v.method);
+      const days = Math.ceil((new Date(v.expiresAt).getTime() - now.getTime()) / 86_400_000);
+      const name = CATEGORY_LABEL[v.category];
+      if (eff === "expired") {
+        if (this.move(v, "expired", { actor: { kind: "system", id: "expiry" }, action: "expired", idempotencyKey: `expired:${v.expiresAt}`, note: `${name} expired on ${v.expiresAt}.` })) changed++;
+        continue;
+      }
+      for (const window of [30, 7]) {
+        if (days <= window && days > (window === 30 ? 7 : 0)) {
+          if (transition(v, "verified", { actor: { kind: "system", id: "renewals" }, action: "reminded", idempotencyKey: `remind-${window}:${v.expiresAt}` })) {
+            changed++;
+            this.notifyMechanic(v.mechanicId, "verification_update", `${name}: renew by ${v.expiresAt}`, "/mechanic/verification", `Your ${name.toLowerCase()} verification expires in ${days} ${days === 1 ? "day" : "days"}. Renew it to keep it on your profile.`);
+          }
+        }
+      }
+    }
+    return changed;
   }
 
   // ---------------------------------------------------------- customer writes
@@ -1393,12 +1635,17 @@ export class MockRepository implements RepositoryCore {
     const m = this.mustMechanic(mechanicId);
     if (!this.getUser(m.userId)?.email.endsWith("@example.test")) throw new LifecycleError("Only for test accounts.", "forbidden");
     const d = this.db();
+    const actor: VActor = { kind: "provider", id: "provider-under-test" };
     for (const kind of ["identity", "background", "driving_record"] as const) {
-      d.screenings.push({ id: newId("scr"), mechanicId, kind, provider: "provider-under-test", providerRef: newId("ref"), status: "verified", result: "clear", completedAt: today(), expiresAt: "2027-12-31" });
+      const sc = { id: newId("scr"), mechanicId, kind, provider: "provider-under-test", providerRef: newId("ref"), status: "verified" as const, result: "clear" as const, completedAt: today(), expiresAt: "2027-12-31" };
+      d.screenings.push(sc);
+      const v = this.newCheck({ mechanicId, accountId: m.userId, subjectType: "screening_check", subjectId: sc.id, category: kind, method: kind === "identity" ? "hosted_identity" : "vendor_screening", provider: "provider-under-test", providerRef: sc.providerRef }, "in_progress", actor, "started");
+      transition(v, "verified", { actor, action: "provider_update", reasonCodes: ["provider_verified"], expiresAt: "2027-12-31" });
     }
     const ins = { id: newId("ins"), mechanicId, carrier: "Test fixture", policyLast4: "0000", coverageCents: 100_000_000, documentName: "coi.pdf", effectiveOn: today(), expiresOn: "2027-12-31" };
     d.insurance.push(ins);
-    d.verifications.push({ id: newId("ver"), mechanicId, subjectType: "insurance_record", subjectId: ins.id, category: "insurance", method: "document_review", status: "verified", submittedAt: today(), verifiedAt: today(), notes: "Test fixture." });
+    const v = this.newCheck({ mechanicId, accountId: m.userId, subjectType: "insurance_record", subjectId: ins.id, category: "insurance", method: "document_review", provider: "provider-under-test", documentIds: ["test-fixture"] }, "submitted", { kind: "mechanic", id: m.userId });
+    transition(v, "verified", { actor: { kind: "system", id: "test-fixture" }, action: "approved", reasonCodes: ["evidence_matches"], note: "Test fixture.", expiresAt: "2027-12-31" });
     this.matchWaiting();
   }
 

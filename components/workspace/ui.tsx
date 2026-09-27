@@ -1,21 +1,24 @@
 import Link from "next/link";
 import { AlertCircle, AlertTriangle, CheckCircle2, Info } from "lucide-react";
 import { STATUS_LABEL } from "@/lib/domain/provenance";
-import type { VerificationStatus } from "@/lib/domain/types";
+import type { EffectiveStatus } from "@/lib/verification/model";
 import { Tick, tickForStatus } from "@/components/trust/marks";
 
-const STATUS_TONE: Record<VerificationStatus, string> = {
+const STATUS_TONE: Record<EffectiveStatus, string> = {
   verified: "text-carbon",
-  pending: "text-ink-2",
-  not_submitted: "text-ink-3",
-  rejected: "text-alert",
-  needs_info: "text-amber",
+  renewal_due: "text-amber",
+  in_progress: "text-ink-2",
+  submitted: "text-ink-2",
+  under_review: "text-ink-2",
+  not_started: "text-ink-3",
+  failed: "text-alert",
+  revoked: "text-alert",
+  needs_more_info: "text-amber",
   expired: "text-alert",
-  reverification_required: "text-amber",
 };
 
-export function StatusPill({ status }: { status: VerificationStatus }) {
-  const tick = status === "needs_info" ? "pending" : tickForStatus(status);
+export function StatusPill({ status }: { status: EffectiveStatus }) {
+  const tick = tickForStatus(status);
   return (
     <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-[0.8125rem] font-semibold ${STATUS_TONE[status]}`}>
       <Tick state={tick} size={14} />

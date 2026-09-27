@@ -1,20 +1,23 @@
-import { Check, Clock, Hourglass, MessageCircleQuestion, RotateCcw, X } from "lucide-react";
-import type { VerificationStatus } from "@/lib/domain/types";
+import { Ban, Check, Clock, Hourglass, MessageCircleQuestion, RotateCcw, X } from "lucide-react";
+import type { EffectiveStatus } from "@/lib/verification/model";
 import type { ScreeningItem, ScreeningState } from "@/lib/domain/eligibility";
 
 /** Status as a solid, colour-coded chip: green approved, red rejected/expired, amber waiting. Always icon + words. */
-const VERDICT: Record<VerificationStatus, { label: string; cls: string; icon: typeof Check }> = {
+const VERDICT: Record<EffectiveStatus, { label: string; cls: string; icon: typeof Check }> = {
   verified: { label: "Approved", cls: "border-go bg-go-wash text-go", icon: Check },
-  rejected: { label: "Rejected", cls: "border-alert bg-alert-wash text-alert", icon: X },
-  pending: { label: "Needs review", cls: "border-amber bg-amber-wash text-amber", icon: Hourglass },
-  needs_info: { label: "Waiting on mechanic", cls: "border-brand-tint bg-brand-wash text-brand-deep", icon: MessageCircleQuestion },
+  failed: { label: "Rejected", cls: "border-alert bg-alert-wash text-alert", icon: X },
+  revoked: { label: "Revoked", cls: "border-alert bg-alert-wash text-alert", icon: Ban },
+  submitted: { label: "Needs review", cls: "border-amber bg-amber-wash text-amber", icon: Hourglass },
+  under_review: { label: "Needs review", cls: "border-amber bg-amber-wash text-amber", icon: Hourglass },
+  in_progress: { label: "With provider", cls: "border-rule bg-sheet text-ink-2", icon: Clock },
+  needs_more_info: { label: "Waiting on mechanic", cls: "border-brand-tint bg-brand-wash text-brand-deep", icon: MessageCircleQuestion },
   expired: { label: "Expired", cls: "border-alert bg-alert-wash text-alert", icon: Clock },
-  reverification_required: { label: "Renewal due", cls: "border-amber bg-amber-wash text-amber", icon: RotateCcw },
-  not_submitted: { label: "Not submitted", cls: "border-rule bg-sheet text-ink-3", icon: Clock },
-} as Record<VerificationStatus, { label: string; cls: string; icon: typeof Check }>;
+  renewal_due: { label: "Renewal due", cls: "border-amber bg-amber-wash text-amber", icon: RotateCcw },
+  not_started: { label: "Not started", cls: "border-rule bg-sheet text-ink-3", icon: Clock },
+};
 
-export function VerdictChip({ status, big = false }: { status: VerificationStatus; big?: boolean }) {
-  const v = VERDICT[status] ?? VERDICT.pending;
+export function VerdictChip({ status, big = false }: { status: EffectiveStatus; big?: boolean }) {
+  const v = VERDICT[status] ?? VERDICT.under_review;
   return (
     <span className={`inline-flex items-center gap-1.5 border font-bold whitespace-nowrap ${big ? "px-3 py-1.5 text-[0.9375rem]" : "px-2 py-0.5 text-[0.8125rem]"} ${v.cls}`}>
       <v.icon size={big ? 17 : 14} strokeWidth={2.75} aria-hidden /> {v.label}

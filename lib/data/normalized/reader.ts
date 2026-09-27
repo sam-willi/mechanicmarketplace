@@ -38,7 +38,8 @@ export const ACCOUNT_BATCH = 50;
 export const PUBLIC_STRIP: Partial<Record<keyof DB, string[]>> = {
   screenings: ["provider", "providerRef", "result", "consentAt"],
   insurance: ["carrier", "policyLast4", "coverageCents", "documentName"],
-  verifications: ["provider", "reviewerId", "notes", "evidenceSummary"],
+  // The provider's key stays: public statements name who checked ("verified by Stripe Identity").
+  verifications: ["providerRef", "reviewerId", "notes", "evidenceSummary", "events", "reasonCodes", "documentIds", "nameMatches", "consentAt", "decidedBy", "accountId"],
   credentials: ["documentName"],
   employment: ["documentName"],
   pastRepairs: ["description"],
@@ -429,7 +430,8 @@ export class Reader {
     await Promise.all([
       this.load("screenings", this.any("mechanic_id", list), level),
       this.load("insurance", this.any("mechanic_id", list), level),
-      this.load("verifications", s`${this.any("mechanic_id", list)} and subject_type = 'insurance_record'`, level),
+      // The canonical records behind the four checks customers see (identity may have no screening row).
+      this.load("verifications", s`${this.any("mechanic_id", list)} and category in ('identity', 'background', 'driving_record', 'insurance')`, level),
     ]);
   }
 

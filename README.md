@@ -5,7 +5,7 @@ Clutch is a two-sided marketplace for independent mobile mechanics and the peopl
 
 **Live site: [mechanicmarketplace.vercel.app](https://mechanicmarketplace.vercel.app)** · Code: [github.com/sam-willi/mechanicmarketplace](https://github.com/sam-willi/mechanicmarketplace)
 
-More detail: product truth in [PRODUCT.md](PRODUCT.md) · build plan and architecture in [docs/PLAN.md](docs/PLAN.md) · data access in [docs/live-reads.md](docs/live-reads.md)
+More detail: product truth in [PRODUCT.md](PRODUCT.md) · build plan and architecture in [docs/PLAN.md](docs/PLAN.md) · data access in [docs/live-reads.md](docs/live-reads.md) · verification in [docs/verification.md](docs/verification.md)
 
 ## Try it in two minutes
 
@@ -101,6 +101,7 @@ What stands between this and public use are **external prerequisites, not missin
 - Transactional and idempotent lifecycle protections
 - Normalized live storage with targeted, access-checked reads (built, off by default)
 - Bookable mechanics with every verification check shown separately, a customer acknowledgement before booking anyone not fully verified, and that record kept with the booking (policy of 2026-09-26)
+- Verification with one canonical record per check and a full history: identity through a hosted ID + selfie provider (Stripe Identity, off until configured), insurance reviewed by staff from a privately stored certificate, background checks behind a disabled provider boundary. Setup: [docs/verification.md](docs/verification.md)
 - Responsive customer, mechanic and staff interfaces
 
 ### Required before public launch
@@ -326,7 +327,7 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md). Don't file it publicl
 | Path | What |
 |---|---|
 | `lib/domain/` | Types, provenance vocabulary, reputation math (pure), and `toPublicProfile()`, the only path from private data to public pages |
-| `lib/verification/` | Expiry lifecycle and the provider-agnostic screening interfaces (`ScreeningProvider`) with a mock implementation and registry |
+| `lib/verification/` | The canonical verification record (statuses, history, transitions), public statements, reason codes, the hosted identity provider (Stripe Identity, plus a test adapter), the background-check boundary (disabled), signed document links and the backfill. See [docs/verification.md](docs/verification.md). |
 | `lib/data/` | `Repository` interface, domain logic (`mock/repository.ts`), seed data, and the facade in `index.ts` that commits every write |
 | `supabase/migrations/0001_init.sql` | The original relational design (Supabase-only: it references `auth.users`). Kept for reference; the app never applies it, and `0004` superseded it |
 | `components/trust/` | Tick marks, provenance chips, the evidence sheet, and the trust-first summary |
@@ -341,7 +342,7 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md). Don't file it publicl
 
 ## Mocked in this MVP
 
-- **Screening vendors:** `CLUTCH_IDENTITY_PROVIDER`, `CLUTCH_BACKGROUND_PROVIDER` and `CLUTCH_DRIVING_RECORD_PROVIDER` all resolve to `mock`. Real adapters (Persona, Stripe Identity, Jumio, Checkr) implement `ScreeningProvider` and register in `lib/verification/providers/registry.ts`. The mock only runs for demo (fictional) mechanics: in the real marketplace, ID, background and driving record checks show "Opens soon", can't be started, and a check that no provider ran can't be approved by staff (`screeningOpen`). Until a real provider is connected those checks show as not completed; under the 2026-09-26 policy that doesn't stop a mechanic being booked, but customers see it and acknowledge it first.
+- **Verification providers:** identity uses Stripe Identity's hosted ID + live selfie flow once `CLUTCH_IDENTITY_PROVIDER=stripe_identity` and its keys are set; until then identity isn't available and nothing reads as verified. Background and driving-record checks stay closed until a provider and an approved adjudication policy exist (`CLUTCH_BACKGROUND_PROVIDER`, `CLUTCH_BACKGROUND_POLICY_APPROVED`). The fictional demo uses labelled test providers. Under the 2026-09-26 policy an unverified mechanic can still be booked; customers see each check's exact status and acknowledge it first. Setup and data handling: [docs/verification.md](docs/verification.md).
 - **Notifications:** updates appear in the in-app Notifications list only. Clutch doesn't send email, SMS or push updates yet, and the UI doesn't promise them.
 - **Auth is real:** Supabase Auth handles email + password (with email confirmation and password reset) and Google. Sessions are refreshed in `proxy.ts`; `lib/session.ts` resolves them to Clutch accounts, which are created on first sign-in (`lib/auth/provision.ts`). Demo accounts are separate, seeded, passwordless, and can be switched off with `CLUTCH_DEMO_LOGINS=off`.
 - **Earnings:** job-value estimates from approved estimates and final amounts. No payments are processed.

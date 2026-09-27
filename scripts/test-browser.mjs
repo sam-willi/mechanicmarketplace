@@ -69,7 +69,15 @@ const appEnv = {
   CLUTCH_OUTBOUND_ALERTS: "",
   CLUTCH_EMAIL_PROVIDER: "",
   CLUTCH_CRON_SECRET: "",
-  CLUTCH_ADMIN_EMAILS: "",
+  // One fixture reviewer; the hosted identity flow runs against the deterministic test provider.
+  CLUTCH_ADMIN_EMAILS: "reviewer@example.test",
+  CLUTCH_TEST_PROVIDERS: "on",
+  CLUTCH_IDENTITY_PROVIDER: "test",
+  CLUTCH_TEST_IDENTITY_SECRET: randomBytes(16).toString("hex"),
+  STRIPE_IDENTITY_SECRET_KEY: "",
+  STRIPE_IDENTITY_WEBHOOK_SECRET: "",
+  CLUTCH_BACKGROUND_PROVIDER: "",
+  CLUTCH_BACKGROUND_POLICY_APPROVED: "",
   SMTP_HOST: "", SMTP_PORT: "", SMTP_USER: "", SMTP_PASSWORD: "", EMAIL_FROM: "",
 };
 // Anything else in .env files (which Next would load) is blanked too: this run uses only the above.

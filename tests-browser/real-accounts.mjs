@@ -316,6 +316,10 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
   await act(C.p, /^Review verification and book/, "a");
   ok(`booking step (${path(C.p)})`, path(C.p) === `/customer/quotes/${quoteId}/book`);
   ok("acknowledgement unticked", await C.p.$eval('input[name="acknowledge"]', (x) => !x.checked));
+  {
+    const t = await main(C.p);
+    ok("booking step states plainly what Clutch hasn't verified (no generic badge)", /Identity not verified by Clutch/.test(t) && /Insurance not verified by Clutch/.test(t) && !/\bTrusted\b/.test(t), t.slice(0, 600));
+  }
   await phone(C.p, "booking step", "11-book");
   await C.p.evaluate(() => { const f = document.querySelector('input[name="acknowledge"]').form; f.noValidate = true; f.requestSubmit(); });
   await C.p.waitForNavigation({ waitUntil: "networkidle0" }).catch(() => {});
@@ -327,7 +331,7 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
   ok(`booked → ${jobPath}`, /^\/customer\/jobs\//.test(jobPath), path(C.p) + " " + (await main(C.p)));
   const jobId = jobPath.split("/").pop();
   const rec = JSON.parse(await psql(`select data->'verificationAtBooking' from ${T('jobs')} id='${jobId}'`) || "null");
-  ok("booking keeps the acknowledgement record", rec && rec.fullyVerified === false && rec.acknowledgement?.version && rec.checks?.length === 4, JSON.stringify(rec));
+  ok("booking keeps the acknowledgement record, with the exact statements shown", rec && rec.fullyVerified === false && rec.acknowledgement?.version === "unverified-booking/2026-09-27.1" && rec.checks?.length === 4 && rec.checks.every((c) => /not verified by Clutch/.test(c.statement ?? "")) && rec.acknowledgement.disclosure.includes("- Identity not verified by Clutch"), JSON.stringify(rec));
   await phone(C.p, "customer job", "12-cust-job");
 
   // ============================================================ 7. restart the app, sessions persist
@@ -349,7 +353,9 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
     ok(`mechanic: ${label} (job ${before} → ${(await statusOf())})`, want((await statusOf())), (await main(M.p)).slice(0, 500));
   }
   await mstep("confirm the appointment time", () => click(M.p, /^Confirm$/, "button"), (x) => x === "scheduled");
-  ok("appointment confirmed", /confirmed/i.test(await psql(`select data->>'confirmedAt' is not null or data->>'appointmentConfirmed' = 'true' or data::text ilike '%confirmedAt%' from ${T('jobs')} id='${jobId}'`)) || /is confirmed for/.test(await main(M.p)), (await main(M.p)).slice(0, 300));
+  // Stored (the confirmation time is recorded) and shown (the shared status moves to Scheduled).
+  const confirmedAt = await psql(`select coalesce(data->>'confirmedAt', '') from ${T('jobs')} id='${jobId}'`);
+  ok(`appointment confirmed (confirmedAt ${confirmedAt || "missing"})`, Boolean(confirmedAt) && /Step 4 of 6 · Scheduled/.test(await main(M.p)), (await main(M.p)).slice(0, 300));
   await mstep("check in and start", () => click(M.p, /^Check in and start/, "button"), (x) => x === "in_progress");
   await mstep("share what they found (matches the estimate)", async () => {
     await set(M.p, 'textarea[name="note"]', "Front pads at 2 mm, rotors scored. Same work as the estimate.");
@@ -494,6 +500,124 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
     ok("saving the profile again: still sent once, one notification", JSON.stringify(await matched()) === JSON.stringify([mechId]) && (await notes()) === 1, `${JSON.stringify(await matched())} ${await notes()}`);
     ok("the demo never sees it", (await psql(`select count(*) from app_records where scope='demo' and (id='${waitId}' or data::text like '%${waitId}%')`)) === "0");
   }
+  // ============================================================ 11. verification: identity (test provider), insurance, review, revoke
+  {
+    const V = await ctx("mechanic-verify");
+    await login(V.p, MECH);
+    const idRec = () => sql.unsafe(store === "normalized" ? `select data from lv_verifications where mechanic_id='${mechId}' and category='identity' order by created_at desc` : `select data from app_records where scope='live' and collection='verifications' and data->>'mechanicId'='${mechId}' and data->>'category'='identity'`).then((rows) => rows.map((r) => r.data).filter((d) => !d.supersededBy));
+    const finishTest = async (outcome, webhook, name = MECH.name) => {
+      await V.p.waitForFunction(() => location.pathname.startsWith("/verification-test/identity/"), { timeout: 20000 });
+      ok(`hosted test page says it isn't a real check (${outcome})`, /not a real identity check/i.test(await main(V.p)));
+      await V.p.evaluate((o, w, n) => {
+        document.querySelector(`input[name="outcome"][value="${o}"]`).click();
+        document.querySelector(`input[name="webhook"][value="${w}"]`).click();
+        const f = document.querySelector('input[name="nameOnId"]');
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(f, n);
+      }, outcome, webhook, name);
+      await act(V.p, /^Finish$/, "button");
+      await V.p.waitForFunction(() => location.pathname === "/mechanic/verification", { timeout: 30000 });
+    };
+    const startId = async () => {
+      await go(V.p, "/mechanic/verification");
+      await act(V.p, /^(Verify your identity|Continue identity check|Try again|Start a new check)/, "button");
+    };
+    await V.p.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+    await go(V.p, "/mechanic/verification");
+    t = await main(V.p);
+    ok("verification center @390: every check says what it is and its status", /Identity not verified by Clutch/.test(t) && /Insurance not verified by Clutch/.test(t) && /Background check/.test(t) && /Phone/.test(t) && (await V.p.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 0, t.slice(0, 400));
+    await V.p.screenshot({ path: `${OUT}20-verification-390.png`, fullPage: true });
+    // Cancelled, and the webhook never arrives: the return page asks the provider itself.
+    await startId();
+    await finishTest("cancelled", "skip");
+    ok("cancelled with no webhook: recovered on return, nothing claimed", /You left before finishing/.test(await main(V.p)) && (await idRec())[0]?.status === "not_started", JSON.stringify((await idRec())[0]?.status));
+    // Selfie mismatch: told what to change.
+    await startId();
+    await finishTest("selfie_mismatch", "once");
+    t = await main(V.p);
+    ok("selfie mismatch → needs more information, with what to change", (await idRec())[0]?.status === "needs_more_info" && /selfie/i.test(t), t.slice(0, 400));
+    // Retry: verified, the webhook delivered twice.
+    await startId();
+    await finishTest("verified", "twice");
+    const rec = (await idRec())[0];
+    t = await main(V.p);
+    ok("verified: one record, verified once despite a duplicate webhook", rec?.status === "verified" && rec.events.filter((e) => e.to === "verified").length === 1 && rec.nameMatches === true, JSON.stringify(rec?.events?.map((e) => e.action)));
+    ok("the center says who verified it (a test provider, not a real check)", /Identity verified by Clutch's test provider \(not a real check\)/.test(t), t.slice(0, 400));
+    ok("nothing identifying stored: no ID number, date of birth, images or scores", !/(idNumber|dateOfBirth|dob|selfieUrl|documentUrl|score)/i.test(JSON.stringify(rec)));
+    // Insurance with a real (private) document.
+    await V.p.setViewport({ width: 1280, height: 900 });
+    await go(V.p, "/mechanic/verification#insurance");
+    await set(V.p, 'form select[name="policyType"]', "general_liability");
+    await set(V.p, 'form input[name="carrier"]', "Fixture Mutual");
+    await set(V.p, 'form input[name="namedInsured"]', MECH.name);
+    await set(V.p, 'form input[name="effectiveOn"]', "2026-01-01");
+    await set(V.p, 'form input[name="expiresOn"]', "2027-06-30");
+    await chooseFile(V.p, '#insurance input[type="file"]', FILES.pdf);
+    ok("certificate stored privately", /stored privately/.test(await main(V.p)), await alertText(V.p));
+    await act(V.p, /^Submit for review$/, "button");
+    const insRow = async () => (await sql.unsafe(store === "normalized" ? `select data from lv_verifications where mechanic_id='${mechId}' and category='insurance'` : `select data from app_records where scope='live' and collection='verifications' and data->>'mechanicId'='${mechId}' and data->>'category'='insurance'`)).map((r) => r.data).at(-1);
+    let ins = await insRow();
+    ok("insurance submitted with its document and details", ins?.status === "submitted" && ins.documentIds?.length === 1, JSON.stringify(ins));
+    const docId = ins.documentIds[0];
+    ok("the document is refused to anyone but its uploader (a customer: 404)", (await fetchAs(C2.p, `/api/media/${docId}`)).status === 404);
+    const G2 = await ctx("guest-2");
+    await go(G2.p, "/");
+    ok("…and to a signed-out visitor", (await fetchAs(G2.p, `/api/media/${docId}`)).status === 404);
+    ok("the uploader can open their own document", (await fetchAs(V.p, `/api/media/${docId}`)).status === 200);
+    // Staff review.
+    const STAFF = { name: "Reviewer Fixture", email: "reviewer@example.test", password: `Fixture-${RUN}-rv` };
+    const A = await ctx("admin");
+    await go(A.p, "/signup?role=customer");
+    await set(A.p, 'form input[name="name"]', STAFF.name);
+    await set(A.p, 'form input[name="email"]', STAFF.email);
+    await set(A.p, 'form input[name="password"]', STAFF.password);
+    await act(A.p, /^Create account$/, "button");
+    await confirmFromMailbox(A.p, STAFF.email);
+    ok("a plain admin session can't open the document without a review link", (await fetchAs(A.p, `/api/media/${docId}`)).status === 404);
+    for (const w of [390, 1280]) {
+      await A.p.setViewport(w === 390 ? { width: 390, height: 844, isMobile: true, hasTouch: true } : { width: 1280, height: 900 });
+      await go(A.p, `/admin/reviews/${ins.id}`);
+      t = await main(A.p);
+      ok(`admin review @${w}: evidence, history and structured actions`, /Fixture Mutual/.test(t) && /History/.test(t) && /Record decision/.test(t) && /Named insured/.test(t) && (await A.p.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 0, t.slice(0, 500));
+      await A.p.screenshot({ path: `${OUT}21-admin-review-${w}.png`, fullPage: true });
+    }
+    const link = await A.p.evaluate(() => [...document.querySelectorAll('a[href*="/api/media/"]')].map((a) => a.getAttribute("href"))[0]);
+    ok(`review link is short-lived and private (${(link ?? "").replace(/vt=.*/, "vt=…")})`, /\?vt=\d+\.[0-9a-f]{64}$/.test(link ?? ""));
+    const opened = await fetchAs(A.p, link);
+    ok("the reviewer opens it through the link, never cached", opened.status === 200 && /no-store/.test(opened.h["cache-control"] ?? ""), JSON.stringify(opened));
+    ok("the same link is useless to someone else", (await fetchAs(V.p, link.replace(/vt=\d+/, "vt=1"))).status === 404 && (await fetchAs(C2.p, link)).status === 404);
+    // Approve without a reason is refused by the form (required); with one, it's recorded.
+    await A.p.evaluate(() => document.querySelector('input[name="action"][value="approve"]').click());
+    await set(A.p, 'select[name="reasonCode"]', "evidence_matches");
+    await act(A.p, /^Record decision$/, "button");
+    ins = await insRow();
+    ok("approved, with the reviewer and reason in the history", ins?.status === "verified" && ins.events.some((e) => e.action === "approved" && e.reasonCodes?.includes("evidence_matches") && e.actor.kind === "staff"), JSON.stringify(ins?.events?.map((e) => e.action)));
+    const slug = await psql(`select data->>'slug' from ${T('mechanics')} id='${mechId}'`);
+    for (const w of [390, 1280]) {
+      await C2.p.setViewport(w === 390 ? { width: 390, height: 844, isMobile: true, hasTouch: true } : { width: 1280, height: 900 });
+      await go(C2.p, `/mechanics/${slug}`);
+      t = await main(C2.p);
+      ok(`customer profile @${w}: each check shown on its own, no generic badge`, /Identity: Verified/.test(t) && /Insurance: Verified/.test(t) && /Background check: Not completed/.test(t) && !/\bTrusted\b/.test(t), t.slice(0, 600));
+      await C2.p.screenshot({ path: `${OUT}22-profile-verified-${w}.png`, fullPage: false });
+    }
+    const opens = await C2.p.evaluate(() => [...document.querySelectorAll("button[aria-haspopup=dialog]")].find((b) => /Insurance/.test(b.getAttribute("aria-label") ?? ""))?.click());
+    await sleep(300);
+    t = await C2.p.evaluate(() => document.querySelector("dialog[open]")?.innerText ?? "");
+    ok("insurance evidence: who, when, what it means, what Clutch checked", /Insurance verified by Clutch staff on/.test(t) && /What this means/.test(t) && /What Clutch checked/.test(t), `${opens} ${t.slice(0, 400)}`);
+    // Revoke: gone from every positive claim at once.
+    await go(A.p, `/admin/reviews/${ins.id}`);
+    await set(A.p, 'select[name="reasonCode"]', "policy_cancelled");
+    await set(A.p, 'textarea[name="note"]', "The carrier says this policy was cancelled.");
+    await act(A.p, /^Record decision$/, "button");
+    ins = await insRow();
+    await go(C2.p, `/mechanics/${slug}`);
+    await C2.p.evaluate(() => [...document.querySelectorAll("button[aria-haspopup=dialog]")].find((b) => /Insurance/.test(b.getAttribute("aria-label") ?? ""))?.click());
+    await sleep(300);
+    t = await C2.p.evaluate(() => document.querySelector("dialog[open]")?.innerText ?? document.body.innerText);
+    ok("revoked: the profile no longer claims insurance", ins?.status === "revoked" && /Insurance not verified by Clutch|hasn't verified/.test(t), `${ins?.status} ${t.slice(0, 300)}`);
+    await go(V.p, "/mechanic/notifications");
+    ok("the mechanic was told, with the reason", /Insurance: verification withdrawn/.test(await main(V.p)) && /cancelled/i.test(await main(V.p)));
+  }
+
   ok("nothing reached the demo scope", await psql(`select count(*) from app_records where scope='demo' and (data->>'email' in ('${CUST.email}','${MECH.email}') or id in ('${reqId}','${jobId}'))`) === "0");
   ok("no delivery was attempted (no provider configured)", await psql(`select count(*) from delivery_attempts where outcome='sent'`) === "0");
 
