@@ -5,7 +5,7 @@ Clutch is a two-sided marketplace for independent mobile mechanics and the peopl
 
 **Live site: [mechanicmarketplace.vercel.app](https://mechanicmarketplace.vercel.app)** · Code: [github.com/sam-willi/mechanicmarketplace](https://github.com/sam-willi/mechanicmarketplace)
 
-More detail: product truth in [PRODUCT.md](PRODUCT.md) · build plan and architecture in [docs/PLAN.md](docs/PLAN.md) · data access in [docs/live-reads.md](docs/live-reads.md) · verification in [docs/verification.md](docs/verification.md)
+More detail: product truth in [PRODUCT.md](PRODUCT.md) · build plan and architecture in [docs/PLAN.md](docs/PLAN.md) · data access in [docs/live-reads.md](docs/live-reads.md) · verification in [docs/verification.md](docs/verification.md) · release preflight in [docs/release-preflight.md](docs/release-preflight.md)
 
 ## Try it in two minutes
 
@@ -423,7 +423,13 @@ Real and demo data are kept apart on the server (`lib/data/scope.ts`). Every rec
 In the demo, every mechanic, shop, customer and review is fictional. Seven demo mechanics have portrait photos; Priya Nair shows an initials print. No repair photos are seeded: galleries show a repair icon and vehicle outline until a mechanic adds photos. Photos taken during a Clutch job are labelled "Verified repair photo"; photos added to a record later are labelled "Mechanic-uploaded photo".
 ## Deployment checklist
 
-Do not enable public traffic until every applicable item is complete.
+Do not enable public traffic until every applicable item is complete. Start with the read-only
+preflight, which checks the configuration items below and reports PASS/WARN/BLOCKED without
+printing secrets or writing anything ([runbook](docs/release-preflight.md)):
+
+```bash
+npm run preflight -- --env-file=.env.production.local --online
+```
 
 - [ ] All tests, type checks, linting and the production build pass
 - [ ] Production database migrations were dry-run and reconciled
