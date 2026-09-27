@@ -47,7 +47,7 @@ export default async function BookWithDisclosure({ params, searchParams }: { par
       <Link href={`/customer/quotes/${id}`} className="inline-flex min-h-11 items-center gap-1.5 text-[0.875rem] text-ink-3 hover:text-ink">
         <ArrowLeft size={14} aria-hidden /> Back to the estimate
       </Link>
-      <h1 className="display mt-2 text-[1.875rem] sm:text-[2.25rem]">Before you book {p.firstName}</h1>
+      <h1 className="display mt-2 text-[2rem] sm:text-[2.25rem]">Before you book {p.firstName}</h1>
       <p className="mt-1 text-ink-2">
         {vehicleLine(v)} · {q.availableOn} · {t.planFor}
       </p>
@@ -80,7 +80,7 @@ export default async function BookWithDisclosure({ params, searchParams }: { par
 
       {verified.length ? (
         <section aria-labelledby="verified" className="mt-4 border border-rule bg-sheet p-4 sm:p-5">
-          <h2 id="verified" className="heading text-[1.125rem]">
+          <h2 id="verified" className="heading text-[1.0625rem]">
             Clutch has verified
           </h2>
           <ul className="mt-2 space-y-1">

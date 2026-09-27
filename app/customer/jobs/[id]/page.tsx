@@ -7,7 +7,7 @@ import { getRepo } from "@/lib/data";
 import { getSession, needs } from "@/lib/session";
 import { BookingVerification } from "@/components/trust/booking-verification";
 import { vehicleLine } from "@/lib/domain/intake";
-import { customerRepairStatus, jobValueCents } from "@/lib/domain/status";
+import { jobValueCents } from "@/lib/domain/status";
 import { dayMonth, usd } from "@/lib/format";
 import { answerNewTime, cancelRepair, confirmCompletion, proposeNewTime, reopenRepair, reportPaymentAsCustomer, respondScopeChange, submitReview } from "@/app/actions/customer";
 import { HistoryList } from "@/components/app/history-list";
@@ -17,7 +17,8 @@ import { ReviewPhoto } from "@/components/app/review-photo";
 import { NowPanel } from "@/components/app/job-lifecycle";
 import { jobLifecycle } from "@/lib/domain/lifecycle";
 import { Tick } from "@/components/trust/marks";
-import { StatusChip } from "@/components/app/status-chip";
+import { journey } from "@/lib/domain/journey";
+import { JourneyStatus } from "@/components/app/journey-status";
 import { PhotoPrint } from "@/components/profile/photo";
 import { MediaThumb } from "@/components/request/media-capture";
 import { EvidenceProvider } from "@/components/trust/evidence-sheet";
@@ -25,6 +26,7 @@ import { ScreeningList } from "@/components/trust/screening-list";
 import { SaveMechanicButton } from "@/components/profile/save-button";
 import { StatusTimeline } from "@/components/visual/timeline";
 import { VehicleTile } from "@/components/visual/vehicle-glyph";
+import { Notice } from "@/components/workspace/ui";
 import { findArea } from "@/lib/domain/areas";
 
 export const metadata: Metadata = { title: "Your repair" };
@@ -66,7 +68,6 @@ export default async function JobPage({ params, searchParams }: { params: Promis
   const q = repo.getQuote(job.quoteId);
   const req = repo.getRequest(job.requestId)!;
   const review = repo.getReviewForJob(job.id);
-  const status = customerRepairStatus(req, [], job);
   const { stages, current } = jobLifecycle(job, review, { customer: s.name.split(" ")[0], mechanic: m.firstName }, "customer");
   const phone = repo.getUser(mech.userId)?.phone;
   const saved = repo.listSaved(s.customerId).includes(m.id);
@@ -109,20 +110,19 @@ export default async function JobPage({ params, searchParams }: { params: Promis
             <ArrowLeft size={14} aria-hidden /> My Repairs
           </Link>
           {sp.error ? (
-            <p role="alert" className="border-l-4 border-alert bg-sheet px-4 py-3 text-[0.9375rem]">
+            <Notice tone="error">
               {sp.error}
-            </p>
+            </Notice>
           ) : notice ? (
-            <p role="status" className="border-l-4 border-brand bg-sheet px-4 py-3 text-[0.9375rem] font-semibold">
-              {notice}
-            </p>
+            <Notice tone="ok"><span className="font-semibold">{notice}</span></Notice>
           ) : null}
+
+          <JourneyStatus j={journey({ request: req, quotes: q ? [q] : [], job, audience: "customer", names: { customer: s.name.split(" ")[0], mechanic: m.firstName } })} audience="customer" names={{ customer: s.name.split(" ")[0], mechanic: m.firstName }} />
 
           {/* The booking, as one confirmation card */}
           <section aria-label="Booking" className={`sheet overflow-hidden ${job.status === "completed" ? "" : "perf-top"}`}>
             <div className="border-b border-rule px-5 pt-6 pb-4">
-              <StatusChip label={status} />
-              <h1 className="display mt-3 text-[1.625rem] sm:text-[2.125rem]">{headline}</h1>
+              <h1 className="display text-[1.75rem] sm:text-[2.25rem]">{headline}</h1>
               {job.status === "cancelled" && job.cancelledBy === "mechanic" ? (
                 <p className="mt-2 text-[0.9375rem] text-ink-2">
                   {m.firstName} cancelled. Your request is open again.{" "}
@@ -138,7 +138,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
             <div className="flex gap-4 border-b border-rule-soft px-5 py-4">
               <PhotoPrint photoUrl={m.photoUrl} initials={m.initials} name={m.displayName} size={72} />
               <div className="min-w-0 flex-1">
-                <p className="heading text-[1.1875rem]">{m.displayName}</p>
+                <p className="heading text-[1.25rem]">{m.displayName}</p>
                 <p className="text-[0.875rem] text-ink-2">
                   {m.reputation.verifiedRepairs} verified repairs
                   {m.reputation.rating ? (
@@ -202,7 +202,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
               </div>
             </dl>
           </section>
-      <NowPanel current={current} hideHeadline>
+      <NowPanel current={current} hideHeadline hideWaiting>
         {job.diagnosis ? (
           <p className="mb-3 text-[0.9375rem]">
             <span className="font-semibold">{m.firstName}&apos;s diagnosis:</span> {job.diagnosis.note}
@@ -285,7 +285,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
 
       {job.status === "awaiting_customer" || job.status === "completed" ? (
         <section id="payment" className="scroll-mt-24 space-y-3">
-          <h2 className="heading text-[1.125rem]">Payment</h2>
+          <h2 className="heading text-[1.0625rem]">Payment</h2>
           <PaymentFacts job={job} viewer="customer" otherName={m.firstName} />
           <form action={reportPaymentAsCustomer.bind(null, job.id)} className="space-y-2">
             <PaymentFields legend="Update what you've paid" required />
@@ -296,7 +296,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
 
       {q?.scope ? (
         <section>
-          <h2 className="heading text-[1.125rem]">Approved scope</h2>
+          <h2 className="heading text-[1.0625rem]">Approved scope</h2>
           <p className="mt-1 text-[0.9375rem] leading-relaxed text-ink-2">{q.scope}</p>
           {job.finalAmountCents ? (
             <p className="tnum mt-2 text-[0.9375rem]">
@@ -342,7 +342,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
 
       {req.media.length > 0 && (
         <section>
-          <h2 className="heading text-[1.125rem]">Photos & documents</h2>
+          <h2 className="heading text-[1.0625rem]">Photos & documents</h2>
           <div className="mt-3 flex flex-wrap gap-2">
             {req.media.map((x) => (
               <MediaThumb key={x.id} m={x} size={88} />
@@ -383,7 +383,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
             </p>
             <p className="flex items-center gap-2">
               <StarRating value={review.overall} size={20} labelled />
-              <span className="tnum text-[1.125rem] font-semibold">{review.overall}/5</span>
+              <span className="tnum text-[1.0625rem] font-semibold">{review.overall}/5</span>
             </p>
             {review.comment ? <p className="text-ink-2">{review.comment}</p> : null}
             <Link href={`/customer/jobs/${job.id}?editReview=1#review`} className="link text-[0.875rem]">
@@ -417,7 +417,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
         <section aria-label={`Use ${m.firstName} again`} className="sheet flex flex-wrap items-center gap-4 p-5">
           <PhotoPrint photoUrl={m.photoUrl} initials={m.initials} name={m.displayName} size={56} />
           <div className="min-w-0 flex-1">
-            <p className="heading text-[1.1875rem]">Want to use {m.firstName} again?</p>
+            <p className="heading text-[1.25rem]">Want to use {m.firstName} again?</p>
             <p className="text-[0.875rem] text-ink-2">Rebooking sends your next request straight to {m.firstName}, with this repair attached.</p>
           </div>
           <div className="flex flex-wrap gap-2">

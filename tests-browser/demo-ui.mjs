@@ -154,7 +154,7 @@ export async function run({ base, db, chrome, out }) {
     const r = await mk.evaluate(() => {
       const card = document.querySelector('[aria-labelledby="ready-title"]');
       const opt = card ? [...card.querySelectorAll("details")].find((x) => /Verification checks \(optional\)/.test(x.innerText)) : null;
-      return { next: document.getElementById("ready-title")?.innerText ?? "", optClosed: opt ? !opt.open : false, earlier: /before this step was required/.test(card?.innerText ?? ""), deciding: /customer deciding/.test(document.body.innerText) };
+      return { next: document.getElementById("ready-title")?.innerText ?? "", optClosed: opt ? !opt.open : false, earlier: /before this step was required/.test(card?.innerText ?? ""), deciding: /estimates?: waiting on the customer/.test(document.body.innerText) };
     });
     ok(`readiness @${w}: the next action leads, checks are separate and collapsed, older estimates explained`, r.next === "Add your service area to start receiving requests." && r.optClosed && r.earlier && !r.deciding, JSON.stringify(r));
     await mk.screenshot({ path: `${OUT}readiness-${w}.png`, fullPage: true });

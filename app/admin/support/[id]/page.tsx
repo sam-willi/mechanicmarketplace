@@ -10,7 +10,7 @@ import { vehicleLine } from "@/lib/domain/intake";
 import { CASE_STATUS } from "@/lib/domain/support";
 import { updateSupportCase } from "@/app/actions/admin";
 import { SiteHeader } from "@/components/site/site-header";
-import { NeedsPersona, PageTitle } from "@/components/workspace/ui";
+import { NeedsPersona, PageTitle, Notice } from "@/components/workspace/ui";
 import { TOPICS } from "@/components/help/help-content";
 import { HistoryList } from "@/components/app/history-list";
 import { SupportThread } from "@/components/help/support-reports";
@@ -53,13 +53,11 @@ export default async function SupportCase({ params, searchParams }: { params: Pr
         </Link>
         <PageTitle title={TOPICS.find(([k]) => k === r.topic)?.[1] ?? "Report"} note={`${r.id.toUpperCase()} · filed ${dayMonth(r.createdAt)} by ${reporter?.name ?? "an account"} (${r.reporterRole === "mechanic" ? "mechanic" : "customer"}) · ${CASE_STATUS[r.status]}`} />
         {sp.error ? (
-          <p role="alert" className="border-l-4 border-alert bg-sheet px-4 py-3 text-[0.9375rem]">
+          <Notice tone="error">
             {sp.error}
-          </p>
+          </Notice>
         ) : sp.saved ? (
-          <p role="status" className="border-l-4 border-brand bg-sheet px-4 py-3 text-[0.9375rem] font-semibold">
-            Saved. The reporter sees it on their Help page.
-          </p>
+          <Notice tone="ok"><span className="font-semibold">Saved. The reporter sees it on their Help page.</span></Notice>
         ) : null}
 
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
@@ -102,7 +100,7 @@ export default async function SupportCase({ params, searchParams }: { params: Pr
 
           <aside className="lg:sticky lg:top-20 lg:self-start">
             <form action={updateSupportCase.bind(null, r.id)} className="space-y-4 border-2 border-ink bg-sheet p-4">
-              <p className="heading text-[1.125rem]">Work this case</p>
+              <p className="heading text-[1.0625rem]">Work this case</p>
               <label className="block">
                 <span className="field-label">Status</span>
                 <select name="status" defaultValue={r.status === "open" ? "in_review" : r.status} className="input mt-1">

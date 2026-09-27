@@ -6,7 +6,8 @@ import { getSession, needs } from "@/lib/session";
 import { paginate, parseCursor } from "@/lib/data/page";
 import { Pager } from "@/components/app/pager";
 import { primarySymptom, vehicleLine } from "@/lib/domain/intake";
-import { customerRepairStatus, isWaitingForMatch } from "@/lib/domain/status";
+import { isWaitingForMatch } from "@/lib/domain/status";
+import { repairChip } from "@/lib/domain/journey";
 import { dayMonth, plural } from "@/lib/format";
 import { StatusChip } from "@/components/app/status-chip";
 
@@ -46,7 +47,7 @@ export default async function CustomerRequests({ searchParams }: { searchParams:
               <p className="font-semibold">{vehicleLine(v)}</p>
               <p className="line-clamp-1 text-[0.9375rem] text-ink-2">{primarySymptom(r)}</p>
             </div>
-            <StatusChip label={customerRepairStatus(r, quotes, job)} />
+            <StatusChip {...repairChip(r, quotes, job)} />
           </div>
           {/* One line: the thing that matters next. */}
           <p className={`mt-2 text-[0.9375rem] ${unanswered || fresh ? "font-bold" : "text-ink-2"}`}>

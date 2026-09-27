@@ -4,7 +4,8 @@ import { ArrowRight, Plus, Search, Wrench } from "lucide-react";
 import { getRepo } from "@/lib/data";
 import { getSession, needs } from "@/lib/session";
 import { primarySymptom, vehicleLine } from "@/lib/domain/intake";
-import { customerRepairStatus, isWaitingForMatch, needsNewMechanic } from "@/lib/domain/status";
+import { isWaitingForMatch, needsNewMechanic } from "@/lib/domain/status";
+import { repairChip } from "@/lib/domain/journey";
 import { monthYear, plural } from "@/lib/format";
 import { PhotoPrint } from "@/components/profile/photo";
 import { StatusChip } from "@/components/app/status-chip";
@@ -12,6 +13,7 @@ import { ConfirmButton } from "@/components/app/confirm-button";
 import { discardIntakeDraft } from "@/app/actions/intake";
 import { RepairIcon } from "@/components/visual/icons";
 import { VehicleTile } from "@/components/visual/vehicle-glyph";
+import { Notice } from "@/components/workspace/ui";
 import { openingLabel, soonest } from "@/lib/domain/availability";
 
 function openingText(openings: { on: string; time: string }[]) {
@@ -87,13 +89,13 @@ export default async function CustomerHome({ searchParams }: { searchParams: Pro
           </Link>
         </div>
         {noSupply ? (
-          <div role="note" className="border-l-4 border-brass bg-sheet px-4 py-3 text-[0.9375rem]">
+          <Notice tone="info">
             <p className="font-semibold">Clutch is launching in Los Angeles.</p>
             <p className="mt-1 max-w-[70ch] text-ink-2">
               No mechanic has finished a Clutch profile yet, so there&apos;s no one to book today. You can still describe a repair: Clutch saves it and sends it to a
               mechanic who fits it once one joins. You&apos;ll see replies on the request here.
             </p>
-          </div>
+          </Notice>
         ) : null}
         {draft ? (
           <div className="flex flex-wrap items-center justify-between gap-3 border border-ink bg-sheet px-4 py-3">
@@ -125,12 +127,12 @@ export default async function CustomerHome({ searchParams }: { searchParams: Pro
           {upcoming.map((j) => {
             const v = repo.getVehicle(j.vehicleId)!;
             const m = profile(j.mechanicId);
-            const st = customerRepairStatus(repo.getRequest(j.requestId)!, [], j);
+            const st = repairChip(repo.getRequest(j.requestId)!, [], j);
             return (
               <Link key={j.id} href={`/customer/jobs/${j.id}`} className="sheet flex gap-4 p-5 hover:border-ink">
                 <PhotoPrint photoUrl={m.photoUrl} initials={m.initials} name={m.displayName} size={52} />
                 <div className="min-w-0">
-                  <StatusChip label={st} />
+                  <StatusChip {...st} />
                   <p className="mt-2 font-bold">
                     {j.status === "scheduled"
                       ? `${m.firstName} is ${j.confirmedAt ? "confirmed" : "booked"} for ${j.scheduledFor}`
@@ -158,10 +160,11 @@ export default async function CustomerHome({ searchParams }: { searchParams: Pro
               const faces = rq.slice(0, 3).map((q) => profile(q.mechanicId));
               return (
                 <li key={r.id}>
-                  <Link href={`/customer/requests/${r.id}`} className="sheet flex flex-wrap items-center gap-4 p-4 hover:border-ink">
+                  <Link href={`/customer/requests/${r.id}`} className="sheet grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 p-4 hover:border-ink">
                     <VehicleTile v={v} size="sm" />
-                    <div className="min-w-0 flex-1">
-                      <p className="flex items-center gap-1.5 font-semibold">
+                    <div className="min-w-0">
+                      <StatusChip {...repairChip(r, rq, undefined)} />
+                      <p className="mt-1.5 flex items-center gap-1.5 font-semibold">
                         <RepairIcon category={r.repairCategory} size={15} /> {vehicleLine(v)}
                       </p>
                       <p className="line-clamp-1 text-[0.875rem] text-ink-2">{primarySymptom(r)}</p>
@@ -176,14 +179,14 @@ export default async function CustomerHome({ searchParams }: { searchParams: Pro
                             ? `${plural(r.interested.length, "mechanic")} interested`
                             : `Sent to ${plural(r.matchedMechanicIds.length, "mechanic")}, waiting for replies`}
                       </p>
+                      {faces.length > 0 && (
+                        <div className="mt-2 flex -space-x-2" aria-hidden>
+                          {faces.map((p) => (
+                            <PhotoPrint key={p.id} photoUrl={p.photoUrl} initials={p.initials} name={p.displayName} size={32} />
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    {faces.length > 0 && (
-                      <div className="flex shrink-0 -space-x-2" aria-hidden>
-                        {faces.map((p) => (
-                          <PhotoPrint key={p.id} photoUrl={p.photoUrl} initials={p.initials} name={p.displayName} size={40} />
-                        ))}
-                      </div>
-                    )}
                     <ArrowRight size={18} aria-hidden className="shrink-0 text-ink-3" />
                   </Link>
                 </li>

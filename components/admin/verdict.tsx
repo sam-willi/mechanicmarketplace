@@ -32,7 +32,7 @@ const SAFETY: Record<ScreeningState, { cls: string; icon: typeof Check; word: st
   rejected: { cls: "border-alert bg-alert-wash text-alert", icon: X, word: "not approved" },
 };
 
-/** The four safety checks at a glance: green ✓, amber waiting, red ✕. */
+/** The four safety checks at a glance: green tick, amber waiting, red cross. */
 export function SafetyChips({ items }: { items: ScreeningItem[] }) {
   return (
     <ul className="flex flex-wrap gap-1.5" aria-label="Verification checks">

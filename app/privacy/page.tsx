@@ -50,7 +50,7 @@ export default function PrivacyPage() {
     <>
       <SiteHeader />
       <main className="mx-auto max-w-[760px] px-4 pt-10 sm:px-6 sm:pt-16">
-        <h1 className="display text-[2.5rem] sm:text-[3.25rem]">Privacy</h1>
+        <h1 className="display text-[2.5rem] sm:text-[3.5rem]">Privacy</h1>
         <p className="mt-4 text-[1.0625rem] leading-relaxed text-ink-2">
           What Clutch stores about you, why, and who can see it, in plain words.
         </p>

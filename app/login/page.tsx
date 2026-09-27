@@ -47,7 +47,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         {sp.exists ? <p className="mt-3 border border-ink bg-sheet px-3 py-2 text-[0.9375rem]">You already have an account with that email. Log in below.</p> : null}
         {sp.reset ? <p className="mt-3 border border-ink bg-sheet px-3 py-2 text-[0.9375rem]">Password updated. Log in with your new password.</p> : null}
         {sp.error === "confirmed_login" ? (
-          <p className="mt-3 border border-go bg-go-wash px-3 py-2 text-[0.9375rem]" role="status">
+          <p className="mt-3 border border-brand/30 bg-brand-wash px-3 py-2 text-[0.9375rem]" role="status">
             {ERRORS.confirmed_login}
           </p>
         ) : sp.error ? (

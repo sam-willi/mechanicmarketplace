@@ -175,7 +175,7 @@ export default async function RepairsPage() {
                     <li key={ph.id}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={ph.url} alt={`${ph.kind} photo`} className="size-14 border border-rule object-cover" />
-                      <p className="text-[0.625rem] text-ink-3">{ph.demo ? "Demo photo" : ph.source === "job" ? "Verified photo" : "Your upload"}</p>
+                      <p className="text-[0.6875rem] text-ink-3">{ph.demo ? "Demo photo" : ph.source === "job" ? "Verified photo" : "Your upload"}</p>
                     </li>
                   ))}
                 </ul>

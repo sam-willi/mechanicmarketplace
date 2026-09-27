@@ -20,6 +20,7 @@ import { EligibilityNotice } from "@/components/trust/eligibility-notice";
 import { ScreeningList } from "@/components/trust/screening-list";
 import { eligibility } from "@/lib/domain/eligibility";
 import { inclusions, quoteTotals } from "@/lib/domain/quote";
+import { Notice } from "@/components/workspace/ui";
 import { customerSummary } from "@/lib/vehicles/spec";
 
 export const metadata: Metadata = { title: "Written estimate" };
@@ -74,18 +75,18 @@ export default async function EstimatePage({ params, searchParams }: { params: P
           <ArrowLeft size={14} aria-hidden /> Back to your request
         </Link>
         {sp.error ? (
-          <p role="alert" className="mt-4 border-l-4 border-alert bg-sheet px-4 py-3 text-[0.9375rem]">
+          <Notice tone="error" className="mt-4">
             {sp.error}
-          </p>
+          </Notice>
         ) : null}
         {q.revisions?.length && q.status === "submitted" ? (
-          <p className="mt-4 border-l-4 border-brass bg-sheet px-4 py-3 text-[0.9375rem]">
+          <Notice tone="info" className="mt-4">
             <span className="font-semibold">
               {p.firstName} revised this estimate (version {q.version ?? 1}
               {q.revisedAt ? `, ${dayMonth(q.revisedAt)}` : ""}).
             </span>{" "}
             You&apos;re reading the current version. Earlier versions are listed at the bottom.
-          </p>
+          </Notice>
         ) : null}
         <article className="sheet perf-top mt-4">
           {/* Document head */}
@@ -109,7 +110,7 @@ export default async function EstimatePage({ params, searchParams }: { params: P
             <div className="flex gap-4">
               <PhotoPrint photoUrl={p.photoUrl} initials={p.initials} name={p.displayName} size={72} />
               <div className="min-w-0 flex-1">
-                <p className="heading text-[1.1875rem]">{p.displayName}</p>
+                <p className="heading text-[1.25rem]">{p.displayName}</p>
                 <p className="text-[0.875rem] text-ink-2">
                   {WORK_MODEL_LABEL[p.workModel]} · {p.neighborhood ?? p.city}
                 </p>
@@ -183,7 +184,7 @@ export default async function EstimatePage({ params, searchParams }: { params: P
               </div>
             ))}
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline py-4">
-              <dt className="heading text-[1.125rem]">Estimated total</dt>
+              <dt className="heading text-[1.0625rem]">Estimated total</dt>
               <dd className="num text-[2rem]">{t.planFor}</dd>
             </div>
           </dl>

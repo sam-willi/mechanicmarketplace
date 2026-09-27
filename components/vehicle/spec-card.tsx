@@ -3,19 +3,12 @@ import type { RepairCategory, Vehicle } from "@/lib/domain/types";
 import { transmissionLabel } from "@/lib/domain/intake";
 import { customerSummary, mechanicHeadline, orderedFields, SPEC_LABEL, STATUS_LABEL } from "@/lib/vehicles/spec";
 import type { SpecStatus, VehicleSpec } from "@/lib/vehicles/types";
+import { levelOfSpec } from "@/lib/domain/fact-level";
+import { FactTag } from "@/components/trust/fact-tag";
 
-const STATUS_STYLE: Record<SpecStatus, string> = {
-  vin_confirmed: "border-carbon/40 bg-carbon-wash text-carbon",
-  mechanic_confirmed: "border-carbon/40 bg-carbon-wash text-carbon",
-  selected: "border-rule bg-sheet text-ink-2",
-  likely: "border-rule bg-paper text-ink-2",
-  customer_text: "border-dashed border-pencil text-pencil",
-  needs_confirmation: "border-amber/60 bg-amber-wash text-amber",
-  not_recorded: "border-dashed border-rule text-ink-3",
-};
-
+/** Where a spec came from, on the shared five-level scale (lib/domain/fact-level.ts). */
 export function StatusTag({ status }: { status: SpecStatus }) {
-  return <span className={`inline-block border px-1.5 text-[0.6875rem] font-bold whitespace-nowrap ${STATUS_STYLE[status]}`}>{STATUS_LABEL[status]}</span>;
+  return <FactTag level={levelOfSpec(status)} label={STATUS_LABEL[status]} />;
 }
 
 function vinLine(v: Vehicle, spec: VehicleSpec | undefined, revealVin: boolean) {
@@ -75,7 +68,7 @@ export function VehicleSpecCard({
   return (
     <section aria-label="Vehicle" className="space-y-3">
       <div>
-        <p className="heading text-[1.125rem] leading-snug sm:text-[1.25rem]">{headline}</p>
+        <p className="heading text-[1.0625rem] leading-snug sm:text-[1.25rem]">{headline}</p>
         <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[0.875rem] text-ink-2">
           {v.mileage ? <span className="tnum">{v.mileage.toLocaleString()} mi</span> : <span>Mileage not given</span>}
           <span aria-hidden className="text-rule">

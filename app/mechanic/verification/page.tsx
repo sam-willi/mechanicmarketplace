@@ -100,7 +100,7 @@ export default async function VerificationCenter({ searchParams }: { searchParam
                   <div>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                       <p className="font-semibold text-ink">{kind === "identity" || kind === "insurance" ? info.shortLabel : `${info.shortLabel} check`}</p>
-                      {status !== "verified" && status !== "reverification_required" ? <span className="border border-ink px-1 text-[0.625rem] font-bold uppercase">Required for work</span> : null}
+                      {status !== "verified" && status !== "reverification_required" ? <span className="border border-ink px-1 text-[0.6875rem] font-bold uppercase">Required for work</span> : null}
                       <StatusPill status={status} />
                     </div>
                     <p className="mt-1 text-[0.875rem] text-ink-2">
@@ -133,7 +133,7 @@ export default async function VerificationCenter({ searchParams }: { searchParam
                         </form>
                       )
                     ) : closed ? (
-                      <p className="border-l-4 border-brass pl-3 text-[0.875rem] text-ink-2">
+                      <p className="border-l border-rule pl-3 text-[0.875rem] text-ink-2">
                         <span className="font-semibold text-ink">Opens soon.</span> Clutch is connecting an independent screening company. Until then no one can complete
                         this check. Customers see it as {v?.status === "pending" ? "could not be verified" : "not completed"}, and you can still be booked once your profile is complete.{" "}
                         {v?.status === "pending" ? "The check you started earlier will need to be run again then." : ""}

@@ -42,6 +42,13 @@ export function Tick({ state = "verified", size = 16, className = "" }: { state?
         <circle cx="13.5" cy="2.5" r="2.5" fill="var(--amber)" stroke="var(--sheet)" strokeWidth="1" />
       </svg>
     );
+  if (state === "inferred")
+    return (
+      <svg width={s} height={s} viewBox="0 0 16 16" aria-hidden className={`shrink-0 ${className}`}>
+        <rect x="0.75" y="0.75" width="14.5" height="14.5" rx="1.5" fill="none" stroke="var(--ink-3)" strokeWidth="1.2" strokeDasharray="0.1 2.3" strokeLinecap="round" />
+        <circle cx="8" cy="8" r="1.8" fill="var(--ink-3)" />
+      </svg>
+    );
   return (
     <svg width={s} height={s} viewBox="0 0 16 16" aria-hidden className={`shrink-0 ${className}`}>
       <rect x="0.75" y="0.75" width="14.5" height="14.5" rx="1.5" fill="none" stroke="var(--rule)" strokeWidth="1.2" />
@@ -49,7 +56,8 @@ export function Tick({ state = "verified", size = 16, className = "" }: { state?
   );
 }
 
-export type TickState = "verified" | "self" | "pending" | "lapsed" | "renewing" | "blank";
+/** inferred: worked out by Clutch from other facts (dotted, with a centre dot), never shown as confirmed. */
+export type TickState = "verified" | "self" | "pending" | "lapsed" | "renewing" | "inferred" | "blank";
 
 export function tickForStatus(status: VerificationStatus, provenance?: ProvenanceSource): TickState {
   if (provenance === "self" && (status === "not_submitted" || status === "verified")) return "self";

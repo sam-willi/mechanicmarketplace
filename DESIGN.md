@@ -69,6 +69,66 @@ typography:
     fontWeight: 600
     lineHeight: 1rem
     letterSpacing: "0.07em"
+  micro:
+    fontFamily: "Montserrat, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "0.75rem"
+    fontWeight: 600
+    lineHeight: 1.3
+  small:
+    fontFamily: "Montserrat, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "0.875rem"
+    fontWeight: 400
+    lineHeight: 1.45
+  lead:
+    fontFamily: "Montserrat, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "1.0625rem"
+    fontWeight: 600
+    lineHeight: 1.45
+  title:
+    fontFamily: "Montserrat, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "1.25rem"
+    fontWeight: 700
+    lineHeight: 1.2
+  title-lg:
+    fontFamily: "Montserrat, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "1.375rem"
+    fontWeight: 700
+    lineHeight: 1.15
+  display-xs:
+    fontFamily: "Montserrat, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "1.75rem"
+    fontWeight: 800
+    lineHeight: 1.05
+  display-sm:
+    fontFamily: "Montserrat, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "2rem"
+    fontWeight: 800
+    lineHeight: 1.02
+  display-md:
+    fontFamily: "Montserrat, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "2.25rem"
+    fontWeight: 800
+    lineHeight: 1.02
+  display-lg:
+    fontFamily: "Montserrat, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "2.5rem"
+    fontWeight: 800
+    lineHeight: 1
+  display-xl:
+    fontFamily: "Montserrat, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "3rem"
+    fontWeight: 800
+    lineHeight: 0.98
+  hero:
+    fontFamily: "Montserrat, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "3.5rem"
+    fontWeight: 800
+    lineHeight: 0.98
+  hero-lg:
+    fontFamily: "Montserrat, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "4rem"
+    fontWeight: 800
+    lineHeight: 0.98
 rounded:
   form: "2px"
 spacing:
@@ -240,9 +300,9 @@ Square-cornered forms: every box, button, input, badge and tick box uses a 2px c
 ### Buttons
 A button is a stamped block, not a pill.
 - **Shape:** Square (2px), 44px minimum height, 18px horizontal padding, 700 weight, 0.875rem.
-- **Primary** (`.btn-ink`): Navy block, cream text, pressed shadow; hover deepens to deep navy. "Request a quote", "Find a mechanic", "Finish and send".
+- **Primary** (`.btn-ink`): Navy block, cream text, pressed shadow; hover deepens to deep navy. One per decision; confirming a booking uses it too (never green). "Request a quote", "Find a mechanic", "Finish and send".
 - **Line** (`.btn-line`): Page background, 1px navy border, deep-navy text; hover washes navy.
-- **Quiet** (`.btn-quiet`): Transparent with a rule border; hover darkens the border to ink-3.
+- **Quiet** (`.btn-quiet`): Transparent with a rule border; hover darkens the border to ink-3. Secondary and decline actions ("Can't make it", "Not interested"); red appears only on the final destructive confirm.
 - **On navy:** A page-coloured block with ink text ("Join as a Mechanic").
 - **Disabled:** 45% opacity. Transitions are 160ms ease-out.
 
@@ -271,6 +331,18 @@ A tick box plus its label, coloured by state, with a dotted underline that turns
 
 ### Inputs / Fields
 Page background, 1px rule border with an ink-3 bottom edge (a filled-in line), 2px corners, 44px tall, 1rem text. Focus switches the border and a 1px ring to navy; the caret is navy. A field label sits above and an optional hint below. Selected chips and radio cards fill navy with cream text.
+
+### Shared status (one model, both sides)
+Every repair shows the same six stages on the customer and mechanic side: Request submitted, Receiving quotes, Mechanic selected, Scheduled, In progress, Completed (`lib/domain/journey.ts`). The status block (`components/app/journey-status.tsx`) shows the stage over a six-part bar (every stage named from md), one sentence for what's true now, the next action, and whose turn it is ("Your turn" in a navy tag, or "Waiting on Maya"). Lists use the same label in the status chip, navy-filled only when it's the reader's turn. The detailed job checklist sits collapsed under it; it never replaces the six stages.
+
+### How sure a fact is (five levels)
+Every fact on a request, vehicle or profile carries one of five levels (`lib/domain/fact-level.ts`, drawn by `components/trust/fact-tag.tsx` with the tick box): **Verified** and **Customer confirmed** in carbon (filled tick); **Self-reported** in pencil (dashed tick); **Inferred by Clutch** in ink-3 (dotted tick with a centre dot); **Unverified** as a blank rule tick. Tags use a short source label ("From VIN", "Customer chose", "Inferred from their words") with the level as its accessible name.
+
+### Messages
+One message block (`Notice` in `components/workspace/ui.tsx`): square, 1px border, washed by meaning, with an icon so meaning never rests on colour. Error = signal red, warning = shop amber, done = navy wash, info = page. Never a thick coloured side stripe, never carbon.
+
+### Job summary
+A mechanic's request opens with one ruled box (`components/request/job-brief.tsx`): the customer's words, the repair type with how it was known, condition, where, how soon, what's attached, and why it came to them (verified work, or what they list). Everything else is the full request below.
 
 ### Counts, Ledgers and Tiles
 Counts are heavy numerals over their base, with a rule-grey dash rather than a zero when there is no data. Ledgers are numbered rows (No.012) with a provenance mark aligned right; matching rows carry the canary stroke. Vehicle and icon tiles are navy-wash squares with navy line drawings.

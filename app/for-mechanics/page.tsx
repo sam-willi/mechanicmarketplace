@@ -21,8 +21,8 @@ export default function ForMechanics() {
       <main className="mx-auto max-w-[1100px] px-4 pt-10 sm:px-6 sm:pt-16">
         <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-16">
           <div>
-            <h1 className="display text-[2.75rem] sm:text-[4.25rem]">Your skill. Your proof. Your customers.</h1>
-            <p className="mt-5 max-w-[52ch] text-[1.125rem] leading-relaxed text-ink-2">
+            <h1 className="display text-[2.5rem] sm:text-[3.5rem] lg:text-[4rem]">Your skill. Your proof. Your customers.</h1>
+            <p className="mt-5 max-w-[52ch] text-[1.0625rem] leading-relaxed text-ink-2">
               Years of good work at a shop or dealership shouldn&apos;t stay with the shop. Clutch turns it into evidence you own, so strangers can check your record on day one of
               going independent.
             </p>
@@ -58,7 +58,7 @@ export default function ForMechanics() {
           </dl>
         </div>
 
-        <section aria-labelledby="launch-title" className="mt-16 border-l-4 border-brass bg-sheet px-5 py-5 sm:px-6">
+        <section aria-labelledby="launch-title" className="sheet mt-16 px-5 py-5 sm:px-6">
           <h2 id="launch-title" className="heading text-[1.5rem]">
             Launching in Los Angeles
           </h2>

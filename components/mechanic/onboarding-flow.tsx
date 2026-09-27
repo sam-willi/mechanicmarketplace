@@ -240,7 +240,7 @@ export function ProfilePreview() {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={v.photoUrl} alt="" className="size-20 border border-rule object-cover" />
         ) : (
-          <span className="grid size-20 place-items-center bg-[#dfe2dc] text-[1.5rem] font-extrabold text-ink-2" aria-hidden>
+          <span className="grid size-20 place-items-center bg-brand-tint text-[1.5rem] font-extrabold text-ink-2" aria-hidden>
             {(v.displayName || "?")
               .split(" ")
               .map((x) => x[0])

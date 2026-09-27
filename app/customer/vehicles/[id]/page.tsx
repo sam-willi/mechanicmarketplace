@@ -67,7 +67,7 @@ export default async function VehiclePage({ params, searchParams }: { params: Pr
             ).map(([n, label], i) => (
               <div key={label} className={`py-2.5 ${i ? "border-l border-rule-soft pl-3" : "pr-3"}`}>
                 <dt className="sr-only">{label}</dt>
-                <dd className="num text-[1.625rem]">{n}</dd>
+                <dd className="num text-[1.75rem]">{n}</dd>
                 <p className="text-[0.75rem] text-ink-2">{label}</p>
               </div>
             ))}

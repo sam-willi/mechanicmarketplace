@@ -1,3 +1,4 @@
+import { Check, CircleHelp, X } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getRepo } from "@/lib/data";
@@ -78,7 +79,7 @@ export default async function DeliveryHealth() {
           </span>
         </nav>
 
-        <section role="status" className={`border-l-4 px-4 py-3 ${cfg.active ? "border-go bg-go-wash" : "border-brass bg-sheet"}`}>
+        <section role="status" className={`border px-4 py-3 ${cfg.active ? "border-go/40 bg-go-wash" : "border-amber/40 bg-amber-wash"}`}>
           <p className="font-bold">{cfg.active ? "Outbound alerts are ON." : "Outbound alerts are OFF. Nothing is emailed or texted."}</p>
           <p className="mt-1 text-[0.9375rem] text-ink-2">
             {cfg.active
@@ -217,7 +218,7 @@ export default async function DeliveryHealth() {
             {cfg.checks.map((c) => (
               <li key={c.key} className="grid gap-1 border-b border-rule-soft py-2 sm:grid-cols-[2rem_16rem_minmax(0,1fr)]">
                 <span aria-hidden className={c.ok === null ? "text-ink-3" : c.ok ? "text-go" : "text-alert"}>
-                  {c.ok === null ? "?" : c.ok ? "✓" : "✗"}
+                  {c.ok === null ? <CircleHelp size={16} /> : c.ok ? <Check size={16} strokeWidth={2.5} /> : <X size={16} strokeWidth={2.5} />}
                 </span>
                 <span className="font-semibold">
                   {c.label}

@@ -171,15 +171,15 @@ export default async function ReviewDetail({ params, searchParams }: { params: P
               ))}
             </dl>
             {v.notes ? (
-              <div className="border-l-4 border-brand bg-sheet px-4 py-3">
+              <Notice tone="ok">
                 <p className="field-label">Notes</p>
                 <p className="mt-1 text-[0.9375rem]">{v.notes}</p>
-              </div>
+              </Notice>
             ) : null}
 
             {others.length ? (
               <div>
-                <h2 className="heading text-[1.125rem]">Everything else for {m.firstName}</h2>
+                <h2 className="heading text-[1.0625rem]">Everything else for {m.firstName}</h2>
                 <ul className="mt-2 divide-y divide-rule-soft border-y border-rule">
                   {others.map((o) => (
                     <li key={o.id}>

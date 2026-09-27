@@ -12,7 +12,8 @@ import { replacementFor } from "@/lib/replacement";
 import { topPicks } from "@/lib/domain/recommend";
 import { toPublicProfile } from "@/lib/domain/public-profile";
 import { eligibility } from "@/lib/domain/eligibility";
-import { customerRepairStatus, isWaitingForMatch } from "@/lib/domain/status";
+import { isWaitingForMatch } from "@/lib/domain/status";
+import { repairChip } from "@/lib/domain/journey";
 import type { RepairRequest } from "@/lib/domain/types";
 
 /**
@@ -72,7 +73,7 @@ test("a request saved with no mechanics is kept in live, marked waiting, and nev
   assert.equal(r.status, "open");
   assert.ok(r.waitingSince, "marked as waiting for a match");
   assert.ok(isWaitingForMatch(r));
-  assert.equal(customerRepairStatus(r, []), "Waiting for a Match");
+  assert.equal(repairChip(r, [], undefined).label, "Request submitted", "saved, not yet sent: the first shared stage");
   // Durable in the live store, not the demo.
   assert.ok(current("live").requests.some((x) => x.id === r.id));
   assert.ok(!current("demo").requests.some((x) => x.id === r.id));
@@ -108,7 +109,7 @@ test("the customer can cancel a request; it stays in their history and leaves th
   assert.equal(x.status, "cancelled");
   assert.ok(x.cancelledAt);
   assert.ok(!isWaitingForMatch(x));
-  assert.equal(customerRepairStatus(x, []), "Cancelled");
+  assert.equal(repairChip(x, [], undefined).label, "Cancelled");
   assert.ok(live.listRequestsForCustomer(c.id).some((y) => y.id === r.id), "kept for their records");
   assert.ok(!(await unmatchedDemand(live)).rows.some((y) => y.id === r.id));
   await assert.rejects(live.updateRequest(r.id, { symptomDescription: "Changed my mind about it.", repairCategory: "brakes", serviceMode: "mobile" }), /can't be changed/);

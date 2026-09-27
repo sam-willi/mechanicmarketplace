@@ -24,8 +24,8 @@ export default function VerificationPage() {
     <EvidenceProvider>
       <SiteHeader />
       <main className="mx-auto max-w-[1000px] px-4 pt-10 sm:px-6 sm:pt-16">
-        <h1 className="display max-w-[18ch] text-[2.5rem] sm:text-[3.75rem]">How Clutch verifies a mechanic.</h1>
-        <p className="mt-5 max-w-[60ch] text-[1.125rem] leading-relaxed text-ink-2">
+        <h1 className="display max-w-[18ch] text-[2.5rem] sm:text-[3.5rem]">How Clutch verifies a mechanic.</h1>
+        <p className="mt-5 max-w-[60ch] text-[1.0625rem] leading-relaxed text-ink-2">
           Two separate systems. Verification checks tell you what Clutch has confirmed about a mechanic&apos;s identity, background, driving record and insurance. Proven
           experience tells you they&apos;ve actually done your kind of repair. One never implies the other.
         </p>

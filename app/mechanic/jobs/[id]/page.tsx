@@ -6,7 +6,6 @@ import { getRepo } from "@/lib/data";
 import { getSession, needs } from "@/lib/session";
 import { vehicleLine } from "@/lib/domain/intake";
 import { findArea, milesBetween } from "@/lib/domain/areas";
-import { mechanicJobStatus } from "@/lib/domain/status";
 import { jobLifecycle } from "@/lib/domain/lifecycle";
 import { quoteTotals } from "@/lib/domain/quote";
 import { usd } from "@/lib/format";
@@ -25,7 +24,8 @@ import {
 import { HistoryList } from "@/components/app/history-list";
 import { EstimateVersions, PaymentFacts, PaymentFields, RescheduleBox, ScopeHistory } from "@/components/app/job-parts";
 import { RepairPhotoUploader } from "@/components/mechanic/photo-uploader";
-import { StatusChip } from "@/components/app/status-chip";
+import { journey } from "@/lib/domain/journey";
+import { JourneyStatus } from "@/components/app/journey-status";
 import { ConfirmButton } from "@/components/app/confirm-button";
 import { DeclineForm } from "@/components/mechanic/decline-form";
 import { ConfirmDecide } from "@/components/mechanic/confirm-decide";
@@ -33,6 +33,7 @@ import { LifecycleRail, NowPanel } from "@/components/app/job-lifecycle";
 import { RequestSummary } from "@/components/request/request-summary";
 import { VehicleSpecCard } from "@/components/vehicle/spec-card";
 import { configsFor, DRIVE_LABEL, ENGINES, TRANSMISSIONS } from "@/lib/vehicles/catalog";
+import { Notice } from "@/components/workspace/ui";
 import { MediaThumb } from "@/components/request/media-capture";
 
 export const metadata: Metadata = { title: "Job" };
@@ -52,7 +53,6 @@ export default async function MechanicJob({ params, searchParams }: { params: Pr
   const c = repo.getCustomer(j.customerId)!;
   const q = repo.getQuote(j.quoteId);
   const user = repo.getUser(c.userId);
-  const status = mechanicJobStatus(j);
   const area = findArea(r.location.area);
   const first = c.displayName.split(" ")[0];
   const past = repo.listCustomerHistory(c.id).filter((h) => h.mechanicId === m.id && h.jobId !== j.id);
@@ -217,26 +217,26 @@ export default async function MechanicJob({ params, searchParams }: { params: Pr
         <ArrowLeft size={14} aria-hidden /> My Jobs
       </Link>
       <div className="border-b-2 border-ink pb-4">
-        <StatusChip label={status} />
-        <h1 className="display mt-2 text-[1.875rem] sm:text-[2.25rem]">{j.title}</h1>
+        <h1 className="display text-[2rem] sm:text-[2.25rem]">{j.title}</h1>
         <p className="mt-1 text-ink-2">
           {vehicleLine(v)} · {first} · {j.scheduledFor}
         </p>
       </div>
+      <JourneyStatus j={journey({ request: r, quotes: q ? [q] : [], job: j, audience: "mechanic", mechanicId: m.id, names: { customer: first, mechanic: m.firstName } })} audience="mechanic" names={{ customer: first, mechanic: m.firstName }} />
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="min-w-0 space-y-6">
           {sp.error ? (
-            <p role="alert" className="border-l-4 border-alert bg-sheet px-4 py-3 text-[0.9375rem]">
+            <Notice tone="error">
               {sp.error}
-            </p>
+            </Notice>
           ) : null}
           {sentBack ? (
             <p className="border-2 border-amber bg-amber-wash px-4 py-3 text-[0.9375rem]">
               <span className="font-semibold">{first} says it isn&apos;t finished:</span> &ldquo;{sentBack.detail}&rdquo;
             </p>
           ) : null}
-          <NowPanel current={current}>{action}</NowPanel>
+          <NowPanel current={current} hideHeadline hideWaiting>{action}</NowPanel>
           {j.status === "scheduled" ? (
             <RescheduleBox job={j} viewer="mechanic" otherName={first} propose={proposeNewTimeAsMechanic.bind(null, j.id)} answer={(accept) => answerNewTimeAsMechanic.bind(null, j.id, accept)} />
           ) : null}
@@ -244,7 +244,7 @@ export default async function MechanicJob({ params, searchParams }: { params: Pr
           <ScopeHistory job={j} />
           {j.status === "awaiting_customer" || j.status === "completed" ? (
             <section id="payment" className="scroll-mt-24 space-y-3">
-              <h2 className="heading text-[1.125rem]">Payment</h2>
+              <h2 className="heading text-[1.0625rem]">Payment</h2>
               {j.finalAmountCents !== undefined ? (
                 <p className="text-[0.9375rem]">
                   Your final amount: <span className="font-bold">{usd(j.finalAmountCents)}</span>
@@ -305,7 +305,7 @@ export default async function MechanicJob({ params, searchParams }: { params: Pr
 
           {r.questions.filter((x) => x.mechanicId === m.id).length > 0 && (
             <section className="space-y-2">
-              <h2 className="heading text-[1.125rem]">Questions with {first}</h2>
+              <h2 className="heading text-[1.0625rem]">Questions with {first}</h2>
               {r.questions
                 .filter((x) => x.mechanicId === m.id)
                 .map((x) => (

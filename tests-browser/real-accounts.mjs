@@ -429,7 +429,8 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
   if (store !== "snapshot") {
     console.log("SKIP  waiting-request dispatch: runs on the snapshot store (what production uses)");
   } else {
-    await go(C2.p, "/customer/requests/new?repair=starters&make=BMW&area=silver-lake");
+    // Long Beach is ~21 mi from our mechanic's Mid-City base (15 mi radius): nobody reaches it yet.
+    await go(C2.p, "/customer/requests/new?repair=starters&make=BMW&area=long-beach");
     const step = (n) => C2.p.waitForFunction((n) => document.body.innerText.includes(`Step ${n} of 4`), { timeout: 20000 }, n);
     await click(C2.p, /^Continue/, "button"); await step(2);
     await C2.p.type("textarea", "Clicks but won't crank on cold mornings.");
@@ -456,6 +457,7 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
     await M2.p.reload({ waitUntil: "networkidle0" });
     await M2.p.screenshot({ path: `${OUT}16-needs-area-390.png`, fullPage: true });
     await M2.p.setViewport({ width: 1280, height: 900 });
+    await M2.p.reload({ waitUntil: "networkidle0" });
     ok("…nothing sent to them yet", (await matched()).length === 0 && (await notes()) === 0);
     await act(M2.p, /^Set area/, "a");
     ok(`"Set area" opens the profile editor (${path(M2.p)})`, path(M2.p).startsWith("/mechanic/onboarding"));
@@ -467,7 +469,7 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
         await act(P, new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`), "button");
       }
     };
-    await set(M2.p, 'select[name="neighborhood"]', "echo-park");
+    await set(M2.p, 'select[name="neighborhood"]', "long-beach");
     await publish(M2.p);
     ok(`area saved → ${path(M2.p)}`, path(M2.p).startsWith("/mechanic") && !path(M2.p).startsWith("/mechanic/onboarding"), await main(M2.p));
     ok("the waiting request went to them, once", JSON.stringify(await matched()) === JSON.stringify([mechId]), JSON.stringify(await matched()));
@@ -485,6 +487,7 @@ export async function run({ base, auth, db, chrome, out, restart, store = "snaps
     await M3.p.reload({ waitUntil: "networkidle0" });
     await M3.p.screenshot({ path: `${OUT}17-dispatched-390.png`, fullPage: true });
     await M3.p.setViewport({ width: 1280, height: 900 });
+    await M3.p.reload({ waitUntil: "networkidle0" });
     // Saving the profile again never sends it twice.
     await go(M3.p, "/mechanic/onboarding?edit=1");
     await publish(M3.p);

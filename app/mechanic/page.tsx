@@ -135,7 +135,7 @@ export default async function MechanicHome({ searchParams }: { searchParams: Pro
       ? [
           {
             icon: Hourglass,
-            title: `${plural(deciding, "estimate")}: customer deciding`,
+            title: `${plural(deciding, "estimate")}: waiting on the customer`,
             href: "/mechanic/quotes",
             cta: "View estimates",
           },

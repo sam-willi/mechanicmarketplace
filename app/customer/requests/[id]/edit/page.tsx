@@ -9,7 +9,7 @@ import { URGENCY, vehicleLine } from "@/lib/domain/intake";
 import { REPAIR_LABEL } from "@/lib/domain/provenance";
 import { REPAIR_CATEGORIES } from "@/lib/domain/types";
 import { editRequest } from "@/app/actions/customer";
-import { Field } from "@/components/workspace/ui";
+import { Field, Notice } from "@/components/workspace/ui";
 import { SubmitButton } from "@/components/auth/submit-button";
 
 export const metadata: Metadata = { title: "Edit request" };
@@ -37,17 +37,17 @@ export default async function EditRequest({ params, searchParams }: { params: Pr
       <p className="mt-1 text-ink-2">{vehicleLine(v)}</p>
 
       {!editable ? (
-        <p className="mt-6 border-l-4 border-brass bg-sheet px-4 py-3 text-[0.9375rem]">
+        <Notice tone="info" className="mt-6">
           {r.status === "cancelled"
             ? "This request is cancelled, so it can't be changed."
             : "A mechanic has already responded to this request, so it can't be changed. You can cancel it from the request page and send a new one."}
-        </p>
+        </Notice>
       ) : (
         <form action={editRequest.bind(null, r.id)} className="mt-6 space-y-5">
           {sp.error ? (
-            <p role="alert" className="border-l-4 border-alert bg-sheet px-4 py-3 text-[0.9375rem]">
+            <Notice tone="error">
               {sp.error}
-            </p>
+            </Notice>
           ) : null}
           <Field label="What is the car doing?">
             <textarea name="symptomDescription" required minLength={10} maxLength={2000} rows={5} defaultValue={r.symptomDescription} className="input" />

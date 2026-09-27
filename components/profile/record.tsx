@@ -48,7 +48,7 @@ export function RecordHeader({ p }: { p: PublicMechanicProfile }) {
         <PhotoPrint photoUrl={p.photoUrl} initials={p.initials} name={p.displayName} size={148} />
       </div>
       <div className="min-w-0 pt-0.5">
-        <h1 className="display text-[2.125rem] text-ink sm:text-[3rem]">{p.displayName}</h1>
+        <h1 className="display text-[2.25rem] text-ink sm:text-[3rem]">{p.displayName}</h1>
         {p.tagline ? <p className="mt-1.5 max-w-[52ch] text-[1rem] leading-snug text-ink-2 sm:text-[1.0625rem]">{p.tagline}</p> : null}
         <p className="mt-2 text-[0.9375rem] font-semibold text-ink">
           {WORK_MODEL_LABEL.mobile}

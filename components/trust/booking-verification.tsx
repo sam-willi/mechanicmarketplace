@@ -15,7 +15,7 @@ export function BookingVerification({ at, current, firstName }: { at?: Verificat
   const insuranceUnverified = !(now.get("insurance")?.verified ?? false);
   return (
     <section id="verification" aria-labelledby="verification-title" className="scroll-mt-24 space-y-2">
-      <h2 id="verification-title" className="heading text-[1.125rem]">
+      <h2 id="verification-title" className="heading text-[1.0625rem]">
         Verification when you booked
       </h2>
       <p className="text-[0.875rem] text-ink-2">

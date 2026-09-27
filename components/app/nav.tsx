@@ -119,13 +119,13 @@ export function BottomNav({ items, tone = "light", hideOn = [], until = "lg" }: 
             href={it.href}
             aria-current={on ? "page" : undefined}
             className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[0.6875rem] font-semibold ${
-              dark ? (on ? "text-sheet" : "text-[#a9bfb1]") : on ? "text-ink" : "text-ink-3"
+              dark ? (on ? "text-sheet" : "text-on-brand-2") : on ? "text-ink" : "text-ink-3"
             }`}
           >
             <Icon size={21} strokeWidth={on ? 2.3 : 1.8} aria-hidden />
             {it.label}
             {it.badge ? (
-              <span className={`tnum absolute top-1.5 left-[calc(50%+6px)] min-w-4 px-1 text-center text-[0.625rem] font-extrabold bg-brass text-brand-night`}>{it.badge}</span>
+              <span className={`tnum absolute top-1.5 left-[calc(50%+6px)] min-w-4 px-1 text-center text-[0.6875rem] font-extrabold bg-brass text-brand-night`}>{it.badge}</span>
             ) : null}
           </Link>
         );
@@ -138,7 +138,7 @@ export function BellLink({ href, unread, tone = "light" }: { href: string; unrea
   return (
     <Link href={href} className={`relative grid size-11 place-items-center ${tone === "dark" ? "text-sheet" : "text-ink"}`} aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`}>
       <Bell size={20} strokeWidth={1.9} aria-hidden />
-      {unread ? <span className={`tnum absolute top-1 right-0.5 min-w-4 px-1 text-center text-[0.625rem] font-extrabold bg-brass text-brand-night`}>{unread}</span> : null}
+      {unread ? <span className={`tnum absolute top-1 right-0.5 min-w-4 px-1 text-center text-[0.6875rem] font-extrabold bg-brass text-brand-night`}>{unread}</span> : null}
     </Link>
   );
 }

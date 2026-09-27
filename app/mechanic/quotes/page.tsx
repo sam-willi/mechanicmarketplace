@@ -14,7 +14,7 @@ import { StatusChip } from "@/components/app/status-chip";
 export const metadata: Metadata = { title: "Estimates" };
 
 const TABS: { key: string; label: string; statuses: Quote["status"][] }[] = [
-  { key: "sent", label: "Customer deciding", statuses: ["submitted"] },
+  { key: "sent", label: "Waiting on customer", statuses: ["submitted"] },
   { key: "draft", label: "Drafts", statuses: ["draft"] },
   { key: "accepted", label: "Accepted", statuses: ["accepted"] },
   { key: "closed", label: "Declined / expired", statuses: ["declined", "expired", "withdrawn"] },
@@ -112,7 +112,7 @@ export default async function MechanicQuotes({ searchParams }: { searchParams: P
                   <td className="py-3 pr-4 text-ink-2">{q.durationHours} hrs</td>
                   <td className="py-3 pr-4 text-ink-2">{q.availableOn}</td>
                   <td className="py-3">
-                    <StatusChip label={q.status === "submitted" ? "Customer deciding" : q.status === "draft" ? "Draft" : q.status === "accepted" ? "Accepted" : q.status === "declined" ? "Not chosen" : "Expired"} />
+                    <StatusChip label={q.status === "submitted" ? "Waiting on customer" : q.status === "draft" ? "Draft" : q.status === "accepted" ? "Accepted" : q.status === "declined" ? "Not chosen" : "Expired"} />
                     {q.status === "submitted" ? (
                       <span className="mt-1 block text-[0.75rem] text-ink-3">{q.viewedAt ? "Viewed by customer" : "Not viewed yet"}</span>
                     ) : null}

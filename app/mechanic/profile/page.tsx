@@ -105,7 +105,7 @@ export default async function PublicProfileTools({ searchParams }: { searchParam
                 <Tick state={st.done ? "verified" : "blank"} size={15} className="mt-[3px] shrink-0" />
                 <span>
                   <span className={st.done ? "text-ink-2" : "font-semibold"}>{st.label}</span>
-                  {st.requiredForWork && !st.done ? <span className="ml-2 border border-ink px-1 text-[0.625rem] font-bold uppercase">Required for work</span> : null}
+                  {st.requiredForWork && !st.done ? <span className="ml-2 border border-ink px-1 text-[0.6875rem] font-bold uppercase">Required for work</span> : null}
                   {!st.done ? <span className="block text-[0.8125rem] text-ink-2">{st.why}</span> : null}
                 </span>
               </span>

@@ -3,7 +3,8 @@ import Link from "next/link";
 import { getRepo } from "@/lib/data";
 import { getSession, needs } from "@/lib/session";
 import { vehicleLine } from "@/lib/domain/intake";
-import { jobValueCents, mechanicJobStatus, type MechanicJobStatus } from "@/lib/domain/status";
+import { jobValueCents } from "@/lib/domain/status";
+import { repairChip } from "@/lib/domain/journey";
 import { findArea } from "@/lib/domain/areas";
 import { dayMonth, usd } from "@/lib/format";
 import { PageTitle } from "@/components/workspace/ui";
@@ -14,7 +15,8 @@ import { today } from "@/lib/verification/lifecycle";
 
 export const metadata: Metadata = { title: "Jobs" };
 
-const GROUPS: MechanicJobStatus[] = ["In Progress", "Upcoming", "Awaiting Customer", "Completed", "Cancelled"];
+/** Grouped by the shared stages (lib/domain/journey.ts), soonest action first. */
+const GROUPS = ["In progress", "Mechanic selected", "Scheduled", "Completed", "Cancelled"] as const;
 
 export default async function MyJobs({ searchParams }: { searchParams: Promise<{ view?: string; d?: string }> }) {
   const repo = await getRepo();
@@ -23,6 +25,8 @@ export default async function MyJobs({ searchParams }: { searchParams: Promise<{
   await (await needs(s)).mechanicJobs();
   const sp = await searchParams;
   const jobs = repo.listJobsForMechanic(s.mechanicId);
+  // A booked job carries its own stage; the request is only consulted before booking.
+  const chipFor = (j: (typeof jobs)[number]) => repairChip(repo.getRequest(j.requestId) ?? { status: "booked", declinedBy: [], matchedMechanicIds: [] } as never, [], j, "mechanic", s.mechanicId);
   const now = today();
   const view = sp.view === "month" ? "month" : "week";
   const anchor = /^\d{4}-\d{2}-\d{2}$/.test(sp.d ?? "") ? sp.d! : now;
@@ -58,11 +62,11 @@ export default async function MyJobs({ searchParams }: { searchParams: Promise<{
       {jobs.length === 0
         ? null
         : GROUPS.map((g) => {
-            const list = jobs.filter((j) => mechanicJobStatus(j) === g);
-            if (!list.length && (g === "Cancelled" || g === "Awaiting Customer" || g === "In Progress")) return null;
+            const list = jobs.filter((j) => chipFor(j).label === g);
+            if (!list.length && g !== "Scheduled" && g !== "Completed") return null;
             return (
               <section key={g} className="space-y-3">
-                <h2 className="heading text-[1.125rem]">
+                <h2 className="heading text-[1.0625rem]">
                   {g} <span className="tnum text-ink-3">{list.length}</span>
                 </h2>
                 <ul className="border-t border-rule">
@@ -87,7 +91,7 @@ export default async function MyJobs({ searchParams }: { searchParams: Promise<{
                           </div>
                           <div className="flex items-center gap-3">
                             <span className="tnum text-[0.9375rem] font-semibold">{usd(jobValueCents(j, q))}</span>
-                            <StatusChip label={g} />
+                            <StatusChip {...chipFor(j)} />
                           </div>
                         </Link>
                       </li>

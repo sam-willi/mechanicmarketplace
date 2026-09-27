@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AlertCircle, AlertTriangle, CheckCircle2, Info } from "lucide-react";
 import { STATUS_LABEL } from "@/lib/domain/provenance";
 import type { VerificationStatus } from "@/lib/domain/types";
 import { Tick, tickForStatus } from "@/components/trust/marks";
@@ -55,10 +56,27 @@ export function Field({
   );
 }
 
-export function Notice({ tone = "info", children }: { tone?: "info" | "warn" | "ok"; children: React.ReactNode }) {
+/**
+ * The one message block for results, warnings and errors on every screen. Square, 1px, washed by
+ * meaning; an icon so meaning never rests on colour alone. Carbon stays reserved for verification.
+ */
+export function Notice({ tone = "info", children, className = "" }: { tone?: "info" | "warn" | "ok" | "error"; children: React.ReactNode; className?: string }) {
   const cls =
-    tone === "warn" ? "border-amber/40 bg-amber-wash text-ink" : tone === "ok" ? "border-carbon/30 bg-carbon-wash text-ink" : "border-rule bg-sheet text-ink-2";
-  return <div className={`border px-4 py-3 text-[0.9375rem] ${cls}`}>{children}</div>;
+    tone === "error"
+      ? "border-alert/50 bg-alert-wash"
+      : tone === "warn"
+        ? "border-amber/40 bg-amber-wash"
+        : tone === "ok"
+          ? "border-brand/30 bg-brand-wash"
+          : "border-rule bg-sheet";
+  const Icon = tone === "error" ? AlertCircle : tone === "warn" ? AlertTriangle : tone === "ok" ? CheckCircle2 : Info;
+  const iconCls = tone === "error" ? "text-alert" : tone === "warn" ? "text-amber" : tone === "ok" ? "text-brand" : "text-ink-3";
+  return (
+    <div role={tone === "error" ? "alert" : tone === "info" ? undefined : "status"} className={`flex gap-2.5 border px-4 py-3 text-[0.9375rem] text-ink ${cls} ${className}`}>
+      <Icon size={18} className={`mt-0.5 shrink-0 ${iconCls}`} aria-hidden />
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  );
 }
 
 export function EmptyRow({ children }: { children: React.ReactNode }) {

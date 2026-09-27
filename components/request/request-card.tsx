@@ -53,7 +53,7 @@ export function RequestCard({
           <VehicleTile v={v} size="sm" className="hidden sm:flex" />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-start justify-between gap-2">
-              <h3 className="heading text-[1.1875rem] leading-tight">
+              <h3 className="heading text-[1.25rem] leading-tight">
                 <Link href={href} className="hover:underline">
                   {vehicleLine(v)}
                 </Link>

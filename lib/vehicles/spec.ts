@@ -232,9 +232,9 @@ export function sameModel(a: string, b: string) {
 // ---------------------------------------------------------------- display
 
 export const STATUS_LABEL: Record<SpecStatus, string> = {
-  vin_confirmed: "VIN confirmed",
+  vin_confirmed: "From VIN",
   selected: "Customer selected",
-  likely: "Needs confirmation",
+  likely: "Likely, not confirmed",
   needs_confirmation: "Needs confirmation",
   customer_text: "Customer's description",
   mechanic_confirmed: "Mechanic confirmed",

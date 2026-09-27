@@ -52,7 +52,7 @@ export function AccountMenu({
         <span className="block text-left leading-tight whitespace-nowrap">
           <span className="hidden text-[0.875rem] font-semibold sm:block">{name.split(" ")[0]}</span>
           {/* The mode, in full, so it's always clear which side of Clutch you're in. */}
-          <span className={`block text-[0.75rem] font-semibold ${tone === "dark" ? "text-[#c9d6cd]" : "text-ink-2"}`}>{mode === "customer" ? "Customer" : "Mechanic"}</span>
+          <span className={`block text-[0.75rem] font-semibold ${tone === "dark" ? "text-on-brand-2" : "text-ink-2"}`}>{mode === "customer" ? "Customer" : "Mechanic"}</span>
         </span>
         <ChevronDown size={14} aria-hidden className="shrink-0" />
       </button>

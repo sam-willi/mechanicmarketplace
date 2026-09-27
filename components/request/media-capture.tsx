@@ -184,7 +184,7 @@ const TAG_ICON: Partial<Record<MediaTag, typeof Camera>> = {
 export function MediaThumb({ m, size = 84 }: { m: RepairMedia; size?: number }) {
   const box = { width: size, height: size };
   const caption = (
-    <span className="absolute inset-x-0 bottom-0 truncate bg-ink/75 px-1.5 py-0.5 text-[0.625rem] font-bold tracking-wide text-sheet uppercase">
+    <span className="absolute inset-x-0 bottom-0 truncate bg-ink/75 px-1.5 py-0.5 text-[0.6875rem] font-bold tracking-wide text-sheet uppercase">
       {TAG_LABEL[m.tag]}
     </span>
   );
@@ -214,7 +214,7 @@ export function MediaThumb({ m, size = 84 }: { m: RepairMedia; size?: number }) 
   const inner = (
     <>
       <Icon size={Math.round(size / 3.6)} strokeWidth={1.6} className="text-ink-2" aria-hidden />
-      <span className="mt-1 px-1 text-center text-[0.625rem] leading-tight font-semibold text-ink-3">{m.url ? kindLabel : `${kindLabel} · sample`}</span>
+      <span className="mt-1 px-1 text-center text-[0.6875rem] leading-tight font-semibold text-ink-3">{m.url ? kindLabel : `${kindLabel} · sample`}</span>
       {caption}
     </>
   );

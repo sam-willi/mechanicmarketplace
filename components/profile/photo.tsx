@@ -25,7 +25,7 @@ export function PhotoPrint({
         <div
           role="img"
           aria-label={`${name} — photo not provided (demo profile)`}
-          className="relative grid size-full place-items-center overflow-hidden bg-[#dfe2dc]"
+          className="relative grid size-full place-items-center overflow-hidden bg-brand-tint"
         >
           <svg className="absolute inset-0 size-full opacity-[0.35]" aria-hidden>
             <defs>

@@ -163,7 +163,7 @@ export default async function AdminQueue({ searchParams }: { searchParams: Promi
                     const days = waited(v.submittedAt);
                     const late = status === "pending" && days > 3;
                     return (
-                      <li key={v.id} className={`grid gap-3 px-4 py-3.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-5 ${late ? "border-l-4 border-l-alert" : ""}`}>
+                      <li key={v.id} className={`grid gap-3 px-4 py-3.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-5 ${late ? "bg-alert-wash" : ""}`}>
                         <div className="min-w-0">
                           <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span className="font-bold">{CATEGORY_LABEL[v.category]}</span>

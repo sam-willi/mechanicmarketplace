@@ -38,7 +38,7 @@ export default async function MechanicLayout({ children }: { children: React.Rea
               <Link href="/" aria-label="Clutch home" className="inline-flex min-h-11 items-center text-sheet">
                 <Logo height={22} />
               </Link>
-              <span className="ml-3 text-[0.8125rem] font-semibold text-[#a9bfb1]">for mechanics</span>
+              <span className="ml-3 text-[0.8125rem] font-semibold text-on-brand-2">for mechanics</span>
             </div>
           </header>
           <main className="mx-auto max-w-[1100px] px-4 py-8 sm:px-6">{children}</main>
@@ -92,7 +92,7 @@ export default async function MechanicLayout({ children }: { children: React.Rea
           <Link href="/mechanic" aria-label="Clutch mechanic home" className="text-sheet">
             <Logo height={22} />
           </Link>
-          <p className="mt-1 text-[0.75rem] font-semibold tracking-[0.06em] text-[#a9bfb1] uppercase">Mechanic</p>
+          <p className="mt-1 text-[0.75rem] font-semibold tracking-[0.06em] text-on-brand-2 uppercase">Mechanic</p>
         </div>
         <div className="flex-1 overflow-y-auto px-2">
           <SideNav items={side} />
