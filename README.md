@@ -2,6 +2,8 @@
 
 A mechanic-first marketplace and portable reputation platform. **Mechanics should own proof of their skill.**
 
+Use @ https://mechanicmarketplace.vercel.app/ 
+
 Product truth: [PRODUCT.md](PRODUCT.md) · Build plan and architecture: [docs/PLAN.md](docs/PLAN.md) · Live data access: [docs/live-reads.md](docs/live-reads.md)
 
 ## What is Clutch?
