@@ -11,6 +11,7 @@
     "test:db": "node scripts/run-db-tests.mjs",
     "db:local": "node scripts/local-db.mjs",
     "db:reset-demo": "node scripts/reset-demo.mjs",
+    "test:browser": "node scripts/test-browser.mjs",
     "verify": "node scripts/verify.mjs"
   },
   "dependencies": {

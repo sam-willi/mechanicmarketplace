@@ -34,7 +34,9 @@ Clutch is designed around a simple principle: mechanics should own proof of thei
 
 Clutch is an active MVP, not a production-ready marketplace.
 
-The core customer, mechanic and staff workflows are implemented and tested. However, real public bookings should remain disabled until the required external services and production configuration are complete.
+The core customer, mechanic and staff workflows are implemented and tested, including **live bookings with real accounts**: sign-up and email confirmation, sign-in, mechanic onboarding (basic profile only; every check may be unverified), a vehicle and repair request, the mechanic's questions and estimate, the customer's verification acknowledgement, booking, and the job through to the customer confirming it's done. `npm run test:browser` runs that whole path in a browser against an isolated database, in both storage modes.
+
+What stands between this and public use are **external prerequisites, not missing product code**: legal review of the booking policy, a production Supabase project with working auth email, secrets and hosting, and the business decisions below. They're listed in the [morning assistance checklist](#morning-assistance-checklist). Until they're done, don't point real customers at it.
 
 ### Implemented
 
@@ -74,6 +76,18 @@ The core customer, mechanic and staff workflows are implemented and tested. Howe
 **Every mechanic is mobile (2026-09-26):** mechanics go to the car. Requests ask where the car is, not where the repair happens; there is no shop option in onboarding, search or estimates, and every mechanic is matched by their travel radius. Older records that say "shop" or "both" are read as mobile (the `work_model`/`service_mode` columns keep their values; nothing reads them differently).
 
 **Booking policy (2026-09-26, flagged for legal review):** a mechanic with a complete basic profile (service area, repairs, pricing, availability) can be matched, quote and be booked even when identity, background, driving-record or insurance checks are missing, pending, failed to run or unverified. Each check is always shown with its own status and never presented as verified. Before booking a mechanic Clutch hasn't fully verified, the customer sees exactly which checks are and aren't verified, ticks an unticked acknowledgement, and that record (disclosure text and version, statuses, who, when) stays with the booking. The disclosure isn't a waiver and doesn't change anyone's obligations.
+
+### Morning assistance checklist
+
+Things only the project owner can do. Everything else is built and tested locally.
+
+1. **Legal review** of the 2026-09-26 booking policy, the disclosure and acknowledgement text (`lib/domain/disclosure.ts`), terms and privacy policy.
+2. **Payments decision.** Clutch doesn't process payments; customers pay mechanics directly and either side can record it. Confirm that's the launch model and that the terms say so.
+3. **Supabase Auth, production project:** Site URL and redirect URLs (`https://<domain>/auth/callback`, `https://<domain>/auth/confirm`), email confirmation on, and **custom SMTP** (Supabase's built-in sender is rate-limited and for testing only) with SPF/DKIM/DMARC on the sending domain.
+4. **Google sign-in:** a Google OAuth client with a published consent screen, added in Supabase. Not tested locally (it needs Google); hide the button if it isn't set up.
+5. **One real sign-up per role against that Supabase project**, with a mailbox you control. Locally the auth server is a stand-in (below), so this is the first run against real Supabase Auth.
+6. **Hosting:** `DATABASE_URL`, `AUTH_SECRET`, `APP_URL` and the Supabase keys set in production; `CLUTCH_DEMO_LOGINS=off` unless the demo should be public.
+7. **Optional before launch:** a screening provider (checks show as not completed until then), an outbound email provider for alerts (in-app notifications work without it), and a support inbox.
 
 ## Table of contents
 
@@ -205,6 +219,8 @@ npm run verify    # lint, type-check, app tests, database tests, production buil
 
 `verify` blanks `DATABASE_URL`, Supabase keys and every Clutch switch for each step, so it never touches your database or services. The database tests always create their own temporary Postgres cluster, which needs Postgres 16+ server binaries (see [Run it](#run-it)); without them, `npm run verify -- --skip-db` skips that step and says so. The steps also run one at a time: `npm test`, `npm run test:db`, `npm run lint`, `npx tsc --noEmit`, `npm run build`.
 
+**Browser test of real accounts** (`npm run test:browser`): two fictional users sign up and complete a booking and repair in Chrome, with a server restart and log-out/log-in, against a throwaway Postgres cluster and a production build with demo logins off (built into `.next-browser-test`, so a running dev server isn't touched; nothing from `.env.local` is used). Sign-up goes through the app's real Supabase Auth code, pointed at `scripts/local-auth.mjs`: a **local stand-in for the Supabase Auth API, not Supabase**. It listens on 127.0.0.1, keeps its users in the throwaway database, and never sends email; confirmation links go to a local mailbox the test reads. It needs Chrome and `npm i --no-save puppeteer-core`. `CLUTCH_BROWSER_STORE=normalized npm run test:browser` runs it on the normalized store.
+
 CI (`.github/workflows/ci.yml`) runs `npm run verify` on Node 20 and 24 on Ubuntu for every push and pull request, forks included. It needs no secrets and has read-only permissions.
 
 Important coverage includes:
@@ -221,7 +237,8 @@ Important coverage includes:
 - notification delivery and privacy;
 - database migration and rollback;
 - large-marketplace pagination and query behavior;
-- responsive layouts and browser workflows.
+- responsive layouts and browser workflows;
+- the real-account path end to end in a browser (`npm run test:browser`).
 
 ## External services
 
@@ -373,13 +390,15 @@ Do not enable public traffic until every applicable item is complete.
 - [ ] A support inbox and response policy exist
 - [ ] Privacy policy, terms and marketplace policies were reviewed
 - [ ] Backup and rollback procedures were tested
-- [ ] Demo access is intentionally enabled or disabled
+- [ ] A real sign-up per role was completed against the production Supabase project
+- [ ] Demo access is intentionally enabled or disabled (with `CLUTCH_DEMO_LOGINS=off`, no public page links to `/demo`)
 - [ ] No test credentials or personal data are present
 
 ## Known limitations
 
 - Real mechanic screening is not yet connected, so ID, background and driving-record checks show as not completed for real mechanics.
 - Under the 2026-09-26 policy, mechanics are bookable without verification (after a customer acknowledgement); this needs legal review before launch.
+- Real-account sign-up is tested locally against a stand-in for the Supabase Auth API, not Supabase itself; Google sign-in isn't tested locally. See the [morning assistance checklist](#morning-assistance-checklist).
 - Clutch does not process payments.
 - Email and SMS marketplace alerts are disabled until a provider is configured.
 - File uploads use database storage and should move to object storage before significant traffic.

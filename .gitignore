@@ -53,3 +53,5 @@ next-env.d.ts
 
 # local development database (npm run db:local)
 /.local-pg/
+# npm run test:browser build output
+/.next-browser-test/

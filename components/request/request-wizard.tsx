@@ -164,6 +164,9 @@ export function RequestWizard({
     setErrors([]);
     setMaxStep((m) => Math.max(m, to));
     setD((x) => ({ ...x, step: to }));
+    // Save the new step right away (the debounced autosave waits for a pause), so a refresh
+    // straight after "Continue" comes back to this step, not an earlier one.
+    void saveIntakeDraft({ ...d, step: to }).catch(() => undefined);
     requestAnimationFrame(() => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
 

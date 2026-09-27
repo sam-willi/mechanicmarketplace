@@ -10,7 +10,7 @@ import { VEHICLE_MAKES } from "@/lib/domain/types";
 import { MODEL_YEARS } from "@/lib/domain/intake";
 import { Wordmark } from "@/components/brand/wordmark";
 import { GoogleButton, OrDivider } from "@/components/auth/google-button";
-import { authConfigured } from "@/lib/supabase/config";
+import { authConfigured, demoLoginsEnabled } from "@/lib/supabase/config";
 
 export const metadata: Metadata = { title: "Sign up" };
 
@@ -90,7 +90,12 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
             ) : null}
             {!authConfigured() ? (
               <p className="mt-6 border border-rule bg-sheet px-3 py-2 text-[0.9375rem] text-ink-2">
-                Sign-up isn&apos;t set up on this server yet. <Link href="/demo" className="link">Try a demo account</Link> instead.
+                Sign-up isn&apos;t set up on this server yet.{" "}
+                {demoLoginsEnabled() ? (
+                  <>
+                    <Link href="/demo" className="link">Try a demo account</Link> instead.
+                  </>
+                ) : null}
               </p>
             ) : (
               <>

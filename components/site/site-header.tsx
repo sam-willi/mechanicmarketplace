@@ -2,6 +2,7 @@ import Link from "next/link";
 import { signOut } from "@/app/actions/account";
 import { getSession } from "@/lib/session";
 import { Wordmark } from "@/components/brand/wordmark";
+import { footerLinks } from "@/lib/site-links";
 
 const NAV = [
   { href: "/customer/mechanics", label: "Find a Mechanic" },
@@ -80,13 +81,12 @@ export function SiteFooter() {
           <p className="max-w-[46ch]">One network, two products: find a mechanic for your car and see what Clutch has verified, or build your independent mechanic business. Launching in Los Angeles.</p>
         </div>
         <nav aria-label="Footer" className="grid grid-cols-2 gap-x-8 gap-y-2">
-          <Link href="/customer/mechanics" className="hover:text-ink">Find a Mechanic</Link>
-          <Link href="/for-mechanics" className="hover:text-ink">For Mechanics</Link>
-          <Link href="/how-it-works" className="hover:text-ink">How It Works</Link>
-          <Link href="/verification" className="hover:text-ink">Verification</Link>
-          <Link href="/help" className="hover:text-ink">Help &amp; safety</Link>
-          <Link href="/login" className="hover:text-ink">Log in</Link>
-          <Link href="/demo" className="text-ink-3 hover:text-ink">Try the demo <span className="text-[0.75rem]">(test data)</span></Link>
+          {footerLinks().map((l) => (
+            <Link key={l.href} href={l.href} className={l.note ? "text-ink-3 hover:text-ink" : "hover:text-ink"}>
+              {l.label}
+              {l.note ? <span className="text-[0.75rem]"> {l.note}</span> : null}
+            </Link>
+          ))}
         </nav>
       </div>
     </footer>

@@ -3,7 +3,7 @@
 1. Fork and clone the repository, then `npm ci` (never `npm install`: the lockfile is the source of truth).
 2. Create a focused branch.
 3. Make the change without adding secrets, real personal data, absolute paths or machine-specific files. Test data uses `@example.test` addresses and invented names.
-4. Run `npm run verify` (lint, type-check, app tests, database tests on a throwaway Postgres, production build). It never uses your `DATABASE_URL`. If you can't install Postgres, run `npm run verify -- --skip-db` and say so in the pull request.
+4. Run `npm run verify` (lint, type-check, app tests, database tests on a throwaway Postgres, production build). It never uses your `DATABASE_URL`. If you can't install Postgres, run `npm run verify -- --skip-db` and say so in the pull request. If you touched sign-up, sign-in, onboarding, requests, estimates, booking or jobs, also run `npm run test:browser` (needs Chrome and `npm i --no-save puppeteer-core`; see the README).
 5. For interface changes, check the page at desktop width and at 390 px, and attach screenshots.
 6. Open a pull request that says:
    - what changed and why;
