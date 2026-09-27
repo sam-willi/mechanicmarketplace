@@ -2,6 +2,7 @@ import { getMediaWithBytes } from "@/lib/data/mock/media-store";
 import { getRepo } from "@/lib/data";
 import { getSession, needs } from "@/lib/session";
 import { serveHeaders } from "@/lib/media/policy";
+import { checkDocToken } from "@/lib/verification/doc-links";
 
 /**
  * Serves uploaded media only to people with a reason to see it: the uploader,
@@ -15,6 +16,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   // Only the records this viewer may see that the file is attached to (public repair photos and
   // portraits; their own request or job; a request they were sent).
   const s = await getSession();
+  // Verification evidence: its uploader, or a reviewer holding a signed, short-lived link bound to
+  // them and this file. Never public, never other mechanics or customers, never a plain admin session.
+  if (m.meta.tag === "verification_doc") {
+    const viewer = s.role === "guest" ? "" : s.userId;
+    const own = Boolean(viewer) && m.ownerId === viewer;
+    const reviewer = Boolean(viewer) && s.role !== "guest" && s.roles.includes("admin") && checkDocToken(new URL(request.url).searchParams.get("vt"), id, viewer);
+    if (!own && !reviewer) return new Response("Not found", { status: 404 });
+    const headers = serveHeaders(id, m.meta, m.bytes);
+    return new Response(m.bytes.slice(), { headers: { ...headers, "Content-Length": String(m.bytes.byteLength), "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" } });
+  }
   await (await needs(s)).media(id);
   // Photos attached to a repair record are part of the mechanic's public work gallery.
   // Repair-record photos and mechanic portraits are public, like the profile they're on.

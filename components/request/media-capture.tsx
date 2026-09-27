@@ -3,14 +3,16 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Camera, Cog, Disc3, Droplets, FileText, FileUp, Gauge, Hash, Loader2, Mic, TriangleAlert, Video, X } from "lucide-react";
 import type { MediaTag, RepairMedia } from "@/lib/domain/types";
+import { acceptFor, uploadMedia } from "@/lib/media/upload-client";
+import { uploadLimits } from "@/lib/media/limits";
 
 type Mode = "photo" | "video" | "audio" | "file";
 
 const MODES: Record<Mode, { label: string; accept: string; capture?: "environment" | "user"; icon: typeof Camera }> = {
-  photo: { label: "Take photo", accept: "image/*", capture: "environment", icon: Camera },
-  video: { label: "Record video", accept: "video/*", capture: "environment", icon: Video },
-  audio: { label: "Record audio", accept: "audio/*", icon: Mic },
-  file: { label: "Upload", accept: "image/*,video/*,audio/*,application/pdf", icon: FileUp },
+  photo: { label: "Take photo", accept: acceptFor(["photo"]), capture: "environment", icon: Camera },
+  video: { label: "Record video", accept: acceptFor(["video"]), capture: "environment", icon: Video },
+  audio: { label: "Record audio", accept: acceptFor(["audio"]), icon: Mic },
+  file: { label: "Upload", accept: acceptFor(["photo", "video", "audio", "pdf"]), icon: FileUp },
 };
 
 /**
@@ -34,6 +36,11 @@ export function MediaCapture({
 }) {
   const [busy, setBusy] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  // Video and audio aren't offered where this deployment can't take them (lib/media/limits.ts).
+  const limits = uploadLimits();
+  const shown = modes.filter((m) => (m === "video" ? limits.video : m === "audio" ? limits.audio : true));
+  const dropped = modes.filter((m) => !shown.includes(m));
   const mine = value.filter((m) => m.tag === tag);
   const latest = useRef(value);
   useEffect(() => {
@@ -43,19 +50,18 @@ export function MediaCapture({
   async function upload(files: FileList | null) {
     if (!files?.length) return;
     setError(null);
+    setNote(null);
     for (const file of Array.from(files)) {
       setBusy((n) => n + 1);
       try {
-        const body = new FormData();
-        body.append("file", file);
-        body.append("tag", tag);
-        const res = await fetch("/api/media", { method: "POST", body });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error ?? "Upload failed");
-        latest.current = [...latest.current, json as RepairMedia];
+        const r = await uploadMedia(file, tag);
+        if (!r.ok) {
+          setError(r.error);
+          continue;
+        }
+        if (r.note) setNote(r.note);
+        latest.current = [...latest.current, r.media];
         onChange(latest.current);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Upload failed. Try again.");
       } finally {
         setBusy((n) => n - 1);
       }
@@ -65,11 +71,18 @@ export function MediaCapture({
   return (
     <div className="space-y-3">
       <div className={`grid gap-2 ${compact ? "grid-cols-2 sm:flex sm:flex-wrap" : "grid-cols-2 sm:grid-cols-4"}`}>
-        {modes.map((m) => (
+        {shown.map((m) => (
           <CaptureButton key={m} mode={m} onFiles={upload} />
         ))}
       </div>
-      {hint ? <p className="text-[0.8125rem] text-ink-3">{hint}</p> : null}
+      {dropped.length ? (
+        <p className="text-[0.8125rem] text-ink-2">
+          {dropped.includes("audio") && !shown.length
+            ? "Recordings can't be uploaded on this version of Clutch yet. Describe the sound in words instead."
+            : `${dropped.includes("video") && dropped.includes("audio") ? "Video and audio" : dropped.includes("video") ? "Video" : "Audio"} can't be uploaded on this version of Clutch yet; photos can.`}
+        </p>
+      ) : null}
+      {hint && shown.length ? <p className="text-[0.8125rem] text-ink-3">{hint}</p> : null}
       {(mine.length > 0 || busy > 0) && (
         <ul className="flex flex-wrap gap-2" aria-label="Attached files">
           {mine.map((m) => (
@@ -92,6 +105,11 @@ export function MediaCapture({
           )}
         </ul>
       )}
+      {note ? (
+        <p className="text-[0.8125rem] text-ink-2" role="status">
+          {note}
+        </p>
+      ) : null}
       {error ? (
         <p className="text-[0.875rem] text-alert" role="alert">
           {error}
@@ -129,6 +147,7 @@ function CaptureButton({ mode, onFiles }: { mode: Mode; onFiles: (f: FileList | 
 }
 
 const TAG_LABEL: Record<MediaTag, string> = {
+  verification_doc: "Verification document",
   portrait: "Portrait",
   before: "Before",
   after: "After",
@@ -166,7 +185,7 @@ const TAG_ICON: Partial<Record<MediaTag, typeof Camera>> = {
 export function MediaThumb({ m, size = 84 }: { m: RepairMedia; size?: number }) {
   const box = { width: size, height: size };
   const caption = (
-    <span className="absolute inset-x-0 bottom-0 truncate bg-ink/75 px-1.5 py-0.5 text-[0.625rem] font-bold tracking-wide text-sheet uppercase">
+    <span className="absolute inset-x-0 bottom-0 truncate bg-ink/75 px-1.5 py-0.5 text-[0.6875rem] font-bold tracking-wide text-sheet uppercase">
       {TAG_LABEL[m.tag]}
     </span>
   );
@@ -196,7 +215,7 @@ export function MediaThumb({ m, size = 84 }: { m: RepairMedia; size?: number }) 
   const inner = (
     <>
       <Icon size={Math.round(size / 3.6)} strokeWidth={1.6} className="text-ink-2" aria-hidden />
-      <span className="mt-1 px-1 text-center text-[0.625rem] leading-tight font-semibold text-ink-3">{m.url ? kindLabel : `${kindLabel} · sample`}</span>
+      <span className="mt-1 px-1 text-center text-[0.6875rem] leading-tight font-semibold text-ink-3">{m.url ? kindLabel : `${kindLabel} · sample`}</span>
       {caption}
     </>
   );

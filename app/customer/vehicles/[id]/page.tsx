@@ -1,3 +1,5 @@
+import { VehicleBrief } from "@/components/vehicle/vehicle-brief";
+import { vehicleSpecOf } from "@/lib/vehicles/effective";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -12,8 +14,6 @@ import { PhotoPrint } from "@/components/profile/photo";
 import { RepairIcon } from "@/components/visual/icons";
 import { VehicleGlyph, VehicleTile } from "@/components/visual/vehicle-glyph";
 import { VehiclePhotoButton } from "@/components/app/vehicle-photo";
-import { SpecPreview } from "@/components/vehicle/vehicle-selector";
-import { customerSummary } from "@/lib/vehicles/spec";
 import { VehicleFields } from "@/components/app/vehicle-form";
 
 export const metadata: Metadata = { title: "Vehicle" };
@@ -44,19 +44,17 @@ export default async function VehiclePage({ params, searchParams }: { params: Pr
         </div>
         <div className="min-w-0">
           <h1 className="display text-[2rem] sm:text-[2.5rem]">{vehicleLine(v)}</h1>
-          <p className="tnum mt-1 text-ink-2">{customerSummary(v, v.spec)}</p>
-          {v.spec ? (
-            <div className="mt-3">
-              <SpecPreview year={v.year} make={v.make} model={v.model} spec={v.spec} />
-            </div>
-          ) : (
+          <div className="mt-3">
+            <VehicleBrief v={v} spec={vehicleSpecOf(v)} audience="customer" showVinTail hideName />
+          </div>
+          {!v.spec || !v.vin ? (
             <p className="mt-2 text-[0.875rem] text-ink-2">
-              Engine and transmission not confirmed yet.{" "}
+              {v.spec ? "Adding your VIN confirms the engine and transmission exactly." : "Saved before Clutch recorded the exact configuration."}{" "}
               <a href="?edit=1#edit" className="font-semibold underline decoration-rule underline-offset-2">
-                Add the exact configuration
+                {v.spec ? "Add your VIN" : "Add the exact configuration"}
               </a>
             </p>
-          )}
+          ) : null}
           <dl className="mt-4 grid grid-cols-3 border-y border-rule">
             {(
               [
@@ -67,7 +65,7 @@ export default async function VehiclePage({ params, searchParams }: { params: Pr
             ).map(([n, label], i) => (
               <div key={label} className={`py-2.5 ${i ? "border-l border-rule-soft pl-3" : "pr-3"}`}>
                 <dt className="sr-only">{label}</dt>
-                <dd className="num text-[1.625rem]">{n}</dd>
+                <dd className="num text-[1.75rem]">{n}</dd>
                 <p className="text-[0.75rem] text-ink-2">{label}</p>
               </div>
             ))}

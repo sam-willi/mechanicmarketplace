@@ -46,14 +46,15 @@ export function AccountMenu({
         aria-label={`Account: ${name}, ${mode} mode`}
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className={`flex items-center gap-2 px-1.5 py-1 ${tone === "dark" ? "text-sheet" : "text-ink"}`}
+        className={`flex min-h-11 shrink-0 items-center gap-2 px-1.5 ${tone === "dark" ? "text-sheet" : "text-ink"}`}
       >
-        <span className={`grid size-8 place-items-center text-[0.75rem] font-extrabold ${tone === "dark" ? "bg-sheet text-ink" : "bg-brand text-sheet"}`}>{initials}</span>
-        <span className="block text-left leading-tight">
+        <span className={`grid size-8 shrink-0 place-items-center text-[0.75rem] font-extrabold ${tone === "dark" ? "bg-sheet text-ink" : "bg-brand text-sheet"}`}>{initials}</span>
+        <span className="block text-left leading-tight whitespace-nowrap">
           <span className="hidden text-[0.875rem] font-semibold sm:block">{name.split(" ")[0]}</span>
-          <span className={`block text-[0.6875rem] font-bold tracking-[0.06em] uppercase ${tone === "dark" ? "text-[#a9bfb1]" : "text-ink-3"}`}>{mode === "customer" ? "Customer" : "Mechanic"}</span>
+          {/* The mode, in full, so it's always clear which side of Clutch you're in. */}
+          <span className={`block text-[0.75rem] font-semibold ${tone === "dark" ? "text-on-brand-2" : "text-ink-2"}`}>{mode === "customer" ? "Customer" : "Mechanic"}</span>
         </span>
-        <ChevronDown size={14} aria-hidden className="hidden sm:inline" />
+        <ChevronDown size={14} aria-hidden className="shrink-0" />
       </button>
       {open && (
         <div role="menu" className="absolute right-0 z-50 mt-2 w-64 border border-ink bg-sheet text-ink shadow-[0_16px_40px_-16px_rgba(22,24,29,0.4)]">

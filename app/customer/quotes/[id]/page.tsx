@@ -1,7 +1,9 @@
+import { VehicleBrief } from "@/components/vehicle/vehicle-brief";
+import { vehicleSpecOf } from "@/lib/vehicles/effective";
 import type { Metadata } from "next";
 import { StarRating } from "@/components/visual/stars";
 import Link from "next/link";
-import { ArrowLeft, CalendarClock, Check, MessageCircleQuestion, Minus } from "lucide-react";
+import { ChevronDown, ArrowLeft, CalendarClock, Check, MessageCircleQuestion, Minus } from "lucide-react";
 import { notFound } from "next/navigation";
 import { getRepo } from "@/lib/data";
 import { getSession, needs } from "@/lib/session";
@@ -20,6 +22,7 @@ import { EligibilityNotice } from "@/components/trust/eligibility-notice";
 import { ScreeningList } from "@/components/trust/screening-list";
 import { eligibility } from "@/lib/domain/eligibility";
 import { inclusions, quoteTotals } from "@/lib/domain/quote";
+import { Notice } from "@/components/workspace/ui";
 import { customerSummary } from "@/lib/vehicles/spec";
 
 export const metadata: Metadata = { title: "Written estimate" };
@@ -74,18 +77,18 @@ export default async function EstimatePage({ params, searchParams }: { params: P
           <ArrowLeft size={14} aria-hidden /> Back to your request
         </Link>
         {sp.error ? (
-          <p role="alert" className="mt-4 border-l-4 border-alert bg-sheet px-4 py-3 text-[0.9375rem]">
+          <Notice tone="error" className="mt-4">
             {sp.error}
-          </p>
+          </Notice>
         ) : null}
         {q.revisions?.length && q.status === "submitted" ? (
-          <p className="mt-4 border-l-4 border-brass bg-sheet px-4 py-3 text-[0.9375rem]">
+          <Notice tone="info" className="mt-4">
             <span className="font-semibold">
               {p.firstName} revised this estimate (version {q.version ?? 1}
               {q.revisedAt ? `, ${dayMonth(q.revisedAt)}` : ""}).
             </span>{" "}
             You&apos;re reading the current version. Earlier versions are listed at the bottom.
-          </p>
+          </Notice>
         ) : null}
         <article className="sheet perf-top mt-4">
           {/* Document head */}
@@ -98,18 +101,22 @@ export default async function EstimatePage({ params, searchParams }: { params: P
                   <RepairIcon category={r.repairCategory} size={22} />
                   {REPAIR_LABEL[r.repairCategory]}
                 </h1>
-                <p className="mt-0.5 text-[0.9375rem] text-ink-2">{customerSummary(v, r.vehicleSpec ?? v.spec)}</p>
+                <p className="mt-0.5 text-[0.9375rem] text-ink-2">{customerSummary(v, vehicleSpecOf(v, r.vehicleSpec))}</p>
               </div>
             </div>
             <p className="text-[0.8125rem] text-ink-3">Issued {dayMonth(q.createdAt)}</p>
           </header>
+
+          <div className="border-b border-rule px-5 py-4 sm:px-7">
+            <VehicleBrief v={v} spec={vehicleSpecOf(v, r.vehicleSpec)} audience="customer" warn="book" editHref={`/customer/vehicles/${v.id}?edit=1#edit`} />
+          </div>
 
           {/* Who */}
           <section aria-label="Your mechanic" className="border-b border-rule px-5 py-5 sm:px-7">
             <div className="flex gap-4">
               <PhotoPrint photoUrl={p.photoUrl} initials={p.initials} name={p.displayName} size={72} />
               <div className="min-w-0 flex-1">
-                <p className="heading text-[1.1875rem]">{p.displayName}</p>
+                <p className="heading text-[1.25rem]">{p.displayName}</p>
                 <p className="text-[0.875rem] text-ink-2">
                   {WORK_MODEL_LABEL[p.workModel]} · {p.neighborhood ?? p.city}
                 </p>
@@ -183,7 +190,7 @@ export default async function EstimatePage({ params, searchParams }: { params: P
               </div>
             ))}
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline py-4">
-              <dt className="heading text-[1.125rem]">Estimated total</dt>
+              <dt className="heading text-[1.0625rem]">Estimated total</dt>
               <dd className="num text-[2rem]">{t.planFor}</dd>
             </div>
           </dl>
@@ -256,9 +263,25 @@ export default async function EstimatePage({ params, searchParams }: { params: P
             </section>
           )}
 
-          <section aria-label="Before you choose" className="border-t border-rule px-5 py-4 sm:px-7">
-            <p className="field-label mb-3">Before you choose</p>
-            <Policies firstName={p.firstName} guarantee={p.guarantee} />
+          {/* The policies in full: open on larger screens; on phones one labelled disclosure, so the
+              mechanic, appointment, scope, total, checks and the action stay in view. Nothing is removed. */}
+          <section aria-label="Before you book" className="border-t border-rule px-5 py-4 sm:px-7">
+            <div className="hidden sm:block">
+              <p className="field-label mb-3">Before you book</p>
+              <Policies firstName={p.firstName} guarantee={p.guarantee} />
+            </div>
+            <details className="group sm:hidden">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 font-semibold [&::-webkit-details-marker]:hidden">
+                <span>
+                  Before you book
+                  <span className="block text-[0.8125rem] font-normal text-ink-2">Payment, cancelling, rescheduling, problems and workmanship</span>
+                </span>
+                <ChevronDown size={18} className="shrink-0 transition-transform group-open:rotate-180" aria-hidden />
+              </summary>
+              <div className="pt-3">
+                <Policies firstName={p.firstName} guarantee={p.guarantee} />
+              </div>
+            </details>
             {q.expiresOn ? <p className="mt-3 text-[0.8125rem] text-ink-3">This estimate is valid until {dayMonth(q.expiresOn)}.</p> : null}
           </section>
 

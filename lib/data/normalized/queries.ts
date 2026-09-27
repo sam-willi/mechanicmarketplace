@@ -1,10 +1,12 @@
+import { STAFF_SKIP } from "@/lib/admin-queue";
+import type { EffectiveStatus } from "@/lib/verification/model";
 import { toPublicProfile, type PublicMechanicProfile } from "@/lib/domain/public-profile";
 import type { SearchPool } from "@/lib/domain/search";
 import { eligibility } from "@/lib/domain/eligibility";
 import { findArea, serves } from "@/lib/domain/areas";
 import { effectiveStatus } from "@/lib/verification/lifecycle";
 import { inQueue, QUEUE_FILTERS, type QueueCounts } from "@/lib/admin-queue";
-import type { MechanicProfile, VerificationRecord, VerificationStatus } from "@/lib/domain/types";
+import type { MechanicProfile, VerificationRecord } from "@/lib/domain/types";
 import { textArray, type EvidenceFacts, type Reader } from "./reader";
 import type { DB } from "../mock/seed";
 
@@ -44,14 +46,31 @@ export class LiveQueries {
    * checks, with reputation totals from the database's counts. Enough to rank, filter and show a
    * result card; the repair list itself isn't read (`verifiedWork` is empty).
    */
-  private liteProfile(id: string, f: EvidenceFacts | undefined, now: Date): PublicMechanicProfile {
+  /**
+   * The check records of the loaded mechanics, grouped by mechanic once per slice state (not
+   * filtered per profile: search builds a profile for every bookable mechanic).
+   */
+  private groups?: { key: string; mechanics: Map<string, DB["mechanics"][number]>; screenings: Map<string, DB["screenings"]>; insurance: Map<string, DB["insurance"]>; verifications: Map<string, DB["verifications"]> };
+  private grouped() {
     const d = this.db;
+    const key = `${d.screenings.length}:${d.insurance.length}:${d.verifications.length}:${d.mechanics.length}`;
+    if (this.groups?.key === key) return this.groups;
+    const by = <T extends { mechanicId: string }>(rows: T[], keep: (x: T) => boolean = () => true) => {
+      const m = new Map<string, T[]>();
+      for (const x of rows) if (keep(x)) (m.get(x.mechanicId) ?? m.set(x.mechanicId, []).get(x.mechanicId)!).push(x);
+      return m;
+    };
+    return (this.groups = { key, mechanics: new Map(d.mechanics.map((m) => [m.id, m])), screenings: by(d.screenings), insurance: by(d.insurance), verifications: by(d.verifications, (x) => CHECK_CATEGORIES.includes(x.category)) });
+  }
+
+  private liteProfile(id: string, f: EvidenceFacts | undefined, now: Date): PublicMechanicProfile {
+    const g = this.grouped();
     const p = toPublicProfile(
       {
-        mechanic: d.mechanics.find((m) => m.id === id)!,
-        screenings: d.screenings.filter((x) => x.mechanicId === id),
-        insurance: d.insurance.filter((x) => x.mechanicId === id),
-        verifications: d.verifications.filter((x) => x.mechanicId === id && x.subjectType === "insurance_record"),
+        mechanic: g.mechanics.get(id)!,
+        screenings: g.screenings.get(id) ?? [],
+        insurance: g.insurance.get(id) ?? [],
+        verifications: g.verifications.get(id) ?? [],
         credentials: [],
         employment: [],
         pastRepairs: [],
@@ -74,6 +93,7 @@ export class LiveQueries {
     const now = new Date();
     const ids = await this.r.bookableCandidateIds();
     await Promise.all([this.r.byIds("mechanics", ids, "public"), this.r.checkRecords(ids, "public")]);
+    this.groups = undefined; // rows may have been replaced in place: regroup
     const facts = await this.r.evidenceFacts(ids, { repair: opts.repair, make: opts.make, model: opts.model });
     const bookable = ids.map((id) => this.liteProfile(id, facts.get(id), now)).filter((p) => eligibility(p).eligible);
     const out = [...bookable];
@@ -128,7 +148,7 @@ export class LiveQueries {
 
   /** Staff queue tab counts, from grouped rows: the same predicate as the page, applied per group. */
   async verificationCounts(nowIso: string, weekAgo: string): Promise<QueueCounts> {
-    const rows = await this.r.sql<{ eff: VerificationStatus; method: string | null; recent: boolean; n: number }[]>`
+    const rows = await this.r.sql<{ eff: EffectiveStatus; method: string | null; recent: boolean; n: number }[]>`
       select lv_effective_status(status, data->>'expiresAt', ${nowIso}::timestamptz) as eff, data->>'method' as method,
         (status = 'verified' and coalesce(data->>'verifiedAt', '') collate "C" >= ${weekAgo}) as recent, count(*)::int as n
       from lv_verifications group by 1, 2, 3`;
@@ -175,17 +195,21 @@ export class LiveQueries {
   }
 
   /** After a decision: this mechanic's most recently submitted pending item, else the oldest pending item. */
-  async nextPendingVerification(excludeId: string, mechanicId: string, nowIso: string): Promise<string | undefined> {
+  // Items waiting for staff never expire, so the time argument (kept for the interface) isn't needed here.
+  async nextPendingVerification(excludeId: string, mechanicId: string, ...[]: [nowIso?: string]): Promise<string | undefined> {
     const s = this.r.sql;
-    const pending = () => s`lv_effective_status(status, data->>'expiresAt', ${nowIso}::timestamptz) = 'pending' and id <> ${excludeId}`;
-    const [mine] = await s<{ id: string }[]>`select id from lv_verifications where status = 'pending' and mechanic_id = ${mechanicId} and ${pending()}
+    // Waiting for staff: submitted or under review, by a method staff decide (never a provider's).
+    const pending = () => s`id <> ${excludeId} and coalesce(data->>'method', '') not in ${s(STAFF_SKIP)}`;
+    const [mine] = await s<{ id: string }[]>`select id from lv_verifications where status in ('submitted', 'under_review') and mechanic_id = ${mechanicId} and ${pending()}
       order by coalesce(data->>'submittedAt', '') collate "C" desc, id collate "C" desc limit 1`;
     if (mine) return mine.id;
-    const [oldest] = await s<{ id: string }[]>`select id from lv_verifications where status = 'pending' and ${pending()}
+    const [oldest] = await s<{ id: string }[]>`select id from lv_verifications where status in ('submitted', 'under_review') and ${pending()}
       order by coalesce(data->>'submittedAt', '') collate "C", id collate "C" limit 1`;
     return oldest?.id;
   }
 }
+
+const CHECK_CATEGORIES: string[] = ["identity", "background", "driving_record", "insurance"];
 
 /** In-memory twins over a whole DB (demo, tests, the snapshot rollback path). */
 export const memoryQueries = {

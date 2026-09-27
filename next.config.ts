@@ -3,6 +3,11 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /** Default .next. `npm run test:browser` builds into its own folder so it never touches a running dev server. */
   distDir: process.env.CLUTCH_DIST_DIR || ".next",
+  /**
+   * Upload limits for this deployment (lib/media/limits.ts), fixed at build time so the browser
+   * and the server agree: "hosted" on Vercel (4 MB, photos shrunk, no video/audio), "full" elsewhere.
+   */
+  env: { CLUTCH_UPLOAD_PROFILE: process.env.CLUTCH_UPLOAD_PROFILE || (process.env.VERCEL ? "hosted" : "full") },
   /** No floating dev badge over the product, even in development demos. Errors still show. */
   devIndicators: false,
   /** Old single-dashboard routes, kept working for links already shared. */

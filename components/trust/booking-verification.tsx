@@ -15,7 +15,7 @@ export function BookingVerification({ at, current, firstName }: { at?: Verificat
   const insuranceUnverified = !(now.get("insurance")?.verified ?? false);
   return (
     <section id="verification" aria-labelledby="verification-title" className="scroll-mt-24 space-y-2">
-      <h2 id="verification-title" className="heading text-[1.125rem]">
+      <h2 id="verification-title" className="heading text-[1.0625rem]">
         Verification when you booked
       </h2>
       <p className="text-[0.875rem] text-ink-2">
@@ -35,7 +35,7 @@ export function BookingVerification({ at, current, firstName }: { at?: Verificat
             return (
               <tr key={c.key} className="border-b border-rule-soft">
                 <td className="py-1.5 pr-3 font-semibold">{c.name}</td>
-                <td className={`py-1.5 pr-3 ${c.verified ? "" : "font-semibold text-amber"}`}>{c.status}</td>
+                <td className={`py-1.5 pr-3 ${c.verified ? "" : "font-semibold text-amber"}`}>{c.statement ?? c.status}</td>
                 {changed ? <td className="py-1.5">{n ? (n.state === "expiring" ? `Verified, renews ${n.when}` : n.state === "expired" && n.when ? `Expired ${n.when}` : STATUS_WORD[n.state]) : "Not applicable"}</td> : null}
               </tr>
             );

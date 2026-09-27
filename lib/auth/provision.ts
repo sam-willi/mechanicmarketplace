@@ -1,4 +1,5 @@
 import "server-only";
+import { parseChoice, vehicleFromChoice } from "@/lib/vehicles/fields";
 import { needsIn, readyRepo } from "@/lib/data";
 import { VEHICLE_MAKES, type User, type VehicleMake } from "@/lib/domain/types";
 
@@ -9,7 +10,7 @@ export type SignupMeta = {
   picture?: string;
   role?: string;
   phone?: string;
-  car?: { year?: number; make?: string; model?: string; mileage?: number };
+  car?: { year?: number; make?: string; model?: string; mileage?: number; choice?: unknown };
 };
 
 /**
@@ -48,7 +49,8 @@ export async function provisionUser(
   const car = meta.car;
   if (role === "customer" && car?.model && VEHICLE_MAKES.includes(car.make as VehicleMake)) {
     const c = repo.getCustomerByUser(user.id);
-    if (c) await repo.addVehicle(c.id, { year: car.year || 2015, make: car.make as VehicleMake, model: car.model, mileage: car.mileage || undefined });
+    // A structured choice (the sign-up picker) gets the full spec; an older plain one is kept as entered.
+    if (c) await repo.addVehicle(c.id, car.choice ? await vehicleFromChoice(parseChoice(car.choice), car.mileage) : { year: car.year || 2015, make: car.make as VehicleMake, model: car.model, mileage: car.mileage || undefined });
   }
   return user;
 }

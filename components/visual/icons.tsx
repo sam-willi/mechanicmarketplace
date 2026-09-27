@@ -43,7 +43,7 @@ export function Avatar({ name, size = 36 }: { name: string; size?: number }) {
     .slice(0, 2)
     .toUpperCase();
   return (
-    <span className="grid shrink-0 place-items-center bg-[#dfe2dc] font-extrabold text-ink-2" style={{ width: size, height: size, fontSize: size * 0.38 }} aria-hidden>
+    <span className="grid shrink-0 place-items-center bg-brand-tint font-extrabold text-ink-2" style={{ width: size, height: size, fontSize: size * 0.38 }} aria-hidden>
       {initials}
     </span>
   );

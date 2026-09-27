@@ -29,15 +29,12 @@ export function DeclineForm({
       <summary
         className={
           big
-            ? `flex min-h-16 w-full cursor-pointer list-none items-center justify-center gap-2 border-2 px-5 text-[1.0625rem] font-bold [&::-webkit-details-marker]:hidden ${
-                danger
-                  ? "border-alert bg-alert-wash text-alert hover:bg-alert hover:text-white group-open:bg-alert group-open:text-white"
-                  : "border-rule bg-sheet text-ink hover:border-ink-3 group-open:border-ink-3"
-              }`
+            ? // Secondary, never louder than the primary action: red is kept for the final, destructive confirm.
+              "btn btn-quiet min-h-14 w-full list-none text-[1.0625rem] group-open:border-ink-3 [&::-webkit-details-marker]:hidden"
             : `min-h-11 cursor-pointer content-center text-[0.875rem] underline underline-offset-2 ${danger ? "text-alert decoration-alert/40" : "text-ink-3 decoration-rule hover:text-ink"}`
         }
       >
-        {big ? <X size={22} strokeWidth={2.75} aria-hidden /> : null}
+        {big ? <X size={20} strokeWidth={2.5} aria-hidden /> : null}
         {summary}
       </summary>
       <form action={action} className="mt-2 space-y-3 border border-rule bg-sheet p-4">

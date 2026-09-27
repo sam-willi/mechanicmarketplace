@@ -38,7 +38,7 @@ export default function HowItWorks() {
       <SiteHeader />
       <main className="mx-auto max-w-[1100px] px-4 pt-10 sm:px-6 sm:pt-16">
         <h1 className="display max-w-[18ch] text-[2.5rem] sm:text-[3.5rem]">One network, two products.</h1>
-        <p className="mt-4 max-w-[60ch] text-[1.125rem] text-ink-2">
+        <p className="mt-4 max-w-[60ch] text-[1.0625rem] text-ink-2">
           Drivers find a mechanic for their car and see what Clutch has and hasn&apos;t verified about them. Mechanics build an independent business on proof of their work. Clutch never decides who is best: it
           shows the evidence and the customer chooses.
         </p>

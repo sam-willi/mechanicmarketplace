@@ -16,6 +16,8 @@
  * picked from Photos; Settings › Camera › Formats › Most Compatible makes the camera save JPEG.)
  */
 import type { MediaKind, MediaTag } from "@/lib/domain/types";
+import { uploadLimits, type UploadLimits } from "./limits";
+import { PREPARE_COPY } from "./prepare";
 
 export type Detected = "jpeg" | "png" | "webp" | "heif" | "mp4" | "mov" | "3gp" | "webm" | "ogg" | "mp3" | "wav" | "aac" | "pdf" | "markup" | "gif" | "zip" | "exe" | "unknown";
 
@@ -42,8 +44,6 @@ const FORMATS: Partial<Record<Detected, Format>> = {
   aac: { kind: "audio", exts: ["aac"], declared: ["audio/aac", "audio/x-aac", "audio/aacp"], contentType: () => "audio/aac", maxBytes: 40 * MB },
   pdf: { kind: "document", exts: ["pdf"], declared: ["application/pdf", "application/x-pdf"], contentType: () => "application/pdf", maxBytes: 20 * MB },
 };
-/** Largest accepted upload (the route refuses bigger bodies before reading them). */
-export const MAX_UPLOAD_BYTES = 40 * MB;
 
 /** Where each kind of file may be attached. */
 const PHOTO_ONLY: MediaTag[] = ["portrait", "vehicle"];
@@ -104,6 +104,8 @@ export const COPY = {
   noType: "Your browser didn't say what kind of file this is. Export it again as a photo, video, recording or PDF, then upload that.",
   photoOnly: "This has to be a photo: a JPEG, PNG or WebP image.",
   mechanicMedia: "Mechanics can upload repair photos and videos only.",
+  verificationDoc: "Upload your document as a PDF or a photo.",
+  verificationDocRole: "Only mechanics upload verification documents.",
   tooBig: (kind: MediaKind, limit: number) => `That ${kind === "document" ? "document" : kind === "photo" ? "photo" : kind === "audio" ? "recording" : "video"} is over ${Math.round(limit / MB)} MB. ${kind === "video" || kind === "audio" ? "Try a shorter clip." : "Try a smaller file."}`,
 } as const;
 
@@ -119,8 +121,8 @@ export function displayName(original: string, ext: string, kind: MediaKind) {
   return `${base || (kind === "document" ? "document" : kind)}.${ext}`;
 }
 
-/** Decide whether an upload is accepted and how it will be stored. */
-export function checkUpload(u: Upload): Accepted | Refused {
+/** Decide whether an upload is accepted and how it will be stored, within this deployment's limits (lib/media/limits.ts). */
+export function checkUpload(u: Upload, limits: UploadLimits = uploadLimits()): Accepted | Refused {
   const refuse = (error: string, status = 415): Refused => ({ ok: false, status, error });
   if (u.bytes.byteLength === 0) return refuse(COPY.empty, 400);
   const detected = sniff(u.bytes);
@@ -144,9 +146,15 @@ export function checkUpload(u: Upload): Accepted | Refused {
   if (parts.length > 1 && parts.slice(0, -1).some((p) => Object.values(FORMATS).some((x) => x!.exts.includes(p)))) return refuse(COPY.hiddenType);
   const contentType = f.contentType(declared);
   const kind: MediaKind = contentType.startsWith("audio/") ? "audio" : f.kind;
-  if (u.bytes.byteLength > f.maxBytes) return refuse(COPY.tooBig(kind, f.maxBytes), 413);
+  if (kind === "video" && !limits.video) return refuse(PREPARE_COPY.noVideo);
+  if (kind === "audio" && !limits.audio) return refuse(PREPARE_COPY.noAudio);
+  const max = Math.min(f.maxBytes, limits.maxBytes);
+  if (u.bytes.byteLength > max) return refuse(limits.profile === "hosted" ? PREPARE_COPY.hostRefused(max) : COPY.tooBig(kind, max), 413);
   if (PHOTO_ONLY.includes(u.tag) && kind !== "photo") return refuse(COPY.photoOnly);
-  if (u.role === "mechanic" && (!MECHANIC_TAGS.includes(u.tag) || (kind !== "photo" && kind !== "video"))) return refuse(COPY.mechanicMedia, 403);
+  // Verification evidence (insurance certificates, credentials): mechanics only, PDF or photo only.
+  if (u.tag === "verification_doc" && u.role !== "mechanic") return refuse(COPY.verificationDocRole, 403);
+  if (u.tag === "verification_doc" && kind !== "photo" && kind !== "document") return refuse(COPY.verificationDoc);
+  if (u.role === "mechanic" && u.tag !== "verification_doc" && (!MECHANIC_TAGS.includes(u.tag) || (kind !== "photo" && kind !== "video"))) return refuse(COPY.mechanicMedia, 403);
   const canonicalExt = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "video/mp4": "mp4", "audio/mp4": "m4a", "video/quicktime": "mov", "video/3gpp": "3gp", "audio/3gpp": "3gp", "video/webm": "webm", "audio/webm": "webm", "audio/ogg": "ogg", "audio/mpeg": "mp3", "audio/wav": "wav", "audio/aac": "aac", "application/pdf": "pdf" }[contentType]!;
   return { ok: true, kind, contentType, ext: canonicalExt, displayName: displayName(name, canonicalExt, kind) };
 }

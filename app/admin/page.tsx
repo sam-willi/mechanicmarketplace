@@ -47,7 +47,7 @@ export default async function AdminQueue({ searchParams }: { searchParams: Promi
   await (await needs(s)).verificationQueue(filter.key, cat, after, QUEUE_PAGE, nowIso);
   const matching = repo
     .listVerifications()
-    .map((v) => ({ v, status: effectiveStatus(v.status, v.expiresAt, at) }))
+    .map((v) => ({ v, status: effectiveStatus(v.status, v.expiresAt, at, v.method) }))
     .filter(({ v, status }) => inQueue(filter.key, status, v.method) && (!cat || v.category === cat));
   const page = paginateAsc(
     matching.map((r) => r.v),
@@ -97,9 +97,9 @@ export default async function AdminQueue({ searchParams }: { searchParams: Promi
         />
 
         {sp.done ? (
-          <p role="status" className={`flex items-center gap-2 border-2 px-4 py-3 font-bold ${sp.done === "rejected" ? "border-alert bg-alert-wash text-alert" : sp.done === "verified" ? "border-go bg-go-wash text-go" : "border-brand-tint bg-brand-wash text-brand-deep"}`}>
-            {sp.done === "rejected" ? <X size={20} strokeWidth={3} aria-hidden /> : <Check size={20} strokeWidth={3} aria-hidden />}
-            {sp.done === "rejected" ? "Rejected." : sp.done === "verified" ? "Approved." : "Sent back to the mechanic."} That was the last item waiting.
+          <p role="status" className={`flex items-center gap-2 border-2 px-4 py-3 font-bold ${sp.done === "reject" || sp.done === "revoke" ? "border-alert bg-alert-wash text-alert" : sp.done === "approve" ? "border-go bg-go-wash text-go" : "border-brand-tint bg-brand-wash text-brand-deep"}`}>
+            {sp.done === "reject" || sp.done === "revoke" ? <X size={20} strokeWidth={3} aria-hidden /> : <Check size={20} strokeWidth={3} aria-hidden />}
+            {sp.done === "reject" ? "Rejected." : sp.done === "revoke" ? "Revoked." : sp.done === "approve" ? "Approved." : "Sent back to the mechanic."} That was the last item waiting.
           </p>
         ) : null}
         {/* The queue at a glance; each tile opens its list. */}
@@ -161,9 +161,10 @@ export default async function AdminQueue({ searchParams }: { searchParams: Promi
                 <ul className="divide-y divide-rule-soft">
                   {items.map(({ v, status }) => {
                     const days = waited(v.submittedAt);
-                    const late = status === "pending" && days > 3;
+                    const waiting = inQueue("queue", status, v.method);
+                    const late = waiting && days > 3;
                     return (
-                      <li key={v.id} className={`grid gap-3 px-4 py-3.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-5 ${late ? "border-l-4 border-l-alert" : ""}`}>
+                      <li key={v.id} className={`grid gap-3 px-4 py-3.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-5 ${late ? "bg-alert-wash" : ""}`}>
                         <div className="min-w-0">
                           <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span className="font-bold">{CATEGORY_LABEL[v.category]}</span>
@@ -173,11 +174,11 @@ export default async function AdminQueue({ searchParams }: { searchParams: Promi
                           <p className="mt-0.5 line-clamp-2 text-[0.9375rem] text-ink-2">{v.evidenceSummary ?? "No summary"}</p>
                           <p className="mt-0.5 text-[0.8125rem] text-ink-3">
                             {METHOD_LABEL[v.method]} · submitted {dayMonth(v.submittedAt)}
-                            {!late && status === "pending" ? ` · ${days === 0 ? "today" : `${plural(days, "day")} ago`}` : ""}
+                            {!late && waiting ? ` · ${days === 0 ? "today" : `${plural(days, "day")} ago`}` : ""}
                           </p>
                         </div>
-                        <Link href={`/admin/reviews/${v.id}`} className={`btn min-h-11 ${status === "pending" ? "btn-ink" : "btn-line"}`}>
-                          {status === "pending" ? "Review" : "Open"} <ArrowRight size={15} aria-hidden />
+                        <Link href={`/admin/reviews/${v.id}`} className={`btn min-h-11 ${waiting ? "btn-ink" : "btn-line"}`}>
+                          {waiting ? "Review" : "Open"} <ArrowRight size={15} aria-hidden />
                         </Link>
                       </li>
                     );

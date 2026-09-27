@@ -11,6 +11,7 @@ const eslintConfig = defineConfig([
     ".next/**",
     // npm run test:browser build output.
     ".next-browser-test/**",
+    ".next-design/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

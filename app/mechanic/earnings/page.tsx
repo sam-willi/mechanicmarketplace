@@ -31,7 +31,7 @@ export default async function Earnings() {
         ).map(([k, v, note]) => (
           <div key={k} className="border-r border-b border-rule-soft p-4 sm:border-b-0 sm:last:border-r-0">
             <dt className="field-label">{k}</dt>
-            <dd className="num mt-2 text-[1.875rem]">{v}</dd>
+            <dd className="num mt-2 text-[2rem]">{v}</dd>
             <p className="mt-1 text-[0.75rem] text-ink-3">{note}</p>
           </div>
         ))}

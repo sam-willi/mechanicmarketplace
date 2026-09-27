@@ -22,7 +22,7 @@ export default function Home() {
           <h1 className="display max-w-[16ch] text-[2.5rem] sm:text-[3.5rem] lg:text-[4rem]">
             Find a mechanic with <span className="text-brand">proven experience</span>
           </h1>
-          <p className="mt-4 text-[1.125rem] text-ink-2">See what they&apos;ve actually fixed, on cars like yours.</p>
+          <p className="mt-4 text-[1.0625rem] text-ink-2">See what they&apos;ve actually fixed, on cars like yours.</p>
           <div className="mt-8">
             <SearchBar
               variant="hero"

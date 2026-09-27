@@ -76,7 +76,7 @@ function Price({ p, repair, big }: { p: PublicMechanicProfile; repair?: RepairCa
   return (
     <p className="whitespace-nowrap">
       <span className="text-[0.75rem] text-ink-3">From </span>
-      <span className={`num ${big ? "text-[1.625rem]" : "text-[1.25rem]"}`}>{s.amount}</span>
+      <span className={`num ${big ? "text-[1.75rem]" : "text-[1.25rem]"}`}>{s.amount}</span>
       <span className="text-[0.8125rem] text-ink-2"> {s.unit}</span>
     </p>
   );
@@ -104,7 +104,7 @@ export function RecommendationCard({ fit, ctx, profileHref, quoteHref, kind, tit
         <div className="flex items-center gap-4">
           <PhotoPrint photoUrl={p.photoUrl} initials={p.initials} name={p.displayName} size={72} />
           <div className="min-w-0">
-            <h3 className="heading text-[1.3125rem] leading-tight">
+            <h3 className="heading text-[1.25rem] leading-tight">
               <Link href={profileHref} className="hover:underline">
                 {p.displayName}
               </Link>
@@ -161,7 +161,7 @@ export function MechanicCard({ fit, ctx, profileHref, quoteHref }: Common) {
         <PhotoPrint photoUrl={p.photoUrl} initials={p.initials} name={p.displayName} size={60} />
         <div className="min-w-0 flex-1 space-y-1.5">
           <div>
-            <h3 className="heading text-[1.125rem] leading-tight">
+            <h3 className="heading text-[1.0625rem] leading-tight">
               <Link href={profileHref} className="hover:underline">
                 {p.displayName}
               </Link>

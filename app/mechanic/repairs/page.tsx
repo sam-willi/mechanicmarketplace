@@ -125,7 +125,7 @@ export default async function RepairsPage() {
                         </Link>
                       </p>
                     </div>
-                  ) : v?.status === "pending" ? (
+                  ) : v?.status === "submitted" || v?.status === "under_review" ? (
                     <p className="text-[0.875rem] text-ink-2">A Clutch reviewer is checking the files you attached.</p>
                   ) : (
                     <form action={requestConfirmation.bind(null, r.id)} className="grid gap-2 sm:grid-cols-[8rem_minmax(0,1fr)_auto]">
@@ -175,7 +175,7 @@ export default async function RepairsPage() {
                     <li key={ph.id}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={ph.url} alt={`${ph.kind} photo`} className="size-14 border border-rule object-cover" />
-                      <p className="text-[0.625rem] text-ink-3">{ph.demo ? "Demo photo" : ph.source === "job" ? "Verified photo" : "Your upload"}</p>
+                      <p className="text-[0.6875rem] text-ink-3">{ph.demo ? "Demo photo" : ph.source === "job" ? "Verified photo" : "Your upload"}</p>
                     </li>
                   ))}
                 </ul>

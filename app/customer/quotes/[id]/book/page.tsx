@@ -1,3 +1,5 @@
+import { vehicleSpecOf } from "@/lib/vehicles/effective";
+import { VehicleBrief } from "@/components/vehicle/vehicle-brief";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -47,10 +49,13 @@ export default async function BookWithDisclosure({ params, searchParams }: { par
       <Link href={`/customer/quotes/${id}`} className="inline-flex min-h-11 items-center gap-1.5 text-[0.875rem] text-ink-3 hover:text-ink">
         <ArrowLeft size={14} aria-hidden /> Back to the estimate
       </Link>
-      <h1 className="display mt-2 text-[1.875rem] sm:text-[2.25rem]">Before you book {p.firstName}</h1>
+      <h1 className="display mt-2 text-[2rem] sm:text-[2.25rem]">Before you book {p.firstName}</h1>
       <p className="mt-1 text-ink-2">
         {vehicleLine(v)} · {q.availableOn} · {t.planFor}
       </p>
+      <div className="mt-4">
+        <VehicleBrief v={v} spec={vehicleSpecOf(v, r.vehicleSpec)} audience="customer" warn="book" editHref={`/customer/vehicles/${v.id}?edit=1#edit`} />
+      </div>
 
       {sp.error ? (
         <p role="alert" className="mt-4 flex gap-2 border-2 border-alert bg-alert-wash px-4 py-3 font-semibold text-alert">
@@ -68,9 +73,7 @@ export default async function BookWithDisclosure({ params, searchParams }: { par
             return (
               <li key={c.key} className="flex items-start gap-2">
                 <S.icon size={18} className="mt-0.5 shrink-0 text-amber" aria-hidden />
-                <span>
-                  <span className="font-bold">{c.name}:</span> {c.status}
-                </span>
+                <span>{c.statement ?? `${c.name}: ${c.status}`}</span>
               </li>
             );
           })}
@@ -80,14 +83,12 @@ export default async function BookWithDisclosure({ params, searchParams }: { par
 
       {verified.length ? (
         <section aria-labelledby="verified" className="mt-4 border border-rule bg-sheet p-4 sm:p-5">
-          <h2 id="verified" className="heading text-[1.125rem]">
+          <h2 id="verified" className="heading text-[1.0625rem]">
             Clutch has verified
           </h2>
           <ul className="mt-2 space-y-1">
             {verified.map((c) => (
-              <li key={c.key}>
-                <span className="font-bold">{c.name}:</span> {c.status}
-              </li>
+              <li key={c.key}>{c.statement ?? `${c.name}: ${c.status}`}</li>
             ))}
           </ul>
         </section>

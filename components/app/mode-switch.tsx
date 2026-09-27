@@ -10,10 +10,10 @@ import type { AppMode } from "@/lib/domain/types";
 export function ModeSwitch({ to, tone = "light" }: { to: AppMode; tone?: "light" | "dark" }) {
   const path = usePathname();
   return (
-    <form action={switchMode.bind(null, to, path)}>
+    <form action={switchMode.bind(null, to, path)} className="hidden sm:block">
       <button
         title={`Switch to ${to === "mechanic" ? "Mechanic" : "Customer"}`}
-        className={`flex min-h-11 min-w-11 items-center justify-center gap-1.5 border px-2.5 text-[0.8125rem] font-semibold ${tone === "dark" ? "border-[#2c4a3c] text-sheet hover:bg-brand-deep/60" : "border-rule text-ink hover:border-ink"}`}
+        className={`flex min-h-11 min-w-11 items-center justify-center gap-1.5 border px-2.5 text-[0.8125rem] font-semibold ${tone === "dark" ? "border-brand-deep text-sheet hover:bg-brand-deep/60" : "border-rule text-ink hover:border-ink"}`}
         aria-label={`Switch to ${to === "mechanic" ? "Mechanic" : "Customer"} mode`}
       >
         <ArrowLeftRight size={15} aria-hidden />

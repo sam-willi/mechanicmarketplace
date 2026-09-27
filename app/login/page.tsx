@@ -47,7 +47,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         {sp.exists ? <p className="mt-3 border border-ink bg-sheet px-3 py-2 text-[0.9375rem]">You already have an account with that email. Log in below.</p> : null}
         {sp.reset ? <p className="mt-3 border border-ink bg-sheet px-3 py-2 text-[0.9375rem]">Password updated. Log in with your new password.</p> : null}
         {sp.error === "confirmed_login" ? (
-          <p className="mt-3 border border-go bg-go-wash px-3 py-2 text-[0.9375rem]" role="status">
+          <p className="mt-3 border border-brand/30 bg-brand-wash px-3 py-2 text-[0.9375rem]" role="status">
             {ERRORS.confirmed_login}
           </p>
         ) : sp.error ? (
@@ -106,9 +106,7 @@ async function DemoAccounts({ next }: { next?: string }) {
   const repo = await readyRepo("demo");
   const demo = [
     { id: "user-maya", mode: "customer", title: "Maya Chen", detail: "Customer · BMW brake request with three estimates" },
-    { id: "user-derek-hall", mode: "mechanic", title: "Derek Hall", detail: "Mechanic and customer · one login, both modes" },
-    { id: "user-marcus-webb", mode: "mechanic", title: "Marcus Webb", detail: "New mechanic · verification in progress" },
-    { id: "user-admin", mode: "admin", title: "Verification reviewer", detail: "Clutch staff · review queue" },
+    { id: "user-derek-hall", mode: "mechanic", title: "Derek Hall", detail: "Mechanic · requests, estimates and a booked job" },
   ];
   return (
     <section aria-labelledby="demo-title" className="mt-14 border border-dashed border-rule bg-paper px-4 pt-3 pb-4">
@@ -136,7 +134,7 @@ async function DemoAccounts({ next }: { next?: string }) {
       </div>
       <p className="mt-3 text-[0.8125rem]">
         <Link href="/demo" className="link text-ink-2">
-          All demo accounts
+          More demo scenarios
         </Link>
       </p>
     </section>

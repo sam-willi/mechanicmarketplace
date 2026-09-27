@@ -1,20 +1,61 @@
 # Clutch
 
-A mechanic-first marketplace and portable reputation platform. **Mechanics should own proof of their skill.**
+**Find a mechanic who comes to you, and see exactly what's been verified about them.**
+Clutch is a two-sided marketplace for independent mobile mechanics and the people whose cars they fix, built around one idea: **mechanics should own proof of their skill.**
 
-Use @ https://mechanicmarketplace.vercel.app/ 
+**Live site: [mechanicmarketplace.vercel.app](https://mechanicmarketplace.vercel.app)** · Code: [github.com/sam-willi/mechanicmarketplace](https://github.com/sam-willi/mechanicmarketplace)
 
-Product truth: [PRODUCT.md](PRODUCT.md) · Build plan and architecture: [docs/PLAN.md](docs/PLAN.md) · Live data access: [docs/live-reads.md](docs/live-reads.md)
+More detail: product truth in [PRODUCT.md](PRODUCT.md) · build plan and architecture in [docs/PLAN.md](docs/PLAN.md) · data access in [docs/live-reads.md](docs/live-reads.md) · verification in [docs/verification.md](docs/verification.md) · release preflight in [docs/release-preflight.md](docs/release-preflight.md)
+
+## Try it in two minutes
+
+The live site has a **demo marketplace** of fictional mechanics and customers, clearly labelled and kept completely separate from real accounts.
+
+1. Open **[mechanicmarketplace.vercel.app/login](https://mechanicmarketplace.vercel.app/login)** and pick a demo account.
+2. As **Maya Chen** (a customer):
+   - open her BMW brake request and compare the three written estimates;
+   - open a mechanic's profile to see their verified repairs, reviews and the status of each check;
+   - look at the Honda request, where the first mechanic declined, to see the suggestions for who else could take it.
+3. As **Derek Hall** (a mechanic):
+   - open **Requests** to see repair requests that fit his skills and area, then write an estimate;
+   - open **Jobs** to confirm Elena's upcoming appointment and walk it through check-in, diagnosis and completion.
+4. To try it as yourself, **sign up** as a customer or mechanic (email, or Google). Real accounts live in the real marketplace, which starts empty.
+
+## How Clutch works
+
+**For customers:**
+1. **Describe the problem.** Pick your exact car, say what it's doing in your own words and add photos. You don't need to know the part.
+2. **Get written estimates.** The request goes to a few available mechanics who match your car, repair and area. They can ask you questions first, then send an itemized estimate at their own price.
+3. **Compare the evidence, not just the price.** Each mechanic's profile shows repairs confirmed on Clutch (on cars like yours), reviews from verified jobs, and the status of four separate checks: identity, background, driving record and insurance.
+4. **Book and track the repair.** The mechanic comes to the car. You approve any extra work before it happens, confirm when it's done, and leave a review.
+
+**For mechanics:**
+1. **Build a profile you own:** your area, the repairs and makes you work on, your rates and availability. That's all it takes to receive requests and be booked.
+2. **Get relevant requests** that match your skills and area, ask questions, and send itemized estimates.
+3. **Run the job:** confirm the time, check in, share what you found, get approval for extra work, and mark it complete.
+4. **Every confirmed job becomes proof.** It's added to your record automatically, and a public link lets you share that record anywhere.
+
+**How trust works:**
+- Clutch never says a mechanic is "verified" as a blanket claim. Identity, background, driving record and insurance each show their own status: Verified, Pending, Not completed, Not verified, Expired or Could not be verified.
+- Under the current policy (2026-09-26, pending legal review), a mechanic with a complete basic profile can be booked even if checks aren't verified. Before booking anyone who isn't fully verified, the customer sees exactly which checks aren't verified and ticks an acknowledgement. That record is kept with the booking and can't be changed.
+- "Verified experience" means repairs confirmed on Clutch by the customer. Rankings (Best Fit, Soonest Strong Fit) are based on that experience, never on price or payment.
+- Every mechanic on Clutch is mobile: they go to the car.
+
+**Built with:**
+- Next.js 16 (App Router) and React 19, TypeScript and Tailwind CSS 4.
+- Supabase for sign-in (email and Google) and PostgreSQL for data.
+- Hosted on Vercel.
+- Tests with Node's test runner on throwaway Postgres databases, plus browser tests in Chrome.
 
 ## What is Clutch?
 
-Clutch is a two-sided marketplace connecting customers with independent mechanics.
+Clutch is a two-sided marketplace connecting customers with independent mobile mechanics.
 
 Customers can:
 
 - identify their exact vehicle and configuration;
 - describe a repair problem and upload supporting photos;
-- find mechanics with relevant, verified experience;
+- find available mechanics who match their car, repair and area, and see each one's Clutch-verified repairs and the status of each check;
 - compare written estimates;
 - book and track repairs;
 - approve revised estimates and additional work;
@@ -60,6 +101,7 @@ What stands between this and public use are **external prerequisites, not missin
 - Transactional and idempotent lifecycle protections
 - Normalized live storage with targeted, access-checked reads (built, off by default)
 - Bookable mechanics with every verification check shown separately, a customer acknowledgement before booking anyone not fully verified, and that record kept with the booking (policy of 2026-09-26)
+- Verification with one canonical record per check and a full history: identity through a hosted ID + selfie provider (Stripe Identity, off until configured), insurance reviewed by staff from a privately stored certificate, background checks behind a disabled provider boundary. Setup: [docs/verification.md](docs/verification.md)
 - Responsive customer, mechanic and staff interfaces
 
 ### Required before public launch
@@ -93,6 +135,8 @@ Things only the project owner can do. Everything else is built and tested locall
 
 ## Table of contents
 
+- [Try it in two minutes](#try-it-in-two-minutes)
+- [How Clutch works](#how-clutch-works)
 - [Run it](#run-it)
 - [Product areas](#product-areas)
 - [Environment variables](#environment-variables)
@@ -101,6 +145,7 @@ Things only the project owner can do. Everything else is built and tested locall
 - [Security and privacy](#security-and-privacy)
 - [Architecture](#how-its-put-together)
 - [Demo accounts](#demo-data)
+- [Deploy your own (Vercel)](#deploy-your-own-vercel)
 - [Deployment checklist](#deployment-checklist)
 - [Known limitations](#known-limitations)
 - [Forking and running on another machine](#forking-and-running-on-another-machine)
@@ -206,6 +251,7 @@ Copy `.env.example` to `.env.local`. Never commit `.env.local` or production cre
 | `CLUTCH_OUTBOUND_ALERTS` | Optional | Enables outbound alerts once a provider is configured |
 | `CLUTCH_EMAIL_PROVIDER`, `SMTP_*`, `EMAIL_FROM` | With alerts | Email provider settings (no adapter ships yet) |
 | `CLUTCH_CRON_SECRET` | When scheduling alerts | Protects the hosted delivery-worker endpoint |
+| `CLUTCH_UPLOAD_PROFILE` | No | `hosted` (automatic on Vercel): 4 MB uploads, photos shrunk in the browser, no video/audio. `full` (default elsewhere): 40 MB with video/audio. Read at build time |
 | `CLUTCH_PG_BIN` | Rarely | Postgres binaries for `test:db` and `db:local`, if not found automatically |
 
 See `.env.example` for the complete and current list.
@@ -271,7 +317,7 @@ Clutch intentionally does not fake unavailable providers.
 - Payment records are self-reported. Clutch does not hold, process, refund or guarantee funds.
 - Secrets must remain in server-side environment variables.
 - Test accounts and placeholder addresses are blocked from outbound delivery.
-- **Uploads** (`lib/media/policy.ts`) are accepted from what their bytes are, never the browser's type or the file name: photos (JPEG, PNG, WebP, up to 20 MB), video (MP4, MOV, WebM, 3GP) and audio (M4A, MP3, WAV, WebM, Ogg, AAC) up to 40 MB, and PDFs (customers' request attachments only, up to 20 MB). The declared type and extension must match the bytes. SVG, HTML/XML, scripts, archives, programs, GIFs and double extensions are refused. HEIC/HEIF is refused with instructions, because most browsers can't display it. Portraits and car photos must be photos; mechanics upload photos and video only.
+- **Uploads** (`lib/media/policy.ts`) are accepted from what their bytes are, never the browser's type or the file name: photos (JPEG, PNG, WebP, up to 20 MB), video (MP4, MOV, WebM, 3GP) and audio (M4A, MP3, WAV, WebM, Ogg, AAC) up to 40 MB, and PDFs (customers' request attachments only, up to 20 MB). **On Vercel** (upload profile `hosted`, set automatically at build; `lib/media/limits.ts`) every file is capped at 4 MB, because Vercel refuses request bodies over about 4.5 MB before the app runs: photos are shrunk in the browser to fit (the camera orientation is kept; metadata such as location is dropped), HEIC is converted to JPEG where the browser can read it, PDFs must be under 4 MB, and video and audio are not offered, with a note saying so. `CLUTCH_UPLOAD_PROFILE=full` (the default elsewhere) restores 40 MB and video/audio on a normal Node server. The declared type and extension must match the bytes. SVG, HTML/XML, scripts, archives, programs, GIFs and double extensions are refused. HEIC/HEIF is refused with instructions, because most browsers can't display it. Portraits and car photos must be photos; mechanics upload photos and video only.
 - **Serving uploads** (`/api/media/[id]`) keeps the same authorization and demo/live isolation, and re-derives the type from the stored bytes. Photos, video and audio are sent inline; PDFs and anything unrecognised (including files stored before this check) are downloads. Every response has `X-Content-Type-Options: nosniff`, a sandboxing `Content-Security-Policy`, `Cross-Origin-Resource-Policy: same-origin` and a generated file name (`clutch-photo-1a2b3c4d.jpg`), never the uploader's. Byte ranges are supported for video.
 
 To report a vulnerability, see [SECURITY.md](SECURITY.md). Don't file it publicly.
@@ -281,7 +327,7 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md). Don't file it publicl
 | Path | What |
 |---|---|
 | `lib/domain/` | Types, provenance vocabulary, reputation math (pure), and `toPublicProfile()`, the only path from private data to public pages |
-| `lib/verification/` | Expiry lifecycle and the provider-agnostic screening interfaces (`ScreeningProvider`) with a mock implementation and registry |
+| `lib/verification/` | The canonical verification record (statuses, history, transitions), public statements, reason codes, the hosted identity provider (Stripe Identity, plus a test adapter), the background-check boundary (disabled), signed document links and the backfill. See [docs/verification.md](docs/verification.md). |
 | `lib/data/` | `Repository` interface, domain logic (`mock/repository.ts`), seed data, and the facade in `index.ts` that commits every write |
 | `supabase/migrations/0001_init.sql` | The original relational design (Supabase-only: it references `auth.users`). Kept for reference; the app never applies it, and `0004` superseded it |
 | `components/trust/` | Tick marks, provenance chips, the evidence sheet, and the trust-first summary |
@@ -296,7 +342,7 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md). Don't file it publicl
 
 ## Mocked in this MVP
 
-- **Screening vendors:** `CLUTCH_IDENTITY_PROVIDER`, `CLUTCH_BACKGROUND_PROVIDER` and `CLUTCH_DRIVING_RECORD_PROVIDER` all resolve to `mock`. Real adapters (Persona, Stripe Identity, Jumio, Checkr) implement `ScreeningProvider` and register in `lib/verification/providers/registry.ts`. The mock only runs for demo (fictional) mechanics: in the real marketplace, ID, background and driving record checks show "Opens soon", can't be started, and a check that no provider ran can't be approved by staff (`screeningOpen`). Until a real provider is connected those checks show as not completed; under the 2026-09-26 policy that doesn't stop a mechanic being booked, but customers see it and acknowledge it first.
+- **Verification providers:** identity uses Stripe Identity's hosted ID + live selfie flow once `CLUTCH_IDENTITY_PROVIDER=stripe_identity` and its keys are set; until then identity isn't available and nothing reads as verified. Background and driving-record checks stay closed until a provider and an approved adjudication policy exist (`CLUTCH_BACKGROUND_PROVIDER`, `CLUTCH_BACKGROUND_POLICY_APPROVED`). The fictional demo uses labelled test providers. Under the 2026-09-26 policy an unverified mechanic can still be booked; customers see each check's exact status and acknowledge it first. Setup and data handling: [docs/verification.md](docs/verification.md).
 - **Notifications:** updates appear in the in-app Notifications list only. Clutch doesn't send email, SMS or push updates yet, and the UI doesn't promise them.
 - **Auth is real:** Supabase Auth handles email + password (with email confirmation and password reset) and Google. Sessions are refreshed in `proxy.ts`; `lib/session.ts` resolves them to Clutch accounts, which are created on first sign-in (`lib/auth/provision.ts`). Demo accounts are separate, seeded, passwordless, and can be switched off with `CLUTCH_DEMO_LOGINS=off`.
 - **Earnings:** job-value estimates from approved estimates and final amounts. No payments are processed.
@@ -377,7 +423,13 @@ Real and demo data are kept apart on the server (`lib/data/scope.ts`). Every rec
 In the demo, every mechanic, shop, customer and review is fictional. Seven demo mechanics have portrait photos; Priya Nair shows an initials print. No repair photos are seeded: galleries show a repair icon and vehicle outline until a mechanic adds photos. Photos taken during a Clutch job are labelled "Verified repair photo"; photos added to a record later are labelled "Mechanic-uploaded photo".
 ## Deployment checklist
 
-Do not enable public traffic until every applicable item is complete.
+Do not enable public traffic until every applicable item is complete. Start with the read-only
+preflight, which checks the configuration items below and reports PASS/WARN/BLOCKED without
+printing secrets or writing anything ([runbook](docs/release-preflight.md)):
+
+```bash
+npm run preflight -- --env-file=.env.production.local --online
+```
 
 - [ ] All tests, type checks, linting and the production build pass
 - [ ] Production database migrations were dry-run and reconciled
@@ -402,6 +454,7 @@ Do not enable public traffic until every applicable item is complete.
 
 - Real mechanic screening is not yet connected, so ID, background and driving-record checks show as not completed for real mechanics.
 - Under the 2026-09-26 policy, mechanics are bookable without verification (after a customer acknowledgement); this needs legal review before launch.
+- On Vercel, video and audio uploads are off and files are capped at 4 MB (photos are shrunk automatically). Direct uploads to Supabase Storage would lift this; until then, host on a normal Node server (Railway, Render) with `CLUTCH_UPLOAD_PROFILE=full` if video matters.
 - Real-account sign-up is tested locally against a stand-in for the Supabase Auth API, not Supabase itself; Google sign-in isn't tested locally. See the [morning assistance checklist](#morning-assistance-checklist).
 - Clutch does not process payments.
 - Email and SMS marketplace alerts are disabled until a provider is configured.
@@ -410,6 +463,33 @@ Do not enable public traffic until every applicable item is complete.
 - Production legal, insurance and marketplace-policy review is still required.
 - Another person's record inside the customer and mechanic apps shows the not-found page with a `noindex` tag, but HTTP status 200, because those pages stream (standard Next.js behavior).
 - A mechanic's profile reads their whole evidence history; this grows with one mechanic's record, not with the marketplace. Other data-access limits are in [docs/live-reads.md](docs/live-reads.md#known-limits).
+
+## Deploy your own (Vercel)
+
+This is how the live site is deployed; about 15 minutes.
+
+1. **Supabase.**
+   - Create a project.
+   - In the SQL editor, run `supabase/migrations/0002_app_store.sql` and `0003_data_scope.sql`.
+   - Copy the project URL, the publishable key and the **transaction pooler** connection string (port 6543).
+2. **Vercel.**
+   - Import the GitHub repo (framework: Next.js; no build settings needed).
+   - Add these environment variables for Production and Preview:
+     - `DATABASE_URL` (the pooler string);
+     - `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`;
+     - `AUTH_SECRET` (from `openssl rand -hex 32`);
+     - `APP_URL` (your Vercel address).
+   - Deploy.
+3. **Supabase → Authentication → URL Configuration.**
+   - Set the Site URL to your Vercel address.
+   - Add `https://<your-domain>/auth/callback` and `https://<your-domain>/auth/confirm` as redirect URLs.
+4. **Google sign-in (optional).**
+   - Create a Google OAuth client with redirect URI `https://<project>.supabase.co/auth/v1/callback`, and enable Google in Supabase with its ID and secret.
+   - On the Google consent screen, add your home page, the privacy page (`/privacy`) and your domain.
+   - Publish the app.
+5. **Check.** The home page loads, demo sign-in works, and `/api/test-login` returns 404.
+
+On Vercel, uploads are limited to 4 MB, with photos shrunk automatically and no video or audio (see [Security and privacy](#security-and-privacy)). The demo marketplace is on unless `CLUTCH_DEMO_LOGINS=off`. `npm run db:reset-demo -- --yes` resets it to the original fictional data (redeploy afterwards).
 
 ## Forking and running on another machine
 

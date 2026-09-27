@@ -19,7 +19,7 @@ export interface StartCheckResult {
   providerRef: string;
   /** Hosted flow the mechanic would be sent to (ID + selfie capture, consent form). */
   hostedUrl?: string;
-  status: VerificationStatus; // usually "pending"
+  status: VerificationStatus; // usually "in_progress"
 }
 
 export interface CheckResult {

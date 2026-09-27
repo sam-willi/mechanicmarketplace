@@ -1,3 +1,4 @@
+import { vehicleSpecOf } from "@/lib/vehicles/effective";
 import { AlertTriangle, MapPin } from "lucide-react";
 import {
   CODE_NOTE,
@@ -63,6 +64,7 @@ export function RequestSummary({
   revealPrivate = false,
   audience = "mechanic",
   showTitle = true,
+  briefShown = false,
 }: {
   r: RepairRequest;
   v: Vehicle;
@@ -71,6 +73,8 @@ export function RequestSummary({
   audience?: "mechanic" | "customer";
   /** Hide the vehicle name when the page heading already shows it. */
   showTitle?: boolean;
+  /** The job summary (components/request/job-brief.tsx) is on screen: don't repeat the condition as a banner. */
+  briefShown?: boolean;
 }) {
   const status = jobStatus(r);
   const site = siteAssessment(r);
@@ -82,12 +86,12 @@ export function RequestSummary({
     <div className="space-y-7">
       {/* Vehicle + status: the two things read first */}
       <div className="space-y-3">
-        {showTitle || audience === "mechanic" ? (
-          <VehicleSpecCard v={v} spec={r.vehicleSpec ?? v.spec} category={r.repairCategory} audience={audience} revealVin={revealPrivate || audience === "customer"} />
+        {briefShown ? null : showTitle || audience === "mechanic" ? (
+          <VehicleSpecCard v={v} spec={vehicleSpecOf(v, r.vehicleSpec)} category={r.repairCategory} audience={audience} revealVin={revealPrivate || audience === "customer"} />
         ) : (
-          <p className="tnum text-[0.9375rem] text-ink-2">{customerSummary(v, r.vehicleSpec ?? v.spec)}</p>
+          <p className="tnum text-[0.9375rem] text-ink-2">{customerSummary(v, vehicleSpecOf(v, r.vehicleSpec))}</p>
         )}
-        <div className={`border px-4 py-3 ${TONE[status.tone]}`}>
+        {briefShown ? null : <div className={`border px-4 py-3 ${TONE[status.tone]}`}>
           <p className="text-[1rem] font-extrabold tracking-[0.06em] uppercase">{status.headline}</p>
           {status.lines.length ? (
             <ul className="mt-1 space-y-0.5 text-[0.9375rem] font-medium text-ink">
@@ -96,10 +100,11 @@ export function RequestSummary({
               ))}
             </ul>
           ) : null}
-        </div>
+        </div>}
       </div>
 
       <Section title="What the car is doing">
+        {briefShown && status.lines.length ? <Row label="Condition">{status.lines.join(" · ")}</Row> : null}
         <Row label={audience === "mechanic" ? "In their words" : "In your words"}>
           <p className="leading-relaxed">&ldquo;{r.symptomDescription}&rdquo;</p>
         </Row>

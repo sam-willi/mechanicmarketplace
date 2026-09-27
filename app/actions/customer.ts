@@ -1,13 +1,12 @@
 "use server";
 
+import { parseChoice, vehicleFromChoice } from "@/lib/vehicles/fields";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getRepo } from "@/lib/data";
 import { getMedia } from "@/lib/data/mock/media-store";
 import { getSession, needs } from "@/lib/session";
-import { resolveSpec } from "@/lib/vehicles/resolve";
-import { EMPTY_CHOICE, type VehicleChoice } from "@/lib/vehicles/choice";
-import { REPAIR_CATEGORIES, VEHICLE_MAKES, type RepairCategory, type Urgency, type VehicleMake } from "@/lib/domain/types";
+import { REPAIR_CATEGORIES, VEHICLE_MAKES, type RepairCategory, type Urgency } from "@/lib/domain/types";
 import { findArea } from "@/lib/domain/areas";
 import { slotLabel } from "@/lib/domain/schedule";
 import { URGENCY } from "@/lib/domain/intake";
@@ -168,28 +167,7 @@ export async function askAboutQuote(quoteId: string, formData: FormData) {
 
 /** Parse the vehicle picker's choice; the spec is rebuilt on the server from it. */
 async function vehicleFields(f: FormData) {
-  let c: VehicleChoice = EMPTY_CHOICE;
-  try {
-    const raw = JSON.parse(String(f.get("choice") ?? "{}")) as Partial<Record<keyof VehicleChoice, unknown>>;
-    c = Object.fromEntries(Object.entries(EMPTY_CHOICE).map(([k, d]) => [k, typeof raw[k as keyof VehicleChoice] === typeof d ? raw[k as keyof VehicleChoice] : d])) as unknown as VehicleChoice;
-  } catch {
-    /* fall through with an empty choice */
-  }
-  const vin = c.vin.trim().toUpperCase();
-  const spec = await resolveSpec({ ...c, model: c.model.slice(0, 80) });
-  const firm = (st?: string) => st && st !== "needs_confirmation";
-  const t = firm(spec?.transmission?.status) ? spec?.transmission?.type : undefined;
-  return {
-    year: Number(c.year) || 2015,
-    make: c.make as VehicleMake,
-    model: c.model.trim().slice(0, 80),
-    trim: firm(spec?.trim?.status) ? spec?.trim?.label : undefined,
-    engine: firm(spec?.engine?.status) ? spec?.engine?.label : c.engineText.trim() || undefined,
-    transmission: t === "manual" ? ("manual" as const) : t === "automatic" ? ("automatic" as const) : t === "cvt" || t === "ecvt" ? ("cvt" as const) : t === "dct" ? ("dual_clutch" as const) : undefined,
-    mileage: Number(String(f.get("mileage") ?? "").replace(/[^0-9]/g, "")) || undefined,
-    vin: /^[A-HJ-NPR-Z0-9]{17}$/.test(vin) ? vin : undefined,
-    spec,
-  };
+  return vehicleFromChoice(parseChoice(String(f.get("choice") ?? "{}")), f.get("mileage"));
 }
 
 export async function addVehicle(formData: FormData) {

@@ -51,6 +51,7 @@ const job = (i = 0) => async (r: Reader, a: A) => void (await r.jobs([a[i] as st
 const quote = (i = 0) => async (r: Reader, a: A) => void (await r.quotes([a[i] as string]));
 const request = (i = 0) => async (r: Reader, a: A) => void (await r.requests([a[i] as string]));
 const mechanic = (i = 0) => async (r: Reader, a: A) => void (await r.byIds("mechanics", [a[i] as string]));
+const withSources = (i = 0) => async (r: Reader, a: A) => void (await r.mechanics([a[i] as string], "full"));
 const user = (i = 0) => async (r: Reader, a: A) => void (await r.user(a[i] as string));
 
 /** Evidence of every mechanic a write's eligibility checks will look at. */
@@ -74,16 +75,33 @@ export const PLANS: Record<Mutation, (r: Reader, a: A) => Promise<void>> = {
     await r.byIds("mechanics", [mid as string]);
     await matchWaiting(r);
   },
-  startScreening: mechanic(),
+  // Verification writes read the mechanic's existing records (the current check, what it supersedes).
+  startScreening: withSources(),
   async refreshScreening(r, [mid]) {
     await r.mechanics([mid as string], "full");
     await matchWaiting(r);
   },
-  submitCredential: mechanic(),
-  submitEmployment: mechanic(),
-  submitInsurance: mechanic(),
+  submitCredential: withSources(),
+  submitEmployment: withSources(),
+  submitInsurance: withSources(),
   async resubmit(r, [vid]) {
-    await r.verifications([vid as string]);
+    const v = await r.verifications([vid as string]);
+    if (v[0]) await r.mechanics([String(v[0].mechanicId)], "full");
+  },
+  prepareIdentityCheck: withSources(),
+  recordIdentityStart: withSources(),
+  async applyProviderResult(r, [input]) {
+    const { providerRef } = input as { providerRef: string };
+    const rows = await r.load("verifications", r.sql`data->>'providerRef' = ${providerRef}`);
+    if (rows[0]) await r.mechanics([String(rows[0].mechanicId)], "full");
+    await matchWaiting(r);
+  },
+  async remindRenewals(r, [nowIso, mid]) {
+    if (mid) return void (await r.mechanics([mid as string], "full"));
+    // Everyone whose verified record is within the reminder window or past it.
+    const soon = new Date(new Date(nowIso as string).getTime() + 31 * 86_400_000).toISOString().slice(0, 10);
+    const rows = await r.load("verifications", r.sql`status = 'verified' and coalesce(data->>'expiresAt', '') <> '' and data->>'expiresAt' <= ${soon}`, "full", r.sql`limit 500`);
+    await r.mechanics(rows.map((x) => String(x.mechanicId)), "full");
   },
   addPastRepair: mechanic(),
   async requestCustomerConfirmation(r, [repairId]) {
@@ -201,12 +219,13 @@ export const PLANS: Record<Mutation, (r: Reader, a: A) => Promise<void>> = {
   },
 
   // ---- staff
-  async decideVerification(r, [vid, decision, reviewerId]) {
+  async decideVerification(r, [vid, action, reviewerId]) {
     const v = await r.verifications([vid as string]);
     await r.user(reviewerId as string);
     if (!v[0]) return;
-    await Promise.all([r.byIds("screenings", [String(v[0].subjectId)]), r.byIds("pastRepairs", [String(v[0].subjectId)]), r.byIds("mechanics", [String(v[0].mechanicId)])]);
-    if (decision === "verified") await matchWaiting(r);
+    // The mechanic's records (the one it supersedes, the insurance policy, the repair) and account.
+    await r.mechanics([String(v[0].mechanicId)], "full");
+    if (action === "approve") await matchWaiting(r);
   },
 
   // ---- customer odds and ends

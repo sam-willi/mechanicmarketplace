@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Camera, Loader2, X } from "lucide-react";
+import { uploadMedia } from "@/lib/media/upload-client";
 
 /** Optional photo on a review. Shown on the mechanic's profile, labelled as the customer's photo. */
 export function ReviewPhoto() {
@@ -10,19 +11,12 @@ export function ReviewPhoto() {
   const [error, setError] = useState<string | null>(null);
   async function upload(file?: File) {
     if (!file) return;
-    if (!file.type.startsWith("image/")) return setError("Choose a photo.");
     setBusy(true);
     setError(null);
     try {
-      const body = new FormData();
-      body.append("file", file);
-      body.append("tag", "after");
-      const res = await fetch("/api/media", { method: "POST", body });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Upload failed");
-      setM({ id: json.id, url: json.url });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed");
+      const r = await uploadMedia(file, "after");
+      if (!r.ok) return setError(r.error);
+      setM({ id: r.media.id, url: r.media.url ?? "" });
     } finally {
       setBusy(false);
     }

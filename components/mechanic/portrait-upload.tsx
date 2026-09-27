@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Camera, Loader2 } from "lucide-react";
+import { uploadMedia } from "@/lib/media/upload-client";
 
 /** Upload a portrait and keep its URL in a hidden field so the onboarding form saves it. */
 export function PortraitUpload({ current }: { current?: string }) {
   const [url, setUrl] = useState(current ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const ref = useRef<HTMLInputElement>(null);
   // Let the live preview (which listens to the form) pick up the new photo.
   useEffect(() => {
@@ -15,19 +17,14 @@ export function PortraitUpload({ current }: { current?: string }) {
   }, [url]);
   async function upload(file?: File) {
     if (!file) return;
-    if (!file.type.startsWith("image/")) return setError("Choose a photo.");
     setBusy(true);
     setError(null);
+    setNote(null);
     try {
-      const body = new FormData();
-      body.append("file", file);
-      body.append("tag", "portrait");
-      const res = await fetch("/api/media", { method: "POST", body });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Upload failed");
-      setUrl(json.url);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed");
+      const r = await uploadMedia(file, "portrait");
+      if (!r.ok) return setError(r.error);
+      setUrl(r.media.url ?? "");
+      setNote(r.note ?? null);
     } finally {
       setBusy(false);
     }
@@ -49,6 +46,11 @@ export function PortraitUpload({ current }: { current?: string }) {
           {url ? "Change photo" : "Add your photo"}
           <input type="file" accept="image/*" className="sr-only" onChange={(e) => upload(e.target.files?.[0])} />
         </label>
+        {note ? (
+          <p className="mt-1 text-[0.8125rem] text-ink-2" role="status">
+            {note}
+          </p>
+        ) : null}
         {error ? (
           <p className="mt-1 text-[0.8125rem] text-alert" role="alert">
             {error}

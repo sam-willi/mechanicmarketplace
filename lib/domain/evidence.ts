@@ -1,8 +1,10 @@
+import { CHECK_INFO } from "@/lib/verification/claims";
+import type { EffectiveStatus } from "@/lib/verification/model";
 import { monthYear } from "@/lib/format";
 import { INSURANCE_UNVERIFIED_NOTE, screeningItems } from "./eligibility";
 import type { PublicCredential, PublicEmployment, PublicRepair, PublicStatus } from "./public-profile";
 import { PROVENANCE, REPAIR_LABEL, SAFETY, STATUS_LABEL, type SafetyInfo } from "./provenance";
-import type { ProvenanceSource, VerificationStatus } from "./types";
+import type { ProvenanceSource } from "./types";
 
 /**
  * Serializable description of one piece of evidence — what the "copy" sheet
@@ -12,30 +14,38 @@ export interface EvidenceDetail {
   title: string;
   kind: "provenance" | "safety";
   source: ProvenanceSource;
-  status: VerificationStatus;
+  status: EffectiveStatus;
   copy: string;
   label: string;
   explanation: string;
   facts: { label: string; value: string }[];
+  /** Safety checks: the plain statement, what it means, and exactly what was checked. */
+  statement?: string;
+  meaning?: string;
+  checked?: string[];
+  notChecked?: string;
 }
 
 const validTo = (d?: string) => (d ? monthYear(d) : "No expiry");
 
 export function safetyEvidence(cat: SafetyInfo["category"], s: PublicStatus, firstName: string): EvidenceDetail {
   const info = SAFETY[cat];
-  const passed = s.status === "verified" || s.status === "reverification_required";
-  const label = screeningItems({ safety: { identity: s, background: s, insurance: s, driving_record: s, drivingApplies: true } })
-    .find((i) => i.key === cat)!.label;
+  const passed = s.status === "verified" || s.status === "renewal_due";
+  const item = screeningItems({ safety: { identity: s, background: s, insurance: s, driving_record: s, drivingApplies: true } }).find((i) => i.key === cat)!;
+  const label = item.label;
+  const ci = CHECK_INFO[cat];
   const facts: EvidenceDetail["facts"] = [{ label: "Status", value: STATUS_LABEL[s.status] }];
-  if (s.verifiedAt) facts.push({ label: cat === "insurance" ? "Reviewed" : "Checked", value: monthYear(s.verifiedAt) });
-  if (s.expiresAt) facts.push({ label: s.status === "expired" ? "Lapsed" : cat === "insurance" ? "Policy valid to" : "Rescreen due", value: monthYear(s.expiresAt) });
-  let explanation = info.explanation;
-  if (s.status === "pending") explanation = `${firstName} has started this check and the result hasn't come back yet. ${info.explanation}`;
-  if (s.status === "expired") explanation = `This was verified before but has lapsed, so Clutch no longer shows it as current. ${firstName} needs to submit an updated document.`;
-  if (s.status === "rejected" || s.status === "needs_info") explanation = `This hasn't been verified. Clutch doesn't publish screening details, only whether a check is current.`;
-  if (s.status === "not_submitted") explanation = `${firstName} hasn't provided this yet. Clutch shows the blank rather than hiding it.`;
-  if (s.status === "reverification_required") explanation = `${info.explanation} It expires soon and ${firstName} has been asked to renew it.`;
-  if (s.unavailable) explanation = `${firstName} started this check, but Clutch hasn't connected a screening company that can run it yet, so it could not be verified.`;
+  if (passed && s.by) facts.push({ label: "Checked by", value: s.by });
+  if (s.verifiedAt && passed) facts.push({ label: cat === "insurance" ? "Reviewed" : "Checked", value: monthYear(s.verifiedAt) });
+  if (s.expiresAt) facts.push({ label: s.status === "expired" ? "Lapsed" : cat === "insurance" ? "Policy valid to" : "Renew by", value: monthYear(s.expiresAt) });
+  let explanation = passed ? ci.meaning : info.explanation;
+  if (s.status === "in_progress" || s.status === "submitted" || s.status === "under_review") explanation = `${firstName} has started this check and the result hasn't come back yet, so it isn't verified.`;
+  if (s.status === "needs_more_info") explanation = `${firstName} has been asked for more information. Until then it isn't verified.`;
+  if (s.status === "expired") explanation = `This was verified before but has lapsed, so Clutch no longer counts it. ${firstName} needs to renew it.`;
+  if (s.status === "failed" || s.status === "revoked") explanation = `Clutch hasn't verified this. Clutch doesn't publish screening details, only whether a check is current.`;
+  if (s.status === "not_started") explanation = `${firstName} hasn't completed this, so Clutch hasn't verified it. Clutch shows the blank rather than hiding it.`;
+  if (s.status === "renewal_due") explanation = `${ci.meaning} It expires soon and ${firstName} has been asked to renew it.`;
+  if (s.unavailable) explanation = `${firstName} started this check, but Clutch hasn't connected a provider that can run it yet, so it isn't verified.`;
   if (cat === "insurance" && !passed) explanation = `${explanation} ${INSURANCE_UNVERIFIED_NOTE}`;
   return {
     title: label,
@@ -46,6 +56,10 @@ export function safetyEvidence(cat: SafetyInfo["category"], s: PublicStatus, fir
     label,
     explanation,
     facts,
+    statement: item.statement,
+    meaning: ci.meaning,
+    checked: passed ? ci.checked : undefined,
+    notChecked: ci.notChecked,
   };
 }
 
@@ -77,7 +91,7 @@ export function employmentEvidence(e: PublicEmployment): EvidenceDetail {
     status: e.status,
     copy: p.copy,
     label: e.provenance === "employer" ? `Confirmed by ${e.employer.replace(" (demo)", "")}` : p.label,
-    explanation: e.status === "pending" ? `${p.explanation} Verification with the employer is in progress.` : p.explanation,
+    explanation: e.status === "under_review" || e.status === "submitted" ? `${p.explanation} Verification with the employer is in progress.` : p.explanation,
     facts: [
       { label: "Source", value: p.label },
       { label: "Dates", value: `${monthYear(e.startedOn)} – ${e.endedOn ? monthYear(e.endedOn) : "present"}` },
@@ -92,7 +106,7 @@ export function repairEvidence(r: PublicRepair): EvidenceDetail {
     title: `${r.year} ${r.make} ${r.model} — ${r.title}`,
     kind: "provenance",
     source: r.provenance,
-    status: r.provenance === "self" ? "not_submitted" : "verified",
+    status: r.provenance === "self" ? "not_started" : "verified",
     copy: p.copy,
     label: p.label,
     explanation: p.explanation,
@@ -112,7 +126,7 @@ export function sourceEvidence(source: ProvenanceSource, title?: string): Eviden
     title: title ?? p.label,
     kind: "provenance",
     source,
-    status: source === "self" ? "not_submitted" : "verified",
+    status: source === "self" ? "not_started" : "verified",
     copy: p.copy,
     label: p.label,
     explanation: p.explanation,

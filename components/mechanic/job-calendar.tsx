@@ -22,11 +22,12 @@ export function calendarStatus(j: Pick<Job, "status" | "confirmedAt">): Calendar
 }
 
 const TONE: Record<CalendarStatus, { box: string; label: string }> = {
-  unconfirmed: { box: "border-l-amber border-y border-r border-dashed border-y-amber/50 border-r-amber/50 bg-amber-wash", label: "Needs your confirmation" },
-  confirmed: { box: "border-l-go bg-go-wash", label: "Confirmed" },
-  in_progress: { box: "border-l-brand bg-brand-wash", label: "In progress" },
-  awaiting_customer: { box: "border-l-brass bg-brass-wash", label: "Awaiting customer" },
-  completed: { box: "border-l-rule bg-paper text-ink-2", label: "Done" },
+  // Named by the shared stages (lib/domain/journey.ts); amber only where you have to act.
+  unconfirmed: { box: "border border-dashed border-amber bg-amber-wash", label: "Mechanic selected: confirm" },
+  confirmed: { box: "border border-brand/50 bg-brand-wash", label: "Scheduled" },
+  in_progress: { box: "border border-ink bg-sheet", label: "In progress" },
+  awaiting_customer: { box: "border border-rule bg-sheet", label: "In progress: waiting on customer" },
+  completed: { box: "border border-rule-soft bg-paper text-ink-2", label: "Completed" },
 };
 
 const dayName = (d: string, style: "short" | "long" = "short") => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { weekday: style, timeZone: "UTC" });
@@ -117,7 +118,7 @@ export function JobCalendar({
               return (
                 <li key={d} className={`min-h-44 min-w-0 p-2 ${isToday ? "bg-brand-wash/40" : "bg-sheet"} ${d < today ? "opacity-70" : ""}`}>
                   <p className={`mb-2 flex items-baseline gap-1.5 text-[0.8125rem] ${isToday ? "font-bold text-brand" : "text-ink-2"}`}>
-                    {dayName(d)} <span className={`tnum text-[1.125rem] ${isToday ? "" : "font-semibold text-ink"}`}>{dayNum(d)}</span>
+                    {dayName(d)} <span className={`tnum text-[1.0625rem] ${isToday ? "" : "font-semibold text-ink"}`}>{dayNum(d)}</span>
                     {isToday ? <span className="sr-only">(today)</span> : null}
                   </p>
                   <ul className="space-y-1.5">
@@ -173,7 +174,7 @@ export function JobCalendar({
       <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[0.75rem] text-ink-2" aria-label="Legend">
         {(["unconfirmed", "confirmed", "in_progress", "awaiting_customer"] as const).map((k) => (
           <li key={k} className="inline-flex items-center gap-1.5">
-            <span className={`inline-block h-3 w-3 border-l-4 ${TONE[k].box}`} aria-hidden /> {TONE[k].label}
+            <span className={`inline-block h-3 w-3 ${TONE[k].box}`} aria-hidden /> {TONE[k].label}
           </li>
         ))}
         <li className="inline-flex items-center gap-1.5">
@@ -187,10 +188,10 @@ export function JobCalendar({
 function Event({ item }: { item: CalendarItem }) {
   const t = TONE[item.status];
   return (
-    <Link href={item.href} className={`block border-l-4 px-2 py-1.5 hover:brightness-95 ${t.box}`}>
+    <Link href={item.href} className={`block px-2 py-1.5 hover:brightness-95 ${t.box}`}>
       <span className="tnum flex items-center gap-1 text-[0.75rem] font-bold">
         {timeLabel(item.slot.time)}
-        {item.status === "confirmed" ? <Check size={14} strokeWidth={3} className="text-go" aria-hidden /> : null}
+        {item.status === "confirmed" ? <Check size={14} strokeWidth={3} className="text-brand" aria-hidden /> : null}
         <span className="sr-only"> · {t.label}</span>
       </span>
       <span className="block truncate text-[0.8125rem] font-semibold">{item.title}</span>
@@ -250,7 +251,7 @@ function MonthGrid({
               <ul className="mt-1 hidden space-y-1 sm:block">
                 {list.slice(0, 2).map((i) => (
                   <li key={i.id}>
-                    <Link href={i.href} className={`block truncate border-l-4 px-1 text-[0.6875rem] font-semibold ${TONE[i.status].box}`}>
+                    <Link href={i.href} className={`block truncate px-1 text-[0.6875rem] font-semibold ${TONE[i.status].box}`}>
                       {timeLabel(i.slot.time).replace(":00", "")} {i.title}
                     </Link>
                   </li>

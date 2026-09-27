@@ -51,9 +51,9 @@ async function verify(mechanicId: string, insuranceExpires = "2027-12-31") {
       current("live").screenings.push({ id: `scr-${mechanicId}-${kind}`, mechanicId, kind, provider: "provider-under-test", providerRef: `ref-${kind}`, status: "verified", result: "clear", completedAt: "2026-09-20", expiresAt: "2027-09-20" });
     }
   });
-  await live.submitInsurance(mechanicId, { carrier: "Test Mutual", expiresOn: insuranceExpires, documentName: "coi.pdf" });
-  const ins = live.listVerifications({ mechanicId, statuses: ["pending"] }).find((v) => v.category === "insurance")!;
-  await live.decideVerification(ins.id, "verified", await staff(), "Checked", insuranceExpires);
+  await live.submitInsurance(mechanicId, { carrier: "Test Mutual", expiresOn: insuranceExpires, documentIds: ["doc-test"] });
+  const ins = live.listVerifications({ mechanicId, statuses: ["submitted"] }).find((v) => v.category === "insurance")!;
+  await live.decideVerification(ins.id, "approve", await staff(), { reasonCode: "evidence_matches", expiresAt: insuranceExpires });
 }
 
 async function request(customerId: string, mechanicIds: string[]) {
@@ -140,7 +140,7 @@ test("after the acknowledgement: one booking, with the exact disclosure, version
   assert.equal(at.acknowledgement!.userId, c.userId);
   assert.ok(Date.parse(at.acknowledgement!.at) > 0);
   assert.equal(at.acknowledgement!.disclosure, disclosureText(m.firstName, at.checks), "the text the confirmation step showed");
-  for (const line of ["- Identity: Not completed", "- Background check: Not completed", "- Driving record: Not completed", "- Insurance: Not completed", INSURANCE_UNVERIFIED_NOTE, ACK_TEXT]) assert.ok(at.acknowledgement!.disclosure.includes(line), line);
+  for (const line of ["- Identity not verified by Clutch", "- Background check not verified by Clutch", "- Driving record not verified by Clutch", "- Insurance not verified by Clutch", INSURANCE_UNVERIFIED_NOTE, ACK_TEXT]) assert.ok(at.acknowledgement!.disclosure.includes(line), line);
   const h = job.history!.find((x) => x.action === "acknowledged unverified checks")!;
   assert.equal(h.by, "customer");
   assert.ok(h.detail!.startsWith(DISCLOSURE_VERSION) && h.detail!.includes("Insurance not completed"), h.detail);
@@ -172,7 +172,7 @@ test("expired or unverified insurance: Clutch says only that it hasn't verified 
   assert.equal(e.eligible, true);
   assert.deepEqual(e.unverified.map((x) => x.label), ["Insurance: Expired Jan 2026"]);
   const text = disclosureText(m.firstName, checksNow(profileOf(m.id)));
-  assert.ok(text.includes("- Insurance: Expired Jan 2026") && text.includes(INSURANCE_UNVERIFIED_NOTE));
+  assert.ok(text.includes("- Insurance expired Jan 2026, so it's no longer verified") && text.includes(INSURANCE_UNVERIFIED_NOTE), text);
   assert.ok(!/liab|responsib|fault|at your own risk|waive/i.test(text), "no legal conclusions, no waiver language");
   assert.ok(!/liab|responsib|fault|waive/i.test(INSURANCE_UNVERIFIED_NOTE));
 });
@@ -269,4 +269,43 @@ test("no verification check is marked as required for work; the basic profile is
   assert.ok(checks.every((s) => !s.requiredForWork), "checks are optional");
   assert.ok(checks.every((s) => /Not required to be booked/.test(s.why)));
   assert.ok(!steps.some((s) => /^Required before/.test(s.why)));
+});
+
+test("an estimate can't be sent until the basic profile is complete (a draft can be saved); verification still isn't required", async () => {
+  const c = await customer();
+  const u = await provisionUser({ id: "vp-noarea", email: "vp-noarea@example.test", meta: { name: "Nia", role: "mechanic" } });
+  // No service area: not a launch area.
+  const m = await live.upsertMechanicProfile({ userId: u!.id, displayName: "Nia Noarea", city: "Los Angeles", serviceRadiusMi: 15, bio: "", workModel: "mobile", declaredRepairCategories: ["brakes"], declaredMakes: ["BMW"], hourlyRateCents: 9000, diagnosticFeeCents: 5000, availabilityNote: "Weekdays" });
+  const r = await request(c.id, [m.id]);
+  await assert.rejects(live.submitQuote(quote(r.id, m.id)), (e: unknown) => e instanceof LifecycleError && e.code === "forbidden" && /Finish your profile before sending estimates: service area/.test(e.message));
+  const draft = await live.submitQuote(quote(r.id, m.id), { draft: true });
+  assert.equal(draft.status, "draft");
+  assert.equal(live.listQuotesForRequest(r.id).filter((q) => q.status === "submitted").length, 0, "the customer is sent nothing");
+  // Once the area is set, the same mechanic (still with no checks verified) can send it.
+  await live.upsertMechanicProfile({ id: m.id, userId: u!.id, displayName: "Nia Noarea", city: "Los Angeles", neighborhood: "mid-city", serviceRadiusMi: 15, bio: "", workModel: "mobile", declaredRepairCategories: ["brakes"], declaredMakes: ["BMW"], hourlyRateCents: 9000, diagnosticFeeCents: 5000, availabilityNote: "Weekdays" });
+  const sent = await live.submitQuote(quote(r.id, m.id));
+  assert.equal(sent.status, "submitted");
+  assert.equal(eligibility(profileOf(m.id)).fullyVerified, false);
+});
+
+test("onboarding says what's actually required: the basic profile, not verification (one source, lib/domain/mechanic-requirements.ts)", async () => {
+  const { UNLOCKS } = await import("@/lib/domain/mechanic-requirements");
+  const { readiness } = await import("@/lib/domain/eligibility");
+  const book = UNLOCKS.find((u) => /be booked/.test(u.goal))!;
+  // Each required readiness item is named in the words onboarding shows.
+  const labels = readiness({ neighborhood: undefined, serviceRadiusMi: 0, pricing: { hourlyRateCents: 0, diagnosticFeeCents: 0, fixed: [] }, availabilityNote: "", openings: [], selfReported: { declaredCategories: [] } } as never).items.map((i) => i.key);
+  assert.deepEqual(labels, ["area", "repairs", "pricing", "availability"]);
+  for (const words of [/where you start from and how far you travel/, /repairs you do/, /prices/, /available/]) assert.match(book.needs, words);
+  assert.doesNotMatch(book.needs, /verif|ID check|background|insurance|driving record/i, "checks aren't a requirement");
+  const checks = UNLOCKS.find((u) => /Verification checks/.test(u.goal))!;
+  assert.match(checks.goal, /optional/);
+  assert.match(checks.needs, /None is required to be booked/);
+  // And the stale sentence can't come back anywhere in the app.
+  const { readdirSync, readFileSync, statSync } = await import("node:fs");
+  const files: string[] = [];
+  const walk = (d: string) => readdirSync(d).forEach((f) => (statSync(`${d}/${f}`).isDirectory() ? walk(`${d}/${f}`) : /\.tsx?$/.test(f) && files.push(`${d}/${f}`)));
+  ["app", "components", "lib"].forEach(walk);
+  const stale = [/ID check, background check and insurance verified/i, /(checks?|identity|background|insurance)[^."]{0,40}\b(must|need to|has to|have to) be verified[^."]{0,40}(send|book|request)/i, /verified,? plus a driving record check/i];
+  const hits = files.filter((f) => stale.some((r) => r.test(readFileSync(f, "utf8"))));
+  assert.deepEqual(hits, []);
 });

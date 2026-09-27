@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   verify:
-    name: verify (Node ${{ matrix.node }}, Ubuntu)
+    name: verify (Node ${{ matrix.node }}, Postgres ${{ matrix.pg }}, Ubuntu)
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -25,6 +25,11 @@ jobs:
       matrix:
         # 20: the oldest supported (package.json engines). 24: the version in .nvmrc.
         node: ["20", "24"]
+        # 17: what Supabase runs in production. 16: the oldest supported, on one Node version.
+        pg: ["17"]
+        include:
+          - node: "24"
+            pg: "16"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,13 +38,15 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-      - name: Postgres server binaries (for the throwaway test cluster)
+      - name: Postgres ${{ matrix.pg }} server binaries (for the throwaway test cluster)
         run: |
-          if ! ls /usr/lib/postgresql/*/bin/initdb >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends postgresql
-          fi
-          ls -d /usr/lib/postgresql/*/bin
+          # The PostgreSQL project's apt repository has every supported major version.
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y --no-install-recommends postgresql-${{ matrix.pg }}
+          echo "CLUTCH_PG_BIN=/usr/lib/postgresql/${{ matrix.pg }}/bin" >> "$GITHUB_ENV"
+          /usr/lib/postgresql/${{ matrix.pg }}/bin/postgres --version
       - run: npm ci
       # Lint, type-check, app tests, database tests on a temporary local cluster, production build.
       # DATABASE_URL and every service key are blanked inside the script.

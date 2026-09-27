@@ -186,6 +186,13 @@ export async function readyRepo(scope: Scope): Promise<Repository> {
   return repoFor(scope);
 }
 
+/** The display name of an account, for server-to-server work with no session (provider webhooks). */
+export async function accountName(scope: Scope, userId: string): Promise<string | undefined> {
+  const repo = await readyRepo(scope);
+  if (targetedScope(scope)) await (await requestContext()).reader.user(userId);
+  return repo.getUser(userId)?.name;
+}
+
 /** No-op loaders, for stores that already hold the whole scope in memory. */
 const NOOP = new Proxy({}, { get: (_t, prop) => (prop === "then" ? undefined : async () => undefined) }) as LiveNeeds;
 

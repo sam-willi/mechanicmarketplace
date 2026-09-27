@@ -76,7 +76,7 @@ export function VehicleTile({
   return (
     <div className={`${h} relative flex shrink-0 flex-col items-center justify-center border border-brand-tint bg-brand-wash text-brand ${className}`} role="img" aria-label={`${name} (no photo)`}>
       <VehicleGlyph model={v.model} width={size === "sm" ? 60 : size === "lg" ? 150 : 88} />
-      <span className={`mt-1 font-extrabold tracking-[0.06em] text-brand-deep uppercase ${size === "sm" ? "text-[0.5625rem]" : "text-[0.6875rem]"}`}>{v.make}</span>
+      <span className={`mt-1 font-extrabold tracking-[0.06em] text-brand-deep uppercase ${size === "sm" ? "text-[0.6875rem]" : "text-[0.6875rem]"}`}>{v.make}</span>
     </div>
   );
 }

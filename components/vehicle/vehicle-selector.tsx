@@ -47,6 +47,9 @@ export function VehicleSelector({
   const [loading, setLoading] = useState<"makes" | "models" | "configs" | "vin" | null>(null);
   const [decode, setDecode] = useState<VinDecode | null>(null);
   const [vinError, setVinError] = useState<string | null>(null);
+  // Open by default when a VIN is already on file; after that the person decides (clearing the
+  // field to retype it must not collapse the section mid-edit).
+  const [vinOpen, setVinOpen] = useState(Boolean(value.vin));
   const latest = useRef(value);
   useEffect(() => {
     latest.current = value;
@@ -265,7 +268,7 @@ export function VehicleSelector({
       ) : null}
       {beforeVin}
       {showVin ? (
-        <details className="group border-t border-rule-soft pt-2" open={Boolean(value.vin)}>
+        <details className="group border-t border-rule-soft pt-2" open={vinOpen} onToggle={(e) => setVinOpen((e.currentTarget as HTMLDetailsElement).open)}>
           <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 font-semibold [&::-webkit-details-marker]:hidden">
             <ScanLine size={17} aria-hidden /> Add VIN for more accurate parts and estimates
             <span className="text-[0.8125rem] font-normal text-ink-3">Optional</span>
@@ -298,6 +301,11 @@ export function VehicleSelector({
                 {decode.displacementL ? `, ${decode.displacementL.toFixed(1)}L${decode.cylinders ? ` ${decode.cylinders}-cylinder` : ""}` : ""}
               </p>
               {decode.warnings.length ? <p className="text-[0.8125rem] text-ink-3">Decoder note: {decode.warnings[0]}</p> : null}
+              {!value.vinConfirmed && value.model && ((decode.year && String(decode.year) !== value.year) || (decode.make && decode.make.toLowerCase() !== value.make.toLowerCase()) || (decode.model && !sameModel(decode.model, value.model))) ? (
+                <p role="alert" className="mt-1 flex items-start gap-1.5 text-[0.875rem] font-semibold text-amber">
+                  <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden /> That doesn&apos;t match what you picked ({value.year} {value.make} {value.model.replace(/^custom:/, "")}). If the VIN is right, use it; if not, check it. Saved as is, both are kept and the difference is shown to mechanics.
+                </p>
+              ) : null}
               {value.vinConfirmed ? (
                 <p className="mt-1 flex items-center gap-1.5 text-[0.875rem] font-semibold">
                   <Check size={15} aria-hidden /> Confirmed as your car

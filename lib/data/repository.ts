@@ -32,6 +32,7 @@ import type {
   Review,
   Slot,
   ScreeningKind,
+  InsurancePolicyType,
   User,
   Vehicle,
   VehicleMake,
@@ -48,6 +49,19 @@ import type {
  * Public pages must only use `getPublicProfile` / `listPublicProfiles` — they
  * never see private rows.
  */
+export type ReviewAction = "approve" | "reject" | "request_info" | "revoke";
+
+export interface InsuranceInput {
+  policyType?: InsurancePolicyType;
+  namedInsured?: string;
+  carrier: string;
+  effectiveOn?: string;
+  expiresOn: string;
+  documentName?: string;
+  /** Private uploads (the certificate). Required. */
+  documentIds: ID[];
+}
+
 export interface RepositoryCore {
   /** The data scope this repository reads and writes (lib/data/scope.ts). Fixed for its lifetime. */
   readonly scope: Scope;
@@ -123,8 +137,16 @@ export interface RepositoryCore {
   refreshScreening(mechanicId: ID, kind: ScreeningKind): Promise<void>;
   submitCredential(mechanicId: ID, input: Omit<Credential, "id" | "mechanicId">): void;
   submitEmployment(mechanicId: ID, input: Omit<EmploymentRecord, "id" | "mechanicId">): void;
-  submitInsurance(mechanicId: ID, input: { carrier: string; expiresOn: string; documentName: string }): void;
-  resubmit(verificationId: ID, note: string): void;
+  submitInsurance(mechanicId: ID, input: InsuranceInput): void;
+  resubmit(verificationId: ID, note: string, documentIds?: ID[]): void;
+  /** Identity (hosted provider flow): the record a new session belongs to, and recording the session. */
+  prepareIdentityCheck(mechanicId: ID): VerificationRecord;
+  recordIdentityStart(mechanicId: ID, input: { provider: string; providerRef: string; recordId: ID }): void;
+  /** A provider result fetched server-side after a signed webhook (idempotent on eventId). */
+  applyProviderResult(input: { providerRef: string; recordId?: ID; status: VerificationStatus; reasonCodes: string[]; eventId: string; provider: string; nameMatches?: boolean; validMonths?: number }): { applied: boolean; status: VerificationStatus };
+  /** Renewal reminders and expiry (idempotent); one mechanic, or everyone. */
+  remindRenewals(nowIso: string, mechanicId?: ID): number;
+  currentCheck(mechanicId: ID, category: VerificationRecord["category"]): VerificationRecord | undefined;
   addPastRepair(mechanicId: ID, input: Omit<PastRepair, "id" | "mechanicId" | "source" | "evidence"> & { evidenceNames: string[] }): PastRepair;
   requestCustomerConfirmation(pastRepairId: ID, contactName: string, contact: string): CustomerConfirmation;
   respondToConfirmation(token: string, response: "confirmed" | "denied"): void;
@@ -187,7 +209,7 @@ export interface RepositoryCore {
   unrunScreening(v: VerificationRecord): boolean;
 
   // ---- Admin writes ----
-  decideVerification(id: ID, decision: "verified" | "rejected" | "needs_info", reviewerId: ID, notes: string, expiresAt?: string): void;
+  decideVerification(id: ID, action: ReviewAction, reviewerId: ID, input: { reasonCode: string; note?: string; expiresAt?: string }): void;
 
   // ---- Customer writes ----
   /**
@@ -260,6 +282,10 @@ export const MUTATIONS = [
   "submitEmployment",
   "submitInsurance",
   "resubmit",
+  "prepareIdentityCheck",
+  "recordIdentityStart",
+  "applyProviderResult",
+  "remindRenewals",
   "addPastRepair",
   "requestCustomerConfirmation",
   "respondToConfirmation",

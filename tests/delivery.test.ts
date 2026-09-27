@@ -92,10 +92,10 @@ test("a booking lifecycle raises exactly the expected alerts, each generic, for 
   const c = live.getCustomerByUser(cu!.id)!;
   const m = await live.upsertMechanicProfile({ userId: mu!.id, displayName: "Morgan Private", city: "Los Angeles", neighborhood: "mid-city", serviceRadiusMi: 15, bio: "", workModel: "mobile", declaredRepairCategories: ["brakes"], declaredMakes: ["BMW"], hourlyRateCents: 9000, diagnosticFeeCents: 5000, availabilityNote: "Weekdays" });
   for (const kind of ["identity", "background", "driving_record"] as const) current("live").screenings.push({ id: `dl-scr-${kind}`, mechanicId: m.id, kind, provider: "provider-under-test", providerRef: kind, status: "verified", result: "clear", completedAt: "2026-09-20", expiresAt: "2027-09-20" });
-  await live.submitInsurance(m.id, { carrier: "T", expiresOn: "2027-12-31", documentName: "coi.pdf" });
+  await live.submitInsurance(m.id, { carrier: "T", expiresOn: "2027-12-31", documentIds: ["doc-test"] });
   const staff = await provisionUser({ id: "dl-staff", email: "staff@example.test", meta: { name: "S", role: "customer" } });
-  const ins = live.listVerifications({ mechanicId: m.id, statuses: ["pending"] })[0];
-  await live.decideVerification(ins.id, "verified", staff!.id, "ok", "2027-12-31");
+  const ins = live.listVerifications({ mechanicId: m.id, statuses: ["submitted"] }).find((v) => v.category === "insurance")!;
+  await live.decideVerification(ins.id, "approve", staff!.id, { reasonCode: "evidence_matches", expiresAt: "2027-12-31" });
   const before = current("live").notifications.length;
   const r = await live.createRequest({ customerId: c.id, vehicleId: "", vehicle: { year: 2016, make: "BMW", model: "328i" }, repairCategory: "brakes", categorySource: "customer", symptomDescription: "Grinding at 4 Private Lane.", occurrence: { conditions: [] }, onset: {}, warningLights: [], diagnosticCodes: [], smells: [], recentRepairs: [], customerParts: [], location: { serviceMode: "mobile", area: "mid-city", address: "4 Private Lane" }, media: [] });
   if (!r.matchedMechanicIds.includes(m.id)) await live.forwardRequest(r.id, [m.id], "broaden");

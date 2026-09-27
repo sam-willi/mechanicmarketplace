@@ -26,12 +26,12 @@ function initialChoice(v?: Vehicle): VehicleChoice {
 }
 
 /** Add/edit a vehicle with the same year → make → model → configuration picker as a repair request. */
-export function VehicleFields({ v }: { v?: Vehicle }) {
+export function VehicleFields({ v, showVin = true }: { v?: Vehicle; showVin?: boolean }) {
   const [choice, setChoice] = useState<VehicleChoice>(initialChoice(v));
   return (
     <div className="space-y-4">
       <input type="hidden" name="choice" value={JSON.stringify(choice)} />
-      <VehicleSelector value={choice} onChange={(c) => setChoice(c)} />
+      <VehicleSelector value={choice} onChange={(c) => setChoice(c)} showVin={showVin} />
       <label className="block max-w-[16rem]">
         <span className="field-label">Mileage</span>
         <input name="mileage" inputMode="numeric" defaultValue={v?.mileage?.toLocaleString()} className="input tnum mt-1" />

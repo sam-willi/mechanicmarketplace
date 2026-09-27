@@ -13,7 +13,8 @@ export type { CheckSnapshot, VerificationAtBooking } from "./types";
  *
  * Policy decision of 2026-09-26 (bookable without verification). Needs legal review before launch.
  */
-export const DISCLOSURE_VERSION = "unverified-booking/2026-09-26.1";
+/** 2026-09-27.1: each line is the plain statement naming who checked what and when. */
+export const DISCLOSURE_VERSION = "unverified-booking/2026-09-27.1";
 export const ACK_TEXT = "I understand these checks have not been completed or verified by Clutch.";
 
 export function checksNow(p: Pick<PublicMechanicProfile, "safety">): CheckSnapshot[] {
@@ -23,6 +24,7 @@ export function checksNow(p: Pick<PublicMechanicProfile, "safety">): CheckSnapsh
     state: c.state,
     status: c.state === "expiring" ? `Verified, renews ${c.when}` : c.state === "expired" && c.when ? `Expired ${c.when}` : STATUS_WORD[c.state],
     verified: c.verified,
+    statement: c.statement,
   }));
 }
 
@@ -47,8 +49,8 @@ export function disclosureText(firstName: string, checks: CheckSnapshot[]) {
   const notDone = checks.filter((c) => !c.verified);
   const lines = [
     `Clutch has not verified these checks for ${firstName}:`,
-    ...notDone.map((c) => `- ${c.name}: ${c.status}`),
-    ...(done.length ? [`Clutch has verified:`, ...done.map((c) => `- ${c.name}: ${c.status}`)] : []),
+    ...notDone.map((c) => `- ${c.statement ?? `${c.name}: ${c.status}`}`),
+    ...(done.length ? [`Clutch has verified:`, ...done.map((c) => `- ${c.statement ?? `${c.name}: ${c.status}`}`)] : []),
     ...(notDone.some((c) => c.key === "insurance") ? [INSURANCE_UNVERIFIED_NOTE] : []),
     `Clutch doesn't vouch for checks it hasn't verified. You can still book, ask ${firstName} directly, or choose a fully verified mechanic.`,
     ACK_TEXT,

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { placeLabel } from "@/lib/domain/areas";
 import { StarRating } from "@/components/visual/stars";
 import { MapPin } from "lucide-react";
 import type { PublicMechanicProfile } from "@/lib/domain/public-profile";
@@ -36,7 +37,7 @@ export function PersonFacts({ p }: { p: PublicMechanicProfile }) {
 
 /** "Who" — the record header. */
 export function RecordHeader({ p }: { p: PublicMechanicProfile }) {
-  const place = p.neighborhood ? `${p.neighborhood}, ${p.city}` : p.city;
+  const place = placeLabel(p.neighborhood, p.city);
   const reach = `Comes to you within ${p.serviceRadiusMi} mi`;
   return (
     <div className="flex items-start gap-4 sm:gap-6">
@@ -47,7 +48,7 @@ export function RecordHeader({ p }: { p: PublicMechanicProfile }) {
         <PhotoPrint photoUrl={p.photoUrl} initials={p.initials} name={p.displayName} size={148} />
       </div>
       <div className="min-w-0 pt-0.5">
-        <h1 className="display text-[2.125rem] text-ink sm:text-[3rem]">{p.displayName}</h1>
+        <h1 className="display text-[2.25rem] text-ink sm:text-[3rem]">{p.displayName}</h1>
         {p.tagline ? <p className="mt-1.5 max-w-[52ch] text-[1rem] leading-snug text-ink-2 sm:text-[1.0625rem]">{p.tagline}</p> : null}
         <p className="mt-2 text-[0.9375rem] font-semibold text-ink">
           {WORK_MODEL_LABEL.mobile}

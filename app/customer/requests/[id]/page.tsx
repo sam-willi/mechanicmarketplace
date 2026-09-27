@@ -24,6 +24,9 @@ import { eligibility, notBookableStatus, screeningSummary } from "@/lib/domain/e
 import { quoteTotals } from "@/lib/domain/quote";
 import { HandoffNote, ReplacementPanel } from "@/components/request/replacement-panel";
 import { replacementFor } from "@/lib/replacement";
+import { Notice } from "@/components/workspace/ui";
+import { journey } from "@/lib/domain/journey";
+import { JourneyStatus } from "@/components/app/journey-status";
 import { emailAlertsOn } from "@/lib/notify/config";
 
 export const metadata: Metadata = { title: "Your shortlist" };
@@ -71,10 +74,9 @@ export default async function CompareQuotes({
   const accepted = quotes.find((q) => q.status === "accepted");
   const job = accepted ? repo.listJobsForCustomer(s.customerId).find((j) => j.quoteId === accepted.id) : undefined;
   const sentQuotes = quotes.filter((q) => q.status !== "draft");
-  const interestedCount = new Set([...r.interested.map((i) => i.mechanicId), ...sentQuotes.map((q) => q.mechanicId)]).size;
   const picks = topPicks(
     withProfiles
-      .filter(({ q }) => q.status === "submitted")
+      .filter(({ q, p }) => q.status === "submitted" && eligibility(p).eligible)
       .map(({ q, p }) => ({
         q,
         p,
@@ -95,7 +97,7 @@ export default async function CompareQuotes({
             !r.declinedBy.includes(mid) && !quotes.some((q) => q.mechanicId === mid && q.status !== "draft") && !r.interested.some((i) => i.mechanicId === mid),
         )
       : [];
-  const rows = withProfiles
+  const allRows = withProfiles
     .filter(({ q }) => q.status !== "draft")
     .map(({ q, p }) => ({
       q,
@@ -104,18 +106,18 @@ export default async function CompareQuotes({
       t: quoteTotals(q),
       exact: p.verifiedWork.filter((x) => x.category === r.repairCategory && x.make === v.make).length,
     }));
-  const stage = job ? (job.status === "scheduled" ? 2 : 3) : sentQuotes.length + interestedCount > 0 ? 1 : 0;
+  // Only estimates the customer could accept are compared. A response from a mechanic whose basic
+  // profile isn't complete (older or demo data; they can't send new ones) is listed apart, with the
+  // reason and no price comparison.
+  const rows = allRows.filter((x) => x.e.eligible || x.q.status === "accepted");
+  const unavailable = allRows.filter((x) => !x.e.eligible && x.q.status !== "accepted");
   const waiting = isWaitingForMatch(r);
+  const chosen = accepted ? repo.getMechanic(accepted.mechanicId)?.firstName : undefined;
+  const j = journey({ request: r, quotes, job, audience: "customer", names: { customer: s.name.split(" ")[0], mechanic: chosen } });
   const cancelled = r.status === "cancelled";
   // Editable until any mechanic responds; cancellable until it's booked.
   const editable = r.status === "open" && !sentQuotes.length && !r.interested.length && !r.questions.length;
   const cancellable = (r.status === "open" || r.status === "quoted") && !job;
-  const stageNotes = [
-    `${waiting ? "Saved" : "Sent"} ${dayMonth(r.createdAt)}`,
-    sentQuotes.length ? plural(sentQuotes.length, "estimate") : interestedCount ? `${interestedCount} interested` : "",
-    accepted ? (repo.getMechanic(accepted.mechanicId)?.firstName ?? "") : "",
-    job?.status === "completed" ? "Done" : job && job.status !== "scheduled" ? "In progress" : "",
-  ];
   const badgesFor = (quoteId: string) => (sentQuotes.length > 1 ? picks.filter((t) => t.row.q.id === quoteId).map((t) => t.title) : []);
 
   return (
@@ -141,18 +143,29 @@ export default async function CompareQuotes({
       </div>
 
       {sp.error ? (
-        <p role="alert" className="mt-4 border-l-4 border-alert bg-sheet px-4 py-3 text-[0.9375rem]">
+        <Notice tone="error" className="mt-4">
           {sp.error}
-        </p>
+        </Notice>
       ) : sp.checked && sp.checked !== "0" && !waiting ? (
-        <p role="status" className="mt-4 flex items-center gap-2 border-l-4 border-brand bg-sheet px-4 py-3 text-[0.9375rem] font-semibold">
-          <Check size={16} aria-hidden /> Sent to {plural(Number(sp.checked) || 1, "mechanic")}. Their replies will appear on this page.
-        </p>
+        <Notice tone="ok" className="mt-4"><span className="font-semibold">Sent to {plural(Number(sp.checked) || 1, "mechanic")}. Their replies will appear on this page.</span></Notice>
       ) : sp.edited ? (
-        <p role="status" className="mt-4 flex items-center gap-2 border-l-4 border-brand bg-sheet px-4 py-3 text-[0.9375rem] font-semibold">
-          <Check size={16} aria-hidden /> Your changes are saved.
-        </p>
+        <Notice tone="ok" className="mt-4"><span className="font-semibold">Your changes are saved.</span></Notice>
       ) : null}
+
+      <div className="mt-6">
+        <JourneyStatus
+          j={j}
+          audience="customer"
+          names={{ customer: s.name.split(" ")[0], mechanic: chosen }}
+          action={
+            job ? (
+              <Link href={`/customer/jobs/${job.id}`} className="btn btn-ink min-h-11">
+                View the repair <ArrowRight size={15} aria-hidden />
+              </Link>
+            ) : undefined
+          }
+        />
+      </div>
 
       {cancelled ? (
         <CancelledPanel r={r} fresh={Boolean(sp.cancelled)} />
@@ -165,18 +178,6 @@ export default async function CompareQuotes({
         <HandoffNote r={r} names={handoffPending.length === 1 ? [repo.getMechanic(handoffPending[0])!.displayName] : handoffPending.map(String)} />
       ) : null}
 
-      {cancelled || waiting ? null : <Lifecycle stage={stage} notes={stageNotes} />}
-
-      {job ? (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border border-brand bg-sheet px-4 py-3">
-          <p className="text-[0.9375rem] font-semibold">
-            {repo.getMechanic(accepted!.mechanicId)?.firstName} is booked for {accepted!.availableOn}.
-          </p>
-          <Link href={`/customer/jobs/${job.id}`} className="btn btn-ink min-h-11">
-            View the repair <ArrowRight size={15} aria-hidden />
-          </Link>
-        </div>
-      ) : null}
 
       {openQuestions.length > 0 && (
         <section aria-labelledby="questions-title" className="mt-6 space-y-3">
@@ -222,7 +223,7 @@ export default async function CompareQuotes({
             {pending ? <p className="text-[0.875rem] text-ink-3">{pending} more still reviewing</p> : null}
           </div>
 
-          {sentQuotes.length >= 2 && (
+          {rows.length >= 2 && (
             <div className="mt-3 hidden overflow-x-auto sm:block">
               <table className="w-full border-collapse text-left text-[0.9375rem]">
                 <thead>
@@ -302,7 +303,7 @@ export default async function CompareQuotes({
           )}
 
           {/* Cards on phones; on larger screens the table above is the comparison. */}
-          <ul className={`mt-5 grid gap-4 lg:grid-cols-3 ${sentQuotes.length >= 2 ? "sm:hidden" : ""}`}>
+          <ul className={`mt-5 grid gap-4 lg:grid-cols-3 ${rows.length >= 2 ? "sm:hidden" : ""}`}>
             {rows.map(({ q, p, e, t, exact }) => {
               const chosen = q.status === "accepted";
               const pick = badgesFor(q.id)[0];
@@ -317,14 +318,14 @@ export default async function CompareQuotes({
                     <div className="flex items-center gap-3">
                       <PhotoPrint photoUrl={p.photoUrl} initials={p.initials} name={p.displayName} size={52} />
                       <div className="min-w-0">
-                        <Link href={`/mechanics/${p.slug}?${ctx}`} className="heading block text-[1.1875rem] hover:underline">
+                        <Link href={`/mechanics/${p.slug}?${ctx}`} className="heading block text-[1.25rem] hover:underline">
                           {p.displayName}
                         </Link>
                         <p className="text-[0.8125rem] text-ink-2">Comes to you</p>
                       </div>
                     </div>
                     <p className="flex items-baseline gap-2">
-                      <span className="num text-[1.625rem] leading-none">{exact}</span>
+                      <span className="num text-[1.75rem] leading-none">{exact}</span>
                       <span className="text-[0.9375rem] font-bold">
                         verified {v.make} {repairNoun(r.repairCategory, exact)}
                       </span>
@@ -342,7 +343,7 @@ export default async function CompareQuotes({
                     {q.notes ? <p className="line-clamp-2 text-[0.875rem] text-ink-2">&ldquo;{q.notes}&rdquo;</p> : null}
                     <div className="mt-auto flex items-end justify-between gap-3 border-t border-rule-soft pt-3">
                       <div>
-                        <p className="num text-[1.625rem]">{t.planFor}</p>
+                        <p className="num text-[1.75rem]">{t.planFor}</p>
                         <p className={`text-[0.8125rem] ${q.partsIncluded ? "text-ink-2" : "font-semibold text-amber"}`}>
                           {q.partsIncluded ? "Parts included" : "Parts at cost"}
                         </p>
@@ -374,7 +375,7 @@ export default async function CompareQuotes({
                   <div className="flex items-center gap-3">
                     <PhotoPrint photoUrl={p.photoUrl} initials={p.initials} name={p.displayName} size={52} />
                     <div className="min-w-0">
-                      <Link href={`/mechanics/${p.slug}?${ctx}`} className="heading block text-[1.1875rem] hover:underline">
+                      <Link href={`/mechanics/${p.slug}?${ctx}`} className="heading block text-[1.25rem] hover:underline">
                         {p.displayName}
                       </Link>
                       <p className="text-[0.8125rem] font-semibold">Estimate coming</p>
@@ -384,6 +385,30 @@ export default async function CompareQuotes({
                 </li>
               ))}
             </ul>
+          )}
+          {unavailable.length > 0 && (
+            <section aria-labelledby="unavailable-title" className="mt-6 border-t border-rule pt-4">
+              <h3 id="unavailable-title" className="text-[1rem] font-bold">
+                Can&apos;t be booked right now
+              </h3>
+              <p className="mt-1 max-w-[62ch] text-[0.875rem] text-ink-2">
+                {unavailable.length === 1 ? "This mechanic replied, but their" : "These mechanics replied, but their"} Clutch profile isn&apos;t complete, so the estimate
+                can&apos;t be accepted. It isn&apos;t part of the comparison above.
+              </p>
+              <ul className="mt-3 space-y-3">
+                {unavailable.map(({ q, p, e }) => (
+                  <li key={q.id} className="flex items-center gap-3">
+                    <PhotoPrint photoUrl={p.photoUrl} initials={p.initials} name={p.displayName} size={40} />
+                    <div className="min-w-0 text-[0.9375rem]">
+                      <Link href={`/mechanics/${p.slug}?${ctx}`} className="font-semibold hover:underline">
+                        {p.displayName}
+                      </Link>
+                      <p className="text-[0.8125rem] text-alert">{notBookableStatus(e)}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
         </section>
       ) : !replacement && !job && !waiting && !cancelled ? (
@@ -395,28 +420,8 @@ export default async function CompareQuotes({
   );
 }
 
-const STAGES = ["Request", "Responses", "Selected mechanic", "Repair"];
 
 /** Request → Responses → Selected mechanic → Repair, with a short note under each. */
-function Lifecycle({ stage, notes }: { stage: number; notes: string[] }) {
-  return (
-    <ol className="mt-6 grid grid-cols-4 gap-1.5" aria-label="Where this repair stands">
-      {STAGES.map((label, i) => (
-        <li key={label} aria-current={i === stage ? "step" : undefined} className="min-w-0">
-          <span className={`block h-2 ${i < stage ? "bg-ink-2" : i === stage ? "bg-brand" : "bg-rule-soft"}`} />
-          <span
-            className={`mt-1.5 block text-[0.75rem] leading-tight sm:text-[0.875rem] ${i === stage ? "font-bold" : i < stage ? "text-ink-2" : "text-ink-3"}`}
-          >
-            {label}
-            {i < stage ? <span className="sr-only"> (done)</span> : null}
-          </span>
-          {notes[i] ? <span className="block text-[0.75rem] text-ink-3">{notes[i]}</span> : null}
-        </li>
-      ))}
-    </ol>
-  );
-}
-
 /** Saved with no mechanic to send it to. Says what was kept and what happens next, without promising outreach. */
 function WaitingPanel({ r, v, checked, editable }: { r: RepairRequest; v: Vehicle; checked?: string; editable: boolean }) {
   const area = findArea(r.location.area);
@@ -434,7 +439,7 @@ function WaitingPanel({ r, v, checked, editable }: { r: RepairRequest; v: Vehicl
         <Clock3 size={20} className="mt-1 shrink-0" aria-hidden />
         <div>
           <h2 id="waiting-title" className="heading text-[1.25rem] sm:text-[1.375rem]">
-            Saved. No mechanic matches this request yet.
+            What happens next
           </h2>
           <p className="mt-1 max-w-[65ch] text-[0.9375rem] text-ink-2">
             Clutch checks again whenever a mechanic finishes their profile. When one fits your car, repair and area, Clutch sends them this request and their reply shows

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Wordmark } from "@/components/brand/wordmark";
+import { Notice as SharedNotice } from "@/components/workspace/ui";
 
 /** The plain frame around sign-in pages. */
 export function AuthShell({ children, aside }: { children: React.ReactNode; aside?: { href: string; label: string } }) {
@@ -20,10 +21,11 @@ export function AuthShell({ children, aside }: { children: React.ReactNode; asid
   );
 }
 
+/** Sign-in pages use the shared message block (components/workspace/ui.tsx). */
 export function Notice({ tone = "ink", children }: { tone?: "ink" | "alert"; children: React.ReactNode }) {
   return (
-    <p className={`mt-4 border px-3 py-2 text-[0.9375rem] ${tone === "alert" ? "border-alert bg-alert-wash" : "border-ink bg-sheet"}`} role={tone === "alert" ? "alert" : "status"}>
+    <SharedNotice tone={tone === "alert" ? "error" : "ok"} className="mt-4">
       {children}
-    </p>
+    </SharedNotice>
   );
 }

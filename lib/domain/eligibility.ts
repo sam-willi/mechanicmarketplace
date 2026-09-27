@@ -3,6 +3,7 @@ import { SAFETY } from "./provenance";
 import { AREAS } from "./areas";
 import { monthYear } from "@/lib/format";
 import { REVERIFY_WINDOW_DAYS } from "@/lib/verification/lifecycle";
+import { statement } from "@/lib/verification/claims";
 
 /**
  * Two separate questions, never merged:
@@ -24,14 +25,17 @@ export function screeningState(s: PublicStatus): ScreeningState {
   switch (s.status) {
     case "verified":
       return "verified";
-    case "reverification_required":
+    case "renewal_due":
       return "expiring";
-    case "pending":
+    case "in_progress":
+    case "submitted":
+    case "under_review":
+    case "needs_more_info":
       return s.unavailable ? "unavailable" : "pending";
     case "expired":
       return "expired";
-    case "rejected":
-    case "needs_info":
+    case "failed":
+    case "revoked":
       return "rejected";
     default:
       return "missing";
@@ -62,6 +66,11 @@ export interface ScreeningItem {
   privateLabel: string;
   /** Expiry month, when known. */
   when?: string;
+  /** The plain public sentence: "Identity verified by Stripe Identity on Sep 26, 2026". */
+  statement: string;
+  /** Who checked it, when verified. */
+  by?: string;
+  verifiedAt?: string;
 }
 
 const NAME: Record<ScreeningKey, string> = {
@@ -83,7 +92,18 @@ export function screeningItems(p: Pick<PublicMechanicProfile, "safety">): Screen
     const label =
       state === "expiring" ? `${name}: Verified, renews ${exp}` : state === "expired" ? `${name}: Expired${exp ? ` ${exp}` : ""}` : `${name}: ${word}`;
     const privateLabel = state === "rejected" ? `${name}: not approved` : label;
-    return { key, name, state, verified: state === "verified" || state === "expiring", label, privateLabel, when: exp };
+    return {
+      key,
+      name,
+      state,
+      verified: state === "verified" || state === "expiring",
+      label,
+      privateLabel,
+      when: exp,
+      statement: statement(key, { state, by: st.by, verifiedAt: st.verifiedAt, expiresAt: st.expiresAt }),
+      by: st.by,
+      verifiedAt: st.verifiedAt,
+    };
   });
 }
 

@@ -10,6 +10,8 @@ export async function resolveSpec(choice?: VehicleChoice): Promise<VehicleSpec |
   const sel = choiceToSelection(choice);
   if (!sel.year || !sel.make || !sel.model) return undefined;
   const configs = await vehicleData.configurations(sel.year, sel.make, sel.model);
-  const decoded = choice.vinConfirmed && choice.vin.length === 17 ? await vehicleData.decodeVin(choice.vin) : undefined;
+  // Any VIN given is decoded: one that matches confirms the selections; one that disagrees is kept
+  // as a recorded conflict (buildSpec never upgrades or overwrites on a mismatch).
+  const decoded = /^[A-HJ-NPR-Z0-9]{17}$/.test(choice.vin.trim().toUpperCase()) ? await vehicleData.decodeVin(choice.vin) : undefined;
   return buildSpec(configs.length ? pruneSelection(configs, sel) : sel, configs, decoded?.ok ? decoded : undefined);
 }

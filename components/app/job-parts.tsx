@@ -139,7 +139,7 @@ export function EstimateVersions({ q, viewer }: { q: Quote; viewer: "customer" |
   const versions = q.revisions ?? [];
   return (
     <section aria-labelledby="versions-title" className="space-y-2">
-      <h2 id="versions-title" className="heading text-[1.125rem]">
+      <h2 id="versions-title" className="heading text-[1.0625rem]">
         Estimate
       </h2>
       <p className="text-[0.9375rem]">
@@ -180,7 +180,7 @@ export function ScopeHistory({ job }: { job: Job }) {
   if (!all.length) return null;
   return (
     <section aria-labelledby="extra-title" className="space-y-2">
-      <h2 id="extra-title" className="heading text-[1.125rem]">
+      <h2 id="extra-title" className="heading text-[1.0625rem]">
         Extra work requests
       </h2>
       <ul className="border-t border-rule text-[0.9375rem]">

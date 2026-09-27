@@ -40,6 +40,7 @@ function legacyTransmission(t?: TransmissionType): IntakeDraft["vehicle"]["trans
 }
 import { ReadinessBadge } from "./readiness";
 import { VehicleTile } from "@/components/visual/vehicle-glyph";
+import { Notice } from "@/components/workspace/ui";
 import { quoteReadiness } from "@/lib/domain/readiness";
 
 /** Four steps a customer recognises. The same detailed fields are stored underneath. */
@@ -429,7 +430,7 @@ export function RequestWizard({
           );
         })}
       </ol>
-      <h2 className="display mt-6 text-[1.875rem] sm:text-[2.25rem]">{STEPS[step]}</h2>
+      <h2 className="display mt-6 text-[2rem] sm:text-[2.25rem]">{STEPS[step]}</h2>
 
       {safetyRisk && step >= 1 && (
         <div role="alert" className="mt-4 flex gap-3 border-2 border-alert bg-alert-wash px-4 py-3 text-[0.9375rem]">
@@ -495,12 +496,10 @@ export function RequestWizard({
               <VehicleSelector value={d.vehicle.choice ?? { ...EMPTY_CHOICE, vin: d.vehicle.vin }} onChange={setChoice} beforeVin={mileage} />
             ) : current ? (
               <>
-                <p className="border-l-4 border-brand bg-sheet px-4 py-3 text-[1.0625rem] font-bold">
-                  {current.year} {current.make} {current.model}
+                <Notice tone="ok"><span className="text-[1.0625rem] font-bold">{current.year} {current.make} {current.model}
                   <span className="font-normal text-ink-2">
                     {[transmissionLabel(current.transmission) || null, d.vehicle.mileage ? `${d.vehicle.mileage} miles` : null].filter(Boolean).map((x) => ` · ${x}`)}
-                  </span>
-                </p>
+                  </span></span></Notice>
                 {current.spec ? (
                   <SpecPreview year={current.year} make={current.make} model={current.model} spec={current.spec} />
                 ) : (
@@ -548,7 +547,7 @@ export function RequestWizard({
         {/* ---------------------------------------------------- 2. THE PROBLEM */}
         {step === 1 && (
           <>
-            <Q req title="What is the car doing?">
+            <Q req title="What is the car doing?" hint="In your own words; you don't need to know the part. For example: “Grinding from the front when I brake, worse in the morning.”">
               <textarea
                 value={d.symptomDescription}
                 onChange={(e) => set("symptomDescription", e.target.value)}
@@ -559,7 +558,10 @@ export function RequestWizard({
               />
             </Q>
             <fieldset>
-              <legend className="text-[1.0625rem] font-bold">Does it start and drive?</legend>
+              <legend className="text-[1.0625rem] font-bold">
+                Does it start and drive?
+                <span className="ml-2 align-middle text-[0.6875rem] font-bold tracking-[0.06em] text-ink uppercase">Required</span>
+              </legend>
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5" role="radiogroup">
                 {CONDITIONS.map((c) => (
                   <label
@@ -714,14 +716,14 @@ export function RequestWizard({
               </details>
             </section>
             {saveOnly ? (
-              <div role="note" className="border-l-4 border-brass bg-sheet px-4 py-3 text-[0.9375rem]">
+              <Notice tone="info">
                 <p className="font-semibold">No mechanics are available on Clutch yet.</p>
                 <p className="mt-1 text-ink-2">
                   Saving keeps this request on your Requests page, where you can edit or cancel it. When a mechanic who fits your car, repair and area joins, Clutch
                   sends it to them and their reply shows on the request.{" "}
                   {alertsOn ? "You'll also get an email alert if alerts are on in your settings." : "Clutch doesn't send email or text alerts yet, so check back there."}
                 </p>
-              </div>
+              </Notice>
             ) : null}
             <p className="text-[0.8125rem] text-ink-3">Your address and access details stay private until you book.</p>
           </>

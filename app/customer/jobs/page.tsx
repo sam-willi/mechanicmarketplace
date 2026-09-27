@@ -5,7 +5,7 @@ import { getSession, needs } from "@/lib/session";
 import { paginate, parseCursor } from "@/lib/data/page";
 import { Pager } from "@/components/app/pager";
 import { primarySymptom, vehicleLine } from "@/lib/domain/intake";
-import { customerRepairStatus } from "@/lib/domain/status";
+import { repairChip } from "@/lib/domain/journey";
 import { dayMonth, monthYear, usd } from "@/lib/format";
 import { StatusChip } from "@/components/app/status-chip";
 import { PhotoPrint } from "@/components/profile/photo";
@@ -15,7 +15,6 @@ export const metadata: Metadata = { title: "My Repairs" };
 const DONE_PAGE = 20;
 const FINAL = ["completed", "cancelled"];
 
-const ORDER = ["Confirm Completion", "In Progress", "Scheduled", "Mechanic Selected", "Responses In", "Requested", "Completed", "Cancelled"];
 
 export default async function MyRepairs({ searchParams }: { searchParams: Promise<{ before?: string }> }) {
   const repo = await getRepo();
@@ -32,9 +31,10 @@ export default async function MyRepairs({ searchParams }: { searchParams: Promis
     .map((r) => {
       const job = jobs.find((j) => j.requestId === r.id);
       const quotes = repo.listQuotesForRequest(r.id).filter((q) => q.status !== "draft");
-      return { r, job, status: customerRepairStatus(r, quotes, job), v: repo.getVehicle(r.vehicleId)! };
+      return { r, job, status: repairChip(r, quotes, job), v: repo.getVehicle(r.vehicleId)! };
     })
-    .sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
+    // Your turn first, then the furthest along; finished and cancelled last.
+    .sort((a, b) => Number(b.status.action) - Number(a.status.action) || Number(a.status.ended || a.status.stage === 5) - Number(b.status.ended || b.status.stage === 5) || b.status.stage - a.status.stage);
   // Earlier Clutch repairs (before this demo's requests) from the verified record.
   const jobRepairIds = new Set(jobs.map((j) => j.id));
   const history = repo.listCustomerHistory(s.customerId).filter((h) => !h.jobId || !jobRepairIds.has(h.jobId));
@@ -56,7 +56,7 @@ export default async function MyRepairs({ searchParams }: { searchParams: Promis
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <p className="font-semibold">{job ? job.title : primarySymptom(r)}</p>
-                    <StatusChip label={status} />
+                    <StatusChip {...status} />
                   </div>
                   <p className="text-[0.875rem] text-ink-2">
                     {vehicleLine(v)}
@@ -66,7 +66,7 @@ export default async function MyRepairs({ searchParams }: { searchParams: Promis
                   {job?.status === "completed" && (job.finalAmountCents || q) ? (
                     <p className="tnum mt-1 text-[0.8125rem] text-ink-3">Final amount {usd(job.finalAmountCents ?? q!.laborCents + q!.diagnosticFeeCents + q!.travelFeeCents)}</p>
                   ) : null}
-                  {status === "Confirm Completion" ? <p className="mt-2 text-[0.875rem] font-bold">Please confirm the work is done</p> : null}
+                  {status.action && status.next ? <p className="mt-2 text-[0.875rem] font-bold">Next: {status.next}</p> : null}
                 </div>
               </Link>
             </li>

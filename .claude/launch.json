@@ -1,6 +1,48 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "clutch", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "--", "-p", "3100"], "port": 3100 }
+    {
+      "name": "clutch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "-p",
+        "3100"
+      ],
+      "port": 3100
+    },
+    {
+      "name": "clutch-memory",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "DATABASE_URL=",
+        "NEXT_PUBLIC_SUPABASE_URL=",
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY=",
+        "CLUTCH_LIVE_STORE=",
+        "CLUTCH_LIVE_READS=",
+        "CLUTCH_OUTBOUND_ALERTS=",
+        "CLUTCH_EMAIL_PROVIDER=",
+        "CLUTCH_TEST_LOGINS=",
+        "CLUTCH_CRON_SECRET=",
+        "SMTP_HOST=",
+        "SMTP_PORT=",
+        "SMTP_USER=",
+        "SMTP_PASSWORD=",
+        "EMAIL_FROM=",
+        "APP_URL=",
+        "AUTH_SECRET=",
+        "CLUTCH_DIST_DIR=.next-design",
+        "CLUTCH_DEMO_LOGINS=on",
+        "npx",
+        "next",
+        "dev",
+        "-p",
+        "3300"
+      ],
+      "port": 3300
+    }
   ]
 }

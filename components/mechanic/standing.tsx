@@ -18,7 +18,7 @@ export function Standing({ p, steps }: { p: PublicMechanicProfile; steps: Profil
   const nextBasic = basics.find((s) => !s.done);
   const e = eligibility(p);
   const items = screeningItems(p);
-  const verifiedCreds = p.credentials.filter((c) => c.provenance !== "self" && (c.status === "verified" || c.status === "reverification_required")).length;
+  const verifiedCreds = p.credentials.filter((c) => c.provenance !== "self" && (c.status === "verified" || c.status === "renewal_due")).length;
   const selfCount = p.selfReported.repairs.length + p.selfReported.claims.length;
   const box = "border border-rule bg-sheet p-4";
   return (

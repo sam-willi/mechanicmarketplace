@@ -11,8 +11,12 @@
     "test:db": "node scripts/run-db-tests.mjs",
     "db:local": "node scripts/local-db.mjs",
     "db:reset-demo": "node scripts/reset-demo.mjs",
+    "db:migrate-verifications": "tsx --env-file-if-exists=.env.local --conditions react-server scripts/migrate-verifications.ts",
+    "db:backfill-vehicle-specs": "tsx --env-file-if-exists=.env.local --conditions react-server scripts/backfill-vehicle-specs.ts",
+    "db:repair-demo-flags": "tsx --env-file-if-exists=.env.local --conditions react-server scripts/repair-demo-flags.ts",
     "test:browser": "node scripts/test-browser.mjs",
-    "verify": "node scripts/verify.mjs"
+    "verify": "node scripts/verify.mjs",
+    "preflight": "tsx --conditions react-server scripts/preflight.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

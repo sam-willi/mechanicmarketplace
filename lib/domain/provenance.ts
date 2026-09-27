@@ -1,10 +1,10 @@
+import type { EffectiveStatus } from "@/lib/verification/model";
 import type {
   PastRepairSource,
   ProvenanceSource,
   RepairCategory,
   VerificationCategory,
   VerificationMethod,
-  VerificationStatus,
 } from "./types";
 
 /**
@@ -98,6 +98,9 @@ export function methodToProvenance(method: VerificationMethod): ProvenanceSource
       return "customer";
     case "document_review":
     case "vendor_screening":
+    case "hosted_identity":
+    case "email_link":
+    case "sms_code":
       return "document";
   }
 }
@@ -148,17 +151,22 @@ export const SAFETY: Record<SafetyInfo["category"], SafetyInfo> = {
 // Status language
 // ---------------------------------------------------------------------------
 
-export const STATUS_LABEL: Record<VerificationStatus, string> = {
-  not_submitted: "Not started",
-  pending: "Pending",
+export const STATUS_LABEL: Record<EffectiveStatus, string> = {
+  not_started: "Not started",
+  in_progress: "In progress",
+  submitted: "Submitted",
+  needs_more_info: "Needs more information",
+  under_review: "Under review",
   verified: "Verified",
-  rejected: "Rejected",
-  needs_info: "Needs more information",
+  renewal_due: "Verified, renewal due",
+  failed: "Not verified",
   expired: "Expired",
-  reverification_required: "Needs reverification",
+  revoked: "Revoked",
 };
 
 export const CATEGORY_LABEL: Record<VerificationCategory, string> = {
+  email: "Email",
+  phone: "Phone",
   identity: "Identity",
   background: "Background check",
   driving_record: "Driving record",
@@ -169,6 +177,9 @@ export const CATEGORY_LABEL: Record<VerificationCategory, string> = {
 };
 
 export const METHOD_LABEL: Record<VerificationMethod, string> = {
+  hosted_identity: "ID and live selfie, checked by an identity provider",
+  email_link: "Email confirmed at sign-in",
+  sms_code: "Code sent by text",
   vendor_screening: "Screening provider",
   document_review: "Document review",
   institution_check: "Checked with issuer",

@@ -2,6 +2,8 @@
 // a throwaway Postgres cluster, the local auth fixture (scripts/local-auth.mjs, a stand-in for
 // Supabase Auth: nothing is emailed), and a production build of the app with demo logins off,
 // built into its own folder (.next-browser-test) so a running dev server is never touched.
+// Then tests-browser/uploads.mjs, and finally tests-browser/demo-ui.mjs on the same build restarted
+// with demo logins on (the demo marketplace lives in the throwaway database too).
 // Never uses DATABASE_URL, Supabase keys or anything else from your environment or .env.local.
 //
 // Needs: Postgres 16+ server binaries (as npm run test:db), Google Chrome or Chromium, and
@@ -61,11 +63,23 @@ const appEnv = {
   CLUTCH_DEMO_LOGINS: "off",
   CLUTCH_TEST_LOGINS: "",
   CLUTCH_LIVE_STORE: process.env.CLUTCH_BROWSER_STORE ?? "",
+  // "hosted" builds as Vercel would (4 MB uploads, no video/audio); default "full".
+  CLUTCH_UPLOAD_PROFILE: process.env.CLUTCH_UPLOAD_PROFILE ?? "full",
   CLUTCH_LIVE_READS: "",
   CLUTCH_OUTBOUND_ALERTS: "",
   CLUTCH_EMAIL_PROVIDER: "",
   CLUTCH_CRON_SECRET: "",
-  CLUTCH_ADMIN_EMAILS: "",
+  // One fixture reviewer; the hosted identity flow runs against the deterministic test provider.
+  CLUTCH_ADMIN_EMAILS: "reviewer@example.test",
+  CLUTCH_TEST_PROVIDERS: "on",
+  // Recorded vPIC responses (lib/vehicles/fixtures.ts): the run never depends on NHTSA being up.
+  CLUTCH_VEHICLE_DATA: "fixtures",
+  CLUTCH_IDENTITY_PROVIDER: "test",
+  CLUTCH_TEST_IDENTITY_SECRET: randomBytes(16).toString("hex"),
+  STRIPE_IDENTITY_SECRET_KEY: "",
+  STRIPE_IDENTITY_WEBHOOK_SECRET: "",
+  CLUTCH_BACKGROUND_PROVIDER: "",
+  CLUTCH_BACKGROUND_POLICY_APPROVED: "",
   SMTP_HOST: "", SMTP_PORT: "", SMTP_USER: "", SMTP_PASSWORD: "", EMAIL_FROM: "",
 };
 // Anything else in .env files (which Next would load) is blanked too: this run uses only the above.
@@ -79,7 +93,8 @@ for (const f of [".env", ".env.local", ".env.production", ".env.production.local
 for (const [k, v] of Object.entries({ DATABASE_URL: DB, NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${authPort}`, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "local-test-key", APP_URL: `http://localhost:${appPort}`, CLUTCH_DEMO_LOGINS: "off" })) appEnv[k] = v;
 const procs = [];
 const start = (cmd, args, env, label) => {
-  const p = spawn(cmd, args, { env, stdio: ["ignore", "pipe", "pipe"] });
+  // Its own process group, so stopping it stops the real server too (npx/npm wrappers don't forward signals).
+  const p = spawn(cmd, args, { env, stdio: ["ignore", "pipe", "pipe"], detached: true });
   let log = "";
   p.stdout.on("data", (d) => (log += d));
   p.stderr.on("data", (d) => (log += d));
@@ -98,15 +113,84 @@ const waitFor = async (url, what) => {
   throw new Error(`${what} didn't start (${url})`);
 };
 let app;
-const startApp = async () => {
-  app = start("npx", ["next", "start", "-p", appPort], appEnv, "app");
+const startApp = async (extra = {}) => {
+  app = start("npx", ["next", "start", "-p", appPort], { ...appEnv, ...extra }, "app");
   await waitFor(`http://localhost:${appPort}/login`, "the app");
+};
+/** Stop the whole group: SIGTERM, then SIGKILL after 5 s (Next waits for the browser's keep-alive
+ *  connections otherwise), then wait until the port is free. Bounded throughout. */
+const killGroup = (p, sig) => {
+  try {
+    process.kill(-p.pid, sig);
+  } catch {}
+};
+const portFree = async (port) => {
+  for (let i = 0; i < 40; i++) {
+    try {
+      await fetch(`http://localhost:${port}/login`, { signal: AbortSignal.timeout(500) });
+    } catch {
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  throw new Error(`port ${port} still in use after stopping the app`);
 };
 const stopApp = async () => {
   if (!app) return;
-  app.kill("SIGTERM");
-  await new Promise((r) => app.once("exit", r));
+  const exited = new Promise((r) => (app.exitCode !== null ? r() : app.once("exit", r)));
+  killGroup(app, "SIGTERM");
+  const forced = setTimeout(() => killGroup(app, "SIGKILL"), 5000);
+  await Promise.race([exited, new Promise((r) => setTimeout(r, 10000))]);
+  clearTimeout(forced);
+  killGroup(app, "SIGKILL");
+  await portFree(appPort);
 };
+
+/**
+ * Run a flow, failing it (instead of waiting forever) if it prints nothing for IDLE_MS: every
+ * check prints a line, so silence means a stuck step. On a stall, the last step, each open page's
+ * URL and a screenshot of it are reported.
+ */
+const IDLE_MS = Number(process.env.CLUTCH_BROWSER_IDLE_MS ?? 120000);
+async function watched(name, run, shots) {
+  let last = Date.now();
+  let lastLine = "(nothing yet)";
+  const log = console.log;
+  console.log = (...a) => {
+    last = Date.now();
+    const line = a.join(" ").trim();
+    if (line) lastLine = line.slice(0, 200);
+    log(...a);
+  };
+  let timer;
+  const stalled = new Promise((_, reject) => {
+    timer = setInterval(async () => {
+      if (Date.now() - last < IDLE_MS) return;
+      clearInterval(timer);
+      const pages = [];
+      for (const [i, { label, p }] of (globalThis.__clutchTestPages ?? []).entries()) {
+        try {
+          const file = path.join(shots, `stalled-${i}-${label}.png`);
+          await p.screenshot({ path: file }).catch(() => {});
+          pages.push(`${label}: ${p.url()} (${file})`);
+        } catch {}
+      }
+      reject(new Error(`${name} stalled: no progress for ${IDLE_MS / 1000}s after "${lastLine}".\nOpen pages:\n  ${pages.join("\n  ")}`));
+    }, 5000);
+  });
+  try {
+    return await Promise.race([run(), stalled]);
+  } finally {
+    clearInterval(timer);
+    console.log = log;
+  }
+}
+// And the whole run is bounded, whatever happens.
+const overall = setTimeout(() => {
+  console.error(`test:browser: gave up after ${process.env.CLUTCH_BROWSER_MAX_MIN ?? 30} minutes`);
+  process.exit(1);
+}, Number(process.env.CLUTCH_BROWSER_MAX_MIN ?? 30) * 60000);
+overall.unref();
 
 let code = 1;
 try {
@@ -121,24 +205,33 @@ try {
   if (build.status !== 0) throw new Error("build failed");
   await startApp();
   const { run: flow } = await import("../tests-browser/real-accounts.mjs");
-  const fails = await flow({
+  const shots = process.env.CLUTCH_BROWSER_SHOTS ?? path.join(dir, "shots");
+  const fails = await watched("real-accounts", () => flow({
     base: `http://localhost:${appPort}`,
     auth: `http://127.0.0.1:${authPort}`,
     db: DB,
     chrome,
     store: appEnv.CLUTCH_LIVE_STORE === "normalized" ? "normalized" : "snapshot",
-    out: path.join(dir, "shots"),
+    out: shots,
     restart: async () => {
       await stopApp();
       await startApp();
     },
-  });
-  code = fails ? 1 : 0;
+  }), shots);
+  const { run: uploads } = await import("../tests-browser/uploads.mjs");
+  const uploadFails = await watched("uploads", () => uploads({ base: `http://localhost:${appPort}`, auth: `http://127.0.0.1:${authPort}`, db: DB, chrome, out: shots, profile: appEnv.CLUTCH_UPLOAD_PROFILE === "hosted" ? "hosted" : "full" }), shots);
+  // The same build with the demo marketplace on: the demo picker, leaving the demo to sign up,
+  // and the demo accounts' screens at phone and desktop widths.
+  await stopApp();
+  await startApp({ CLUTCH_DEMO_LOGINS: "on" });
+  const { run: demoUi } = await import("../tests-browser/demo-ui.mjs");
+  const demoFails = await watched("demo-ui", () => demoUi({ base: `http://localhost:${appPort}`, db: DB, chrome, out: shots }), shots);
+  code = fails || uploadFails || demoFails ? 1 : 0;
 } catch (e) {
   console.error(e);
   for (const p of procs) console.error(`--- ${p.label} log (tail) ---\n${p.log().slice(-3000)}`);
 } finally {
-  for (const p of procs) p.kill("SIGTERM");
+  for (const p of procs) killGroup(p, "SIGKILL");
   spawnSync(path.join(bin, "pg_ctl"), ["-D", path.join(dir, "data"), "-m", "immediate", "stop"], { env: baseEnv });
   rmSync(dir, { recursive: true, force: true });
 }

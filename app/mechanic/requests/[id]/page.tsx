@@ -1,3 +1,5 @@
+import { vehicleSpecOf } from "@/lib/vehicles/effective";
+import { VehicleBrief } from "@/components/vehicle/vehicle-brief";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, Check } from "lucide-react";
@@ -5,7 +7,10 @@ import { notFound } from "next/navigation";
 import { getRepo } from "@/lib/data";
 import { getSession, needs } from "@/lib/session";
 import { REPAIR_LABEL, repairNoun } from "@/lib/domain/provenance";
-import { jobStatus, vehicleLine } from "@/lib/domain/intake";
+import { vehicleLine } from "@/lib/domain/intake";
+import { journey } from "@/lib/domain/journey";
+import { JourneyStatus } from "@/components/app/journey-status";
+import { JobBrief, type MatchEvidence } from "@/components/request/job-brief";
 import { findArea, milesBetween } from "@/lib/domain/areas";
 import { toPublicProfile } from "@/lib/domain/public-profile";
 import { dayMonth, usd } from "@/lib/format";
@@ -20,7 +25,7 @@ import { EstimateBuilder } from "@/components/mechanic/estimate-builder";
 import { EligibilityNotice } from "@/components/trust/eligibility-notice";
 import { DeclineForm } from "@/components/mechanic/decline-form";
 import { NeedsPersona, Notice } from "@/components/workspace/ui";
-import { RequestSummary, StatusBadge } from "@/components/request/request-summary";
+import { RequestSummary } from "@/components/request/request-summary";
 import { MediaThumb } from "@/components/request/media-capture";
 
 export const metadata: Metadata = { title: "Repair request" };
@@ -53,7 +58,17 @@ export default async function RequestDetail({ params, searchParams }: { params: 
   const myInterest = r.interested.find((i) => i.mechanicId === s.mechanicId);
   const myQuestions = r.questions.filter((q) => q.mechanicId === s.mechanicId);
   const area = findArea(r.location.area);
-  const status = jobStatus(r);
+  const job = repo.listJobsForMechanic(s.mechanicId).find((x) => x.requestId === r.id);
+  const j = journey({ request: r, quotes: repo.listQuotesForRequest(r.id), job, audience: "mechanic", mechanicId: s.mechanicId, names: { customer: first, mechanic: m.firstName } });
+  // Why it came to them, on the shared five-level scale: verified work first, then what they list.
+  const make = v.make;
+  const match: MatchEvidence = cross
+    ? { level: "verified", text: `${cross} verified ${make} ${repairNoun(r.repairCategory, cross)}` }
+    : cat
+      ? { level: "verified", text: `${cat} verified ${repairNoun(r.repairCategory, cat)}` }
+      : m.declaredRepairCategories.includes(r.repairCategory)
+        ? { level: "self_reported", text: `You list ${REPAIR_LABEL[r.repairCategory].toLowerCase()} on your profile` }
+        : { level: "inferred", text: `Your verified ${make} work and your area` };
   const canRespond = !mine && !declined;
   // "Interested" and the estimate are one step: interest (or a saved draft) opens the estimate box.
   const interested = canRespond && Boolean(myInterest || draft);
@@ -111,22 +126,26 @@ export default async function RequestDetail({ params, searchParams }: { params: 
       </Link>
       <div className="flex flex-wrap items-end justify-between gap-3 border-b-2 border-ink pb-4">
         <div>
-          <h1 className="display text-[1.875rem] sm:text-[2.25rem]">{vehicleLine(v)}</h1>
+          <h1 className="display text-[2rem] sm:text-[2.25rem]">{vehicleLine(v)}</h1>
           <p className="mt-1 text-ink-2">
-            {c?.displayName} · posted {dayMonth(r.createdAt)}
+            {first} · posted {dayMonth(r.createdAt)}
+            {v.mileage ? ` · ${Math.round(v.mileage / 1000)}k mi` : ""}
           </p>
         </div>
-        <StatusBadge tone={status.tone}>{status.headline}</StatusBadge>
       </div>
 
       {sp.error ? (
-        <p role="alert" className="border-l-4 border-alert bg-sheet px-4 py-3 text-[0.9375rem]">
+        <Notice tone="error">
           {sp.error}
-        </p>
+        </Notice>
       ) : null}
       {sp.sent ? <Notice tone="ok">Estimate sent. {first} gets a notification and sees it next to your verified record.</Notice> : null}
 
-      {/* Your response: decide first, then the estimate, as one connected step. */}
+      <JourneyStatus j={j} audience="mechanic" names={{ customer: first, mechanic: m.firstName }} />
+      <VehicleBrief v={v} spec={vehicleSpecOf(v, r.vehicleSpec)} audience="mechanic" warn={canRespond ? "quote" : undefined} showVinTail={booked} />
+      <JobBrief r={r} distanceMi={area ? milesBetween(m, area) : undefined} match={match} />
+
+      {/* Your response: decide, then the estimate, as one connected step. */}
       <section id="estimate" aria-labelledby="respond-title" className="scroll-mt-20">
         {declined ? (
           <Notice>You declined this request.</Notice>
@@ -208,19 +227,15 @@ export default async function RequestDetail({ params, searchParams }: { params: 
             <h2 id="respond-title" className="heading text-[1.5rem] sm:text-[1.75rem]">
               Can you take this job?
             </h2>
-            <p className="mt-1 text-ink-2">
-              Matched on your {cross ? `${cross} verified ${v.make} ${repairNoun(r.repairCategory, cross)}` : `${cat} verified ${repairNoun(r.repairCategory, cat)}`}.
-              {readiness.level === "ask" ? (
-                <>
-                  {" "}
-                  Some details are missing:{" "}
-                  <a href="#ask" className="font-semibold text-ink underline decoration-rule underline-offset-2">
-                    ask {first} first
-                  </a>
-                  .
-                </>
-              ) : null}
-            </p>
+            {readiness.level === "ask" ? (
+              <p className="mt-1 text-ink-2">
+                Some details are missing:{" "}
+                <a href="#ask" className="font-semibold text-ink underline decoration-rule underline-offset-2">
+                  ask {first} first
+                </a>
+                .
+              </p>
+            ) : null}
             <div className="mt-5 grid gap-3 sm:grid-cols-2 sm:items-start">
               <form action={markInterested.bind(null, r.id)}>
                 <button className="btn btn-ink min-h-16 w-full text-[1.0625rem]">
@@ -253,8 +268,8 @@ export default async function RequestDetail({ params, searchParams }: { params: 
 
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <div className="min-w-0">
-          <h2 className="heading mb-3 text-[1.25rem]">The request</h2>
-          <RequestSummary r={r} v={v} distanceMi={area ? milesBetween(m, area) : undefined} revealPrivate={booked} audience="mechanic" showTitle={false} />
+          <h2 className="heading mb-3 text-[1.25rem]">Full request</h2>
+          <RequestSummary r={r} v={v} distanceMi={area ? milesBetween(m, area) : undefined} revealPrivate={booked} audience="mechanic" showTitle={false} briefShown />
         </div>
 
         <aside className="space-y-6">
@@ -288,7 +303,7 @@ export default async function RequestDetail({ params, searchParams }: { params: 
             ))}
             {canRespond ? (
               <form action={askQuestion.bind(null, r.id)} className="space-y-2">
-                <textarea name="question" required rows={2} className="input" placeholder="e.g. Can you send a video of what happens when you press Start?" aria-label={`Ask ${first} a question`} />
+                <textarea name="question" required rows={2} className="input" placeholder="e.g. When you press Start, is there a click, a whir, or nothing at all?" aria-label={`Ask ${first} a question`} />
                 <button className="btn btn-line min-h-11 text-sm">Ask {first}</button>
               </form>
             ) : null}

@@ -67,7 +67,7 @@ test("with the acknowledgement: one job, the record in the job and the history, 
   assert.equal(row.v.fullyVerified, false);
   assert.equal(row.v.acknowledgement.version, DISCLOSURE_VERSION);
   assert.equal(row.v.acknowledgement.customerId, c.id);
-  assert.ok(row.v.acknowledgement.disclosure.includes("Insurance: Not completed"));
+  assert.ok(row.v.acknowledgement.disclosure.includes("- Insurance not verified by Clutch"), row.v.acknowledgement.disclosure);
   const hist = await db<{ detail: string }[]>`select detail from lv_history where entity_type = 'job' and entity_id = ${j1.id} and action = 'acknowledged unverified checks'`;
   assert.equal(hist.length, 1);
   assert.ok(hist[0].detail.startsWith(DISCLOSURE_VERSION));
@@ -97,9 +97,9 @@ test("the checks change on one instance between reading and booking on the other
   const b = liveSlice(B).repo;
   const su = await b.createUser({ id: uid("staff"), name: "Sky Staff", email: `${uid("s")}@example.test`, role: "customer" });
   await b.grantAdmin(su.id);
-  await b.submitInsurance(m.id, { carrier: "Test Mutual", expiresOn: "2027-12-31", documentName: "coi.pdf" });
-  const [ver] = await db<{ id: string }[]>`select id from lv_verifications where mechanic_id = ${m.id} and category = 'insurance' and status = 'pending'`;
-  await b.decideVerification(ver.id, "verified", su.id, "Checked", "2027-12-31");
+  await b.submitInsurance(m.id, { carrier: "Test Mutual", expiresOn: "2027-12-31", documentIds: ["doc-test"] });
+  const [ver] = await db<{ id: string }[]>`select id from lv_verifications where mechanic_id = ${m.id} and category = 'insurance' and status = 'submitted'`;
+  await b.decideVerification(ver.id, "approve", su.id, { reasonCode: "evidence_matches", expiresAt: "2027-12-31" });
   await assert.rejects(liveSlice(A).repo.acceptQuote(q.id, c.id, undefined, read), /changed since you reviewed it/);
   const fresh = await ackOn(A, m.slug);
   assert.notEqual(fresh.snapshot, read.snapshot);

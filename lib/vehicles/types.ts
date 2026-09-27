@@ -66,6 +66,18 @@ export interface VehicleSpec {
   vin: VinInfo;
   /** Plain-language open questions a mechanic may want to confirm. */
   open: string[];
+  /** Inferred for a car saved before structured details existed (lib/vehicles/effective.ts). */
+  legacy?: boolean;
+  /** Changes made after the fact (a customer edit, a mechanic confirming): what it was, what it became, who. Never rewritten. */
+  corrections?: SpecCorrection[];
+}
+
+export interface SpecCorrection {
+  at: string;
+  by: "customer" | "mechanic";
+  field: "engine" | "transmission" | "drivetrain" | "trim" | "body" | "platform" | "fuel" | "vin" | "model" | "year";
+  from: { label: string; status: SpecStatus };
+  to: { label: string; status: SpecStatus };
 }
 
 /** What a completed repair recorded about the car. Older records simply don't have these. */

@@ -67,3 +67,12 @@ test("a request saved as a shop visit before the change is matched and assessed 
   assert.notEqual(siteAssessment(got).headline, "", "the site is assessed as a mobile job");
   assert.doesNotMatch(siteAssessment(got).headline, /shop/i);
 });
+
+test("a place is named once: never 'Inglewood, Inglewood'", async () => {
+  const { placeLabel } = await import("@/lib/domain/areas");
+  assert.equal(placeLabel("Inglewood", "Inglewood"), "Inglewood");
+  assert.equal(placeLabel("Mid-City", "Los Angeles"), "Mid-City, Los Angeles");
+  assert.equal(placeLabel(undefined, "Los Angeles"), "Los Angeles");
+  assert.equal(placeLabel("long beach", "Long Beach"), "long beach");
+  assert.equal(placeLabel("", ""), "");
+});

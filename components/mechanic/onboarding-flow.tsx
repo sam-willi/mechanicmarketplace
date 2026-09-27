@@ -4,9 +4,11 @@ import { Children, useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
 import { findArea } from "@/lib/domain/areas";
 
-type StepMeta = { title: string; why: string; minutes: number; required?: string[] };
+type StepMeta = { title: string; why: string; minutes: number; required?: string[]; optional?: boolean };
 
 const KEY = "clutch-onboarding-draft";
+/** The step you were on, for this browser tab: leaving (say, to Verification) and coming back resumes it. */
+const STEP_KEY = "clutch-onboarding-step";
 
 /**
  * A real stepped flow around one form: every step's fields stay in the form
@@ -33,6 +35,27 @@ export function OnboardingFlow({
   const formRef = useRef<HTMLDivElement>(null);
 
   const form = () => formRef.current?.closest("form") ?? null;
+
+  useEffect(() => {
+    try {
+      const saved = Number(sessionStorage.getItem(`${STEP_KEY}:${persist ? "new" : "edit"}`));
+      if (saved > 0 && saved < steps.length) {
+        setTimeout(() => {
+          setStep(saved);
+          setReached(saved);
+        }, 0);
+      }
+    } catch {
+      /* storage unavailable: start at the beginning */
+    }
+  }, [persist, steps.length]);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(`${STEP_KEY}:${persist ? "new" : "edit"}`, String(step));
+    } catch {
+      /* not remembered */
+    }
+  }, [step, persist]);
 
   // Restore, then keep saving on this device.
   useEffect(() => {
@@ -156,6 +179,11 @@ export function OnboardingFlow({
           </button>
         ) : null}
         <div className="flex-1" />
+        {step < steps.length - 1 && steps[step].optional ? (
+          <button type="button" onClick={() => go(step + 1)} className="btn btn-quiet min-h-12">
+            Do this later
+          </button>
+        ) : null}
         {step < steps.length - 1 ? (
           <button type="button" onClick={() => go(step + 1)} className="btn btn-ink min-h-12 px-6">
             Continue <ArrowRight size={17} aria-hidden />
@@ -167,6 +195,7 @@ export function OnboardingFlow({
               setSubmitting(true);
               try {
                 localStorage.removeItem(KEY);
+                sessionStorage.removeItem(`${STEP_KEY}:${persist ? "new" : "edit"}`);
               } catch {
                 /* nothing to clear */
               }
@@ -211,7 +240,7 @@ export function ProfilePreview() {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={v.photoUrl} alt="" className="size-20 border border-rule object-cover" />
         ) : (
-          <span className="grid size-20 place-items-center bg-[#dfe2dc] text-[1.5rem] font-extrabold text-ink-2" aria-hidden>
+          <span className="grid size-20 place-items-center bg-brand-tint text-[1.5rem] font-extrabold text-ink-2" aria-hidden>
             {(v.displayName || "?")
               .split(" ")
               .map((x) => x[0])
@@ -222,8 +251,7 @@ export function ProfilePreview() {
         <div className="min-w-0">
           <p className="heading text-[1.25rem]">{v.displayName || "Your name"}</p>
           <p className="text-[0.875rem] text-ink-2">
-            {model} · {v.neighborhood ? `${findArea(v.neighborhood)?.label ?? v.neighborhood}, ` : ""}
-            {v.city || "Los Angeles"} · within {v.serviceRadiusMi || 15} mi
+            {model} · {v.neighborhood ? (findArea(v.neighborhood)?.label ?? v.neighborhood) : "Where you start from"} · within {v.serviceRadiusMi || 15} mi
           </p>
           <p className="mt-1 text-[0.875rem]">
             <span className="font-semibold">${v.hourlyRate || "?"}</span>/hr · ${v.diagnosticFee || "?"} diagnostic
