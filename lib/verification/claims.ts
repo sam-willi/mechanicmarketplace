@@ -72,11 +72,28 @@ export const CHECK_INFO: Record<CheckKey, CheckInfo> = {
   },
 };
 
-const fmt = (d?: string) => (d ? new Date(`${d.slice(0, 10)}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : "");
-const month = (d?: string) => (d ? new Date(`${d.slice(0, 10)}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" }) : "");
+// Formatters built once: search builds a statement for every check of every bookable mechanic.
+const DAY = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+const MONTH = new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+const fmt = (d?: string) => (d ? DAY.format(new Date(`${d.slice(0, 10)}T12:00:00Z`)) : "");
+const month = (d?: string) => (d ? MONTH.format(new Date(`${d.slice(0, 10)}T12:00:00Z`)) : "");
+
+type StatementInput = { state: "verified" | "expiring" | "pending" | "unavailable" | "missing" | "expired" | "rejected"; by?: string; verifiedAt?: string; expiresAt?: string };
+// The same few statements repeat across a search's many profiles: remember them (bounded).
+const memo = new Map<string, string>();
 
 /** The plain public statement for one check. */
-export function statement(key: CheckKey, s: { state: "verified" | "expiring" | "pending" | "unavailable" | "missing" | "expired" | "rejected"; by?: string; verifiedAt?: string; expiresAt?: string }) {
+export function statement(key: CheckKey, s: StatementInput) {
+  const k = `${key}|${s.state}|${s.by ?? ""}|${s.verifiedAt ?? ""}|${s.expiresAt ?? ""}`;
+  const hit = memo.get(k);
+  if (hit !== undefined) return hit;
+  if (memo.size > 5000) memo.clear();
+  const out = build(key, s);
+  memo.set(k, out);
+  return out;
+}
+
+function build(key: CheckKey, s: StatementInput) {
   const name = CHECK_INFO[key].name;
   switch (s.state) {
     case "verified":

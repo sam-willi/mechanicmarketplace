@@ -46,14 +46,31 @@ export class LiveQueries {
    * checks, with reputation totals from the database's counts. Enough to rank, filter and show a
    * result card; the repair list itself isn't read (`verifiedWork` is empty).
    */
-  private liteProfile(id: string, f: EvidenceFacts | undefined, now: Date): PublicMechanicProfile {
+  /**
+   * The check records of the loaded mechanics, grouped by mechanic once per slice state (not
+   * filtered per profile: search builds a profile for every bookable mechanic).
+   */
+  private groups?: { key: string; mechanics: Map<string, DB["mechanics"][number]>; screenings: Map<string, DB["screenings"]>; insurance: Map<string, DB["insurance"]>; verifications: Map<string, DB["verifications"]> };
+  private grouped() {
     const d = this.db;
+    const key = `${d.screenings.length}:${d.insurance.length}:${d.verifications.length}:${d.mechanics.length}`;
+    if (this.groups?.key === key) return this.groups;
+    const by = <T extends { mechanicId: string }>(rows: T[], keep: (x: T) => boolean = () => true) => {
+      const m = new Map<string, T[]>();
+      for (const x of rows) if (keep(x)) (m.get(x.mechanicId) ?? m.set(x.mechanicId, []).get(x.mechanicId)!).push(x);
+      return m;
+    };
+    return (this.groups = { key, mechanics: new Map(d.mechanics.map((m) => [m.id, m])), screenings: by(d.screenings), insurance: by(d.insurance), verifications: by(d.verifications, (x) => CHECK_CATEGORIES.includes(x.category)) });
+  }
+
+  private liteProfile(id: string, f: EvidenceFacts | undefined, now: Date): PublicMechanicProfile {
+    const g = this.grouped();
     const p = toPublicProfile(
       {
-        mechanic: d.mechanics.find((m) => m.id === id)!,
-        screenings: d.screenings.filter((x) => x.mechanicId === id),
-        insurance: d.insurance.filter((x) => x.mechanicId === id),
-        verifications: d.verifications.filter((x) => x.mechanicId === id && CHECK_CATEGORIES.includes(x.category)),
+        mechanic: g.mechanics.get(id)!,
+        screenings: g.screenings.get(id) ?? [],
+        insurance: g.insurance.get(id) ?? [],
+        verifications: g.verifications.get(id) ?? [],
         credentials: [],
         employment: [],
         pastRepairs: [],
@@ -76,6 +93,7 @@ export class LiveQueries {
     const now = new Date();
     const ids = await this.r.bookableCandidateIds();
     await Promise.all([this.r.byIds("mechanics", ids, "public"), this.r.checkRecords(ids, "public")]);
+    this.groups = undefined; // rows may have been replaced in place: regroup
     const facts = await this.r.evidenceFacts(ids, { repair: opts.repair, make: opts.make, model: opts.model });
     const bookable = ids.map((id) => this.liteProfile(id, facts.get(id), now)).filter((p) => eligibility(p).eligible);
     const out = [...bookable];
